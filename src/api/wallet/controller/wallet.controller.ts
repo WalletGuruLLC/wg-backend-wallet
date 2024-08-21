@@ -6,6 +6,7 @@ import {
 	Post,
 	Patch,
 	Param,
+	Get,
 } from '@nestjs/common';
 
 import {
@@ -17,13 +18,18 @@ import {
 
 import { WalletService } from '../service/wallet.service';
 import { errorCodes, successCodes } from 'src/utils/constants';
-import { CreateWalletDto, UpdateWalletDto } from '../dto/wallet.dto';
+import {
+	CreateWalletDto,
+	GetWalletDto,
+	UpdateWalletDto,
+} from '../dto/wallet.dto';
 
 @ApiTags('wallet')
 @Controller('api/v1/wallet')
 export class WalletController {
 	constructor(private readonly walletService: WalletService) {}
 
+	//CONTROLLER TO ADD A WALLET
 	@Post('/')
 	@ApiCreatedResponse({
 		description: 'The Add Wallet',
@@ -37,11 +43,11 @@ export class WalletController {
 				customCode: 'WGE0072',
 				customMessage: successCodes.WGE0072?.description.replace(
 					'$variable',
-					result.Name
+					result.name
 				),
 				customMessageEs: successCodes.WGE0072?.descriptionEs.replace(
 					'$variable',
-					result.Name
+					result.name
 				),
 				data: result,
 			};
@@ -58,6 +64,7 @@ export class WalletController {
 		}
 	}
 
+	// CONTROLLER TO UPDATE THE SELECTED WALLET
 	@Patch('/:id')
 	@ApiOkResponse({
 		description: 'The record has been successfully updated.',
@@ -81,16 +88,17 @@ export class WalletController {
 				id,
 				updateWalletDto
 			);
+
 			return {
 				statusCode: HttpStatus.OK,
 				customCode: 'WGE0076',
 				customMessage: successCodes.WGE0076?.description.replace(
 					'$variable',
-					walletUpdated.Name
+					walletUpdated.name
 				),
 				customMessageEs: successCodes.WGE0076?.descriptionEs.replace(
 					'$variable',
-					walletUpdated.Name
+					walletUpdated.name
 				),
 				data: walletUpdated,
 			};
@@ -105,5 +113,19 @@ export class WalletController {
 				HttpStatus.INTERNAL_SERVER_ERROR
 			);
 		}
+	}
+
+	// CONTROLLER TO GET ALL ROUTES
+	@Get()
+	@ApiOkResponse({
+		description: 'Successfully returned modules',
+	})
+	async findAll() {
+		const modules = await this.walletService.findAll();
+		return {
+			statusCode: HttpStatus.OK,
+			message: 'Successfully returned modules',
+			data: modules,
+		};
 	}
 }

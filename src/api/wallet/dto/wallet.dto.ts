@@ -1,14 +1,22 @@
 export class CreateWalletDto {
-	Name: string;
-	WalletType: string;
-	WalletAddress: string;
-	Active: boolean;
+	name: string;
+	walletType: string;
+	walletAddress: string;
+	active: boolean;
 }
 
 export class UpdateWalletDto {
-	Id?: string;
-	Name?: string;
-	WalletType?: string;
-	WalletAddress?: string;
-	Active?: boolean;
+	id?: string;
+	name?: string;
+	walletType?: string;
+	walletAddress?: string;
+	active?: boolean;
+}
+
+export class GetWalletDto {
+	id?: string;
+	name?: string;
+	walletType?: string;
+	walletAddress?: string;
+	active?: boolean;
 }
