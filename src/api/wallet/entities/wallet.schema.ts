@@ -3,13 +3,13 @@ import { v4 as uuidv4 } from 'uuid';
 
 export const WalletSchema = new dynamoose.Schema(
 	{
-		id: {
+		Id: {
 			type: String,
 			hashKey: true,
 			default: () => uuidv4(),
 			required: true,
 		},
-		name: {
+		Name: {
 			type: String,
 			required: true,
 			validate: (value: string) => {
@@ -19,11 +19,11 @@ export const WalletSchema = new dynamoose.Schema(
 				return true;
 			},
 		},
-		walletType: {
+		WalletType: {
 			type: String,
 			required: true,
 		},
-		walletAddress: {
+		WalletAddress: {
 			type: String,
 			required: true,
 			validate: (value: string) => {
@@ -34,7 +34,7 @@ export const WalletSchema = new dynamoose.Schema(
 				return true;
 			},
 		},
-		active: {
+		Active: {
 			type: Boolean,
 			required: true,
 			default: true,

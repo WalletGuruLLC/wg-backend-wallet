@@ -16,8 +16,12 @@ export class WalletService {
 	//SERVICE TO CREATE A WALLET
 	async create(createWalletDto: CreateWalletDto) {
 		try {
-			const result = await this.dbInstance.create(createWalletDto);
-			return result;
+			const createWalletDtoConverted = {
+				Name: createWalletDto.name,
+				WalletType: createWalletDto.walletType,
+				WalletAddress: createWalletDto.walletAddress,
+			};
+			return await this.dbInstance.create(createWalletDtoConverted);
 		} catch (error) {
 			console.error('Error creating Wallet:', error.message);
 			throw new Error('Failed to create user. Please try again later.');
@@ -27,7 +31,7 @@ export class WalletService {
 	// SERVICE TO FIND THE SELECTED WALLET
 	async findOne(id: string): Promise<Wallet | null> {
 		try {
-			return await this.dbInstance.get({ id: id });
+			return await this.dbInstance.get({ Id: id });
 		} catch (error) {
 			throw new Error(`Error retrieving user: ${error.message}`);
 		}
@@ -39,13 +43,14 @@ export class WalletService {
 		updateWalletDto: UpdateWalletDto
 	): Promise<Wallet | null> {
 		try {
-			return await this.dbInstance.update({
-				id: id,
-				name: updateWalletDto.name,
-				walletAddress: updateWalletDto.walletAddress,
-				walletType: updateWalletDto.walletType,
-				active: updateWalletDto.active,
-			});
+			const createWalletDtoConverted = {
+				Id: id,
+				Name: updateWalletDto.name,
+				WalletType: updateWalletDto.walletType,
+				WalletAddress: updateWalletDto.walletAddress,
+				Active: updateWalletDto.active,
+			};
+			return await this.dbInstance.update(createWalletDtoConverted);
 		} catch (error) {
 			throw new Error(`Error updating user: ${error.message}`);
 		}

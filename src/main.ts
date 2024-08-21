@@ -13,6 +13,7 @@ async function bootstrap() {
 			'Comprehensive documentation for the Wallet Guru API, detailing the wallet service and its endpoints'
 		)
 		.addServer('http://localhost:3000/', 'Local environment')
+		.addServer('https://dev.wallet.walletguru.co/', 'Local environment')
 		.setVersion('1.0')
 		.build();
 

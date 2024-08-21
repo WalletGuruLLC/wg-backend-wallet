@@ -43,11 +43,11 @@ export class WalletController {
 				customCode: 'WGE0072',
 				customMessage: successCodes.WGE0072?.description.replace(
 					'$variable',
-					result.name
+					result.Name
 				),
 				customMessageEs: successCodes.WGE0072?.descriptionEs.replace(
 					'$variable',
-					result.name
+					result.Name
 				),
 				data: result,
 			};
@@ -88,17 +88,16 @@ export class WalletController {
 				id,
 				updateWalletDto
 			);
-
 			return {
 				statusCode: HttpStatus.OK,
 				customCode: 'WGE0076',
 				customMessage: successCodes.WGE0076?.description.replace(
 					'$variable',
-					walletUpdated.name
+					walletUpdated.Name
 				),
 				customMessageEs: successCodes.WGE0076?.descriptionEs.replace(
 					'$variable',
-					walletUpdated.name
+					walletUpdated.Name
 				),
 				data: walletUpdated,
 			};
