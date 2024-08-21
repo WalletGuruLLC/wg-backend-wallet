@@ -1,0 +1,42 @@
+image: python:3.7.4-alpine3.10
+
+pipelines:
+  branches:
+    "development":
+      - stage:
+          name: Build with Docker
+          deployment: Dev
+          steps:
+            - step:
+                name: Build with Docker
+                script:
+                  - pip3 install awscli
+                  - TAG=${BITBUCKET_BRANCH}-${BITBUCKET_BUILD_NUMBER}
+                  - TAG_LATEST=${BITBUCKET_BRANCH}-latest
+                  - aws configure set aws_access_key_id "${AWS_KEY}"
+                  - aws configure set aws_secret_access_key "${AWS_SECRET}"
+                  - eval $(aws ecr get-login --no-include-email --region us-east-2 | sed 's;https://;;g')
+                  - docker build --build-arg NODE_ENV=$NODE_ENV --build-arg AWS_REGION=$AWS_REGION_P --build-arg AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID_P --build-arg AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY_P -t ${IMAGE}:$TAG .
+                  - docker build --build-arg NODE_ENV=$NODE_ENV --build-arg AWS_REGION=$AWS_REGION_P --build-arg AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID_P --build-arg AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY_P -t ${IMAGE}:$TAG_LATEST .
+                  - docker push ${IMAGE}:$TAG
+                  - docker push ${IMAGE}:$TAG_LATEST
+                caches:
+                  - pip
+                services:
+                  - docker
+            - step:
+                name: Deploy to DEV
+                script:
+                  - pipe: atlassian/aws-eks-kubectl-run:1.2.0
+                    variables:
+                      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID_TERRAFORM}
+                      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY_TERRAFORM}
+                      AWS_DEFAULT_REGION: "us-east-2"
+                      CLUSTER_NAME: ${CLUSTER_NAME}
+                      KUBECTL_COMMAND: "set"
+                      KUBECTL_ARGS:
+                      - "image"
+                      - "--namespace=dev"
+                      - "deployment/backend-wallet"
+                      - "backend-wallet=${IMAGE}:${BITBUCKET_BRANCH}-${BITBUCKET_BUILD_NUMBER}"
+                      DEBUG: "true"
