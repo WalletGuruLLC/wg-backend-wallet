@@ -144,17 +144,21 @@ export const errorCodes = {
 			'Hubo un error al enviar el correo electrónico con el OTP. Por favor, inténtelo de nuevo.',
 	},
 	WGE0073: {
-		message: 'ERROR',
+		message: 'Wallet creation failed',
 		description: 'An error has occurred. Please try again later.',
 		descriptionEs: 'Ocurrió un error. Por favor, intente nuevamente más tarde.',
 	},
 	WGE0074: {
 		message: 'Wallet not found',
-		description:
-			'There is no wallet associated with the entered info.',
+		description: 'There is no wallet associated with the entered info.',
 		descriptionEs:
-			'No existe una cuenta asociada con el correo electrónico o nombre de usuario ingresado.',
+			'No hay ninguna billetera asociada con la información ingresada.',
 	},
+	WGE0075: {
+		message: 'Wallet update failed',
+		description: 'An error has occurred. Please try again later.',
+		descriptionEs: 'Ocurrió un error. Por favor, intente nuevamente más tarde.',
+	}
 };
 
 export const successCodes = {
@@ -216,4 +220,9 @@ export const successCodes = {
 		description: 'The wallet $variable was Sucessfully created.',
 		descriptionEs: 'La billetera $variable se creó correctamente.',
 	},
+	WGE0076: {
+		message: 'Sucessful Wallet Update',
+		description: 'The wallet $variable was Sucessfully created.',
+		descriptionEs: 'La billetera $variable se creó correctamente.',
+	}
 };

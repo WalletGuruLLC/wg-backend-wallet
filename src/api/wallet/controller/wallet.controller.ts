@@ -21,12 +21,12 @@ import { CreateWalletDto, UpdateWalletDto } from '../dto/wallet.dto';
 
 @ApiTags('wallet')
 @Controller('api/v1/wallet')
-export class UserController {
+export class WalletController {
 	constructor(private readonly walletService: WalletService) {}
 
-	@Post('/add')
+	@Post('/')
 	@ApiCreatedResponse({
-		description: 'Add Wallet',
+		description: 'The Add Wallet',
 	})
 	@ApiForbiddenResponse({ description: 'Forbidden.' })
 	async create(@Body() createWalletDto: CreateWalletDto) {
@@ -69,30 +69,38 @@ export class UserController {
 	) {
 		try {
 			const walletFind = await this.walletService.findOne(id);
-			console.log('result', walletFind);
 			if (!walletFind) {
 				return {
 					statusCode: HttpStatus.NOT_FOUND,
-					customCode: 'WGE0002',
-					customMessage: errorCodes.WGE0002?.description,
-					customMessageEs: errorCodes.WGE0002?.descriptionEs,
+					customCode: 'WGE0074',
+					customMessage: errorCodes.WGE0074?.description,
+					customMessageEs: errorCodes.WGE0074?.descriptionEs,
 				};
 			}
-			const walletUpdated = await this.walletService.findOne(id);
+			const walletUpdated = await this.walletService.update(
+				id,
+				updateWalletDto
+			);
 			return {
 				statusCode: HttpStatus.OK,
-				customCode: 'WGE0020',
-				customMessage: successCodes.WGE0020?.description,
-				customMessageEs: successCodes.WGE0020?.descriptionEs,
+				customCode: 'WGE0076',
+				customMessage: successCodes.WGE0076?.description.replace(
+					'$variable',
+					walletUpdated.Name
+				),
+				customMessageEs: successCodes.WGE0076?.descriptionEs.replace(
+					'$variable',
+					walletUpdated.Name
+				),
 				data: walletUpdated,
 			};
 		} catch (error) {
 			throw new HttpException(
 				{
 					statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-					customCode: 'WGE0016',
-					customMessage: errorCodes.WGE0016?.description,
-					customMessageEs: errorCodes.WGE0016?.descriptionEs,
+					customCode: 'WGE0075',
+					customMessage: errorCodes.WGE0075?.description,
+					customMessageEs: errorCodes.WGE0075?.descriptionEs,
 				},
 				HttpStatus.INTERNAL_SERVER_ERROR
 			);

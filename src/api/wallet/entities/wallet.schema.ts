@@ -11,6 +11,7 @@ export const WalletSchema = new dynamoose.Schema(
 		},
 		Name: {
 			type: String,
+			required: true,
 			validate: (value: string) => {
 				if (value.length < 4) {
 					throw new Error('Name must be at least 4 characters long');
@@ -18,9 +19,13 @@ export const WalletSchema = new dynamoose.Schema(
 				return true;
 			},
 		},
-		WalletType: String,
+		WalletType: {
+			type: String,
+			required: true,
+		},
 		WalletAddress: {
 			type: String,
+			required: true,
 			validate: (value: string) => {
 				const urlRegex = /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/i;
 				if (!urlRegex.test(value)) {
@@ -31,6 +36,7 @@ export const WalletSchema = new dynamoose.Schema(
 		},
 		Active: {
 			type: Boolean,
+			required: true,
 			default: true,
 		},
 	},

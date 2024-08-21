@@ -7,8 +7,8 @@ export class CreateWalletDto {
 
 export class UpdateWalletDto {
 	Id?: string;
-	name?: string;
-	walletType?: string;
-	walletAddress?: string;
-	active?: string;
+	Name?: string;
+	WalletType?: string;
+	WalletAddress?: string;
+	Active?: boolean;
 }

@@ -3,7 +3,7 @@ import * as dynamoose from 'dynamoose';
 import { Model } from 'dynamoose/dist/Model';
 import { WalletSchema } from '../entities/wallet.schema';
 import { Wallet } from '../entities/wallet.entity';
-import { CreateWalletDto } from '../dto/wallet.dto';
+import { CreateWalletDto, UpdateWalletDto } from '../dto/wallet.dto';
 
 @Injectable()
 export class WalletService {
@@ -15,9 +15,7 @@ export class WalletService {
 
 	async create(createWalletDto: CreateWalletDto) {
 		try {
-			console.log('createWalletDto', createWalletDto);
 			const result = await this.dbInstance.create(createWalletDto);
-
 			return result;
 		} catch (error) {
 			console.error('Error creating Wallet:', error.message);
@@ -30,6 +28,23 @@ export class WalletService {
 			return await this.dbInstance.get({ Id: id });
 		} catch (error) {
 			throw new Error(`Error retrieving user: ${error.message}`);
+		}
+	}
+
+	async update(
+		id: string,
+		updateWalletDto: UpdateWalletDto
+	): Promise<Wallet | null> {
+		try {
+			return await this.dbInstance.update({
+				Id: id,
+				Name: updateWalletDto.Name,
+				WalletAddress: updateWalletDto.WalletAddress,
+				WalletType: updateWalletDto.WalletType,
+				Active: updateWalletDto.Active,
+			});
+		} catch (error) {
+			throw new Error(`Error updating user: ${error.message}`);
 		}
 	}
 }
