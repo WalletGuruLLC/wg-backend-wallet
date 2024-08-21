@@ -1,7 +1,7 @@
 {
-	"name": "auth-paystream-scrummers",
+	"name": "wallet-paystream-scrummers",
 	"version": "0.0.1",
-	"description": "Authentication service paystream",
+	"description": "Wallet service paystream",
 	"author": "Scrummers",
 	"private": true,
 	"license": "UNLICENSED",
