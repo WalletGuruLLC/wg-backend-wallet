@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
-import { UserModule } from './api/wallet/wallet.module';
+import { WalletModule } from './api/wallet/wallet.module';
 import { ConfigModule } from '@nestjs/config';
 
 @Module({
-	imports: [ConfigModule.forRoot(), UserModule],
+	imports: [ConfigModule.forRoot(), WalletModule],
 	controllers: [],
 	providers: [],
 })

@@ -3,14 +3,15 @@ import { v4 as uuidv4 } from 'uuid';
 
 export const WalletSchema = new dynamoose.Schema(
 	{
-		Id: {
+		id: {
 			type: String,
 			hashKey: true,
 			default: () => uuidv4(),
 			required: true,
 		},
-		Name: {
+		name: {
 			type: String,
+			required: true,
 			validate: (value: string) => {
 				if (value.length < 4) {
 					throw new Error('Name must be at least 4 characters long');
@@ -18,9 +19,13 @@ export const WalletSchema = new dynamoose.Schema(
 				return true;
 			},
 		},
-		WalletType: String,
-		WalletAddress: {
+		walletType: {
 			type: String,
+			required: true,
+		},
+		walletAddress: {
+			type: String,
+			required: true,
 			validate: (value: string) => {
 				const urlRegex = /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/i;
 				if (!urlRegex.test(value)) {
@@ -29,8 +34,9 @@ export const WalletSchema = new dynamoose.Schema(
 				return true;
 			},
 		},
-		Active: {
+		active: {
 			type: Boolean,
+			required: true,
 			default: true,
 		},
 	},
