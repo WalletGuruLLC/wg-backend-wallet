@@ -1,5 +1,15 @@
 image: python:3.7.4-alpine3.10
 
+
+definitions:
+  services:
+    docker:
+      memory: 7168
+
+options:
+  docker: true
+  size: 2x
+
 pipelines:
   branches:
     "development":
@@ -9,6 +19,7 @@ pipelines:
           steps:
             - step:
                 name: Build with Docker
+                size: 2x
                 script:
                   - pip3 install awscli
                   - TAG=${BITBUCKET_BRANCH}-${BITBUCKET_BUILD_NUMBER}
