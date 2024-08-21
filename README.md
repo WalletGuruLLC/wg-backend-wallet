@@ -1,29 +1,24 @@
-# README #
+# Wallet Microservice
 
-This README would normally document whatever steps are necessary to get your application up and running.
+## Requirements
 
-### What is this repository for? ###
+- Node.js (v14 or higher)
+- NestJS (v7 or higher)
+- AWS DynamoDB
+- Dynamoose (v2 or higher)
+- AWS SDK for Node.js
 
-* Quick summary
-* Version
-* [Learn Markdown](https://bitbucket.org/tutorials/markdowndemo)
+## Installation
 
-### How do I get set up? ###
+    npm install
 
-* Summary of set up
-* Configuration
-* Dependencies
-* Database configuration
-* How to run tests
-* Deployment instructions
+## Configuration
 
-### Contribution guidelines ###
+### Set up the environment variables
 
-* Writing tests
-* Code review
-* Other guidelines
+Create a .env file in the root of the project following the content of .env.example.
 
-### Who do I talk to? ###
 
-* Repo owner or admin
-* Other community or team contact
+## Running the Application
+
+    npm run start
