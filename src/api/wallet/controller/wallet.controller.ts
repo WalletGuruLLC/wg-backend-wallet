@@ -7,6 +7,7 @@ import {
 	Patch,
 	Param,
 	Get,
+	Query,
 } from '@nestjs/common';
 
 import {
@@ -43,11 +44,11 @@ export class WalletController {
 				customCode: 'WGE0072',
 				customMessage: successCodes.WGE0072?.description.replace(
 					'$variable',
-					result.Name
+					result.name
 				),
 				customMessageEs: successCodes.WGE0072?.descriptionEs.replace(
 					'$variable',
-					result.Name
+					result.name
 				),
 				data: result,
 			};
@@ -119,12 +120,17 @@ export class WalletController {
 	@ApiOkResponse({
 		description: 'Successfully returned modules',
 	})
-	async findAll() {
-		const modules = await this.walletService.findAll();
+	async findAll(@Query('page') page?: string, @Query('items') items?: string) {
+		const pageNumber = page ? parseInt(page, 10) : 1;
+		const itemsNumber = items ? parseInt(items, 10) : 25;
+		const wallets = await this.walletService.getWallets(
+			pageNumber,
+			itemsNumber
+		);
 		return {
 			statusCode: HttpStatus.OK,
 			message: 'Successfully returned modules',
-			data: modules,
+			data: wallets,
 		};
 	}
 }
