@@ -158,6 +158,11 @@ export const errorCodes = {
 		message: 'Wallet update failed',
 		description: 'An error has occurred. Please try again later.',
 		descriptionEs: 'Ocurrió un error. Por favor, intente nuevamente más tarde.',
+	},
+	WGE0078: {
+		message: 'Wallet returning error',
+		description: 'An error has occurred. Please try again later.',
+		descriptionEs: 'Ocurrió un error. Por favor, intente nuevamente más tarde.'
 	}
 };
 
@@ -224,5 +229,11 @@ export const successCodes = {
 		message: 'Sucessful Wallet Update',
 		description: 'The wallet $variable was Sucessfully updated.',
 		descriptionEs: 'La billetera $variable se atualizó correctamente.',
+	}
+	,
+	WGE0077: {
+		message: 'Sucessful returned wallets',
+		description: 'The wallets was getting succesfully.',
+		descriptionEs: 'Las billeteras se estaban procesando con éxito.',
 	}
 };
