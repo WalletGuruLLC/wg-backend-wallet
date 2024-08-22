@@ -222,7 +222,7 @@ export const successCodes = {
 	},
 	WGE0076: {
 		message: 'Sucessful Wallet Update',
-		description: 'The wallet $variable was Sucessfully created.',
-		descriptionEs: 'La billetera $variable se creó correctamente.',
+		description: 'The wallet $variable was Sucessfully updated.',
+		descriptionEs: 'La billetera $variable se atualizó correctamente.',
 	}
 };

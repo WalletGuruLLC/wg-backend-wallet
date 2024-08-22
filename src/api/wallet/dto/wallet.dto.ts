@@ -10,8 +10,6 @@ export class UpdateWalletDto {
 	walletType?: string;
 	walletAddress?: string;
 	active?: boolean;
-	createDate?: string;
-	updateDate?: string;
 }
 
 export class GetWalletDto {

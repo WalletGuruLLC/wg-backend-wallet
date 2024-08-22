@@ -89,18 +89,26 @@ export class WalletController {
 				id,
 				updateWalletDto
 			);
+
+			const walledCamelCase = {
+				id: walletUpdated?.Id,
+				name: walletUpdated?.Name,
+				walletType: walletUpdated?.WalletType,
+				walletAddress: walletUpdated?.WalletAddress,
+				active: walletUpdated?.Active,
+			};
 			return {
 				statusCode: HttpStatus.OK,
 				customCode: 'WGE0076',
 				customMessage: successCodes.WGE0076?.description.replace(
 					'$variable',
-					walletUpdated.Name
+					walledCamelCase.name
 				),
 				customMessageEs: successCodes.WGE0076?.descriptionEs.replace(
 					'$variable',
-					walletUpdated.Name
+					walledCamelCase.name
 				),
-				data: walletUpdated,
+				data: walledCamelCase,
 			};
 		} catch (error) {
 			throw new HttpException(

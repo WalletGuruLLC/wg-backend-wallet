@@ -26,7 +26,6 @@ export class WalletService {
 			const createdWallet = await this.dbInstance.create(
 				createWalletDtoConverted
 			);
-			console.log(createdWallet);
 			const camelCaseWallet = {
 				id: createdWallet?.Id,
 				name: createdWallet?.Name,
@@ -35,7 +34,6 @@ export class WalletService {
 				active: createdWallet?.Active,
 			};
 			return camelCaseWallet;
-			// return await this.adapt(createdWallet);
 		} catch (error) {
 			console.error('Error creating Wallet:', error.message);
 			throw new Error('Failed to create user. Please try again later.');
@@ -57,14 +55,25 @@ export class WalletService {
 		updateWalletDto: UpdateWalletDto
 	): Promise<Wallet | null> {
 		try {
-			const createWalletDtoConverted = {
+			const updateWalletDtoConverted = {
 				Id: id,
 				Name: updateWalletDto.name,
 				WalletType: updateWalletDto.walletType,
 				WalletAddress: updateWalletDto.walletAddress,
 				Active: updateWalletDto.active,
 			};
-			return await this.dbInstance.update(createWalletDtoConverted);
+
+			const updateObject = Object.entries(updateWalletDtoConverted).reduce(
+				(acc, [key, value]) => {
+					if (value !== undefined) {
+						acc[key] = value;
+					}
+					return acc;
+				},
+				{ Id: id }
+			);
+
+			return await this.dbInstance.update(updateObject);
 		} catch (error) {
 			throw new Error(`Error updating user: ${error.message}`);
 		}
