@@ -27,7 +27,6 @@ import {
 	UpdateWalletDto,
 } from '../dto/wallet.dto';
 
-import {VerifyService} from "../../../verify/verify/verify.service";
 
 @ApiTags('wallet')
 @Controller('api/v1/wallet')
@@ -201,41 +200,8 @@ export class WalletController {
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
 				customCode: 'WGE0078',
 				customMessage: errorCodes.WGE0078?.description,
-				customMessageEs: errorCodes.WGE0078?.descriptionEs
+				customMessageEs: errorCodes.WGE0078?.descriptionEs,
 			};
 		}
 	}
-    // CONTROLLER TO GET ALL ROUTES
-    @Get()
-    @ApiOkResponse({
-        description: 'Successfully returned modules',
-    })
-    async findAll(@Query('page') page?: string, @Query('items') items?: string,
-				  @Headers('Authorization') token?: string) {
-        try {
-            const instanceVerifier = await this.verifyService.getVerifiedFactory();
-            await instanceVerifier.verify(token.split(' ')[1]);
-        } catch (e) {
-            throw new HttpException(
-                {
-                    statusCode: HttpStatus.UNAUTHORIZED,
-                    customCode: 'WGE0021',
-                    customMessage: errorCodes.WGE0021?.description,
-                    customMessageEs: errorCodes.WGE0021?.descriptionEs,
-                },
-                HttpStatus.UNAUTHORIZED
-            );
-        }
-        const pageNumber = page ? parseInt(page, 10) : 1;
-        const itemsNumber = items ? parseInt(items, 10) : 25;
-        const wallets = await this.walletService.getWallets(
-            pageNumber,
-            itemsNumber
-        );
-        return {
-            statusCode: HttpStatus.OK,
-            message: 'Successfully returned modules',
-            data: wallets,
-        };
-    }
 }

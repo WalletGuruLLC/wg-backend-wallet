@@ -3,11 +3,10 @@ import { WalletController } from './controller/wallet.controller';
 import { WalletService } from './service/wallet.service';
 import { ConfigModule } from '@nestjs/config';
 import { VerifyService } from '../../verify/verify.service';
-import {VerifyService} from "../../verify/verify/verify.service";
 import {VerifyModule} from "../../verify/verify.module";
 
 @Module({
-	imports: [VerifyModule],
+	imports: [ConfigModule, VerifyModule],
 	controllers: [WalletController],
 	providers: [WalletService, VerifyService],
 })
