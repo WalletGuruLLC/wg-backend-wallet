@@ -33,6 +33,7 @@
 		"@nestjs/platform-express": "^9.0.0",
 		"@nestjs/schematics": "^9.0.0",
 		"@nestjs/swagger": "^7.4.0",
+		"@southlane/cognito-jwt-verifier": "^0.1.8",
 		"amazon-cognito-identity-js": "^6.3.12",
 		"bcrypt": "^5.1.1",
 		"class-transformer": "^0.5.1",

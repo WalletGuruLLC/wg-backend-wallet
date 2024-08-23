@@ -841,6 +841,11 @@
     consola "^2.15.0"
     node-fetch "^2.6.1"
 
+"@panva/asn1.js@^1.0.0":
+  version "1.0.0"
+  resolved "https://registry.npmjs.org/@panva/asn1.js/-/asn1.js-1.0.0.tgz"
+  integrity sha512-UdkG3mLEqXgnlKsWanWcgb6dOjUzJ+XC5f+aWw30qrtjxeNUSfKX1cd5FBzOaXQumoe9nIqeZUvrRJS03HCCtw==
+
 "@sinclair/typebox@^0.24.1":
   version "0.24.51"
   resolved "https://registry.npmjs.org/@sinclair/typebox/-/typebox-0.24.51.tgz"
@@ -866,6 +871,13 @@
   integrity sha512-IxvBBCTFDHbVoK7zIxqA1ZOdc4QfM5HM7rGleCuHi7L1wnKv5Pn69xXJQ9hgxH60ZVygH9/JG0jRgtUncE3QUA==
   dependencies:
     tslib "^2.6.2"
+
+"@southlane/cognito-jwt-verifier@^0.1.8":
+  version "0.1.8"
+  resolved "https://registry.npmjs.org/@southlane/cognito-jwt-verifier/-/cognito-jwt-verifier-0.1.8.tgz"
+  integrity sha512-MCsR1iCeMfHina7cqzbIyC9v46i8a7fp7KGMG2qziSxo3rY3CVt9SYEe5zB+6lU34gBm+GE6pTEbwLBo/9pXvg==
+  dependencies:
+    jose "^1.28.0"
 
 "@tsconfig/node10@^1.0.7":
   version "1.0.11"
@@ -3734,6 +3746,13 @@ jmespath@0.16.0:
   version "0.16.0"
   resolved "https://registry.npmjs.org/jmespath/-/jmespath-0.16.0.tgz"
   integrity sha512-9FzQjJ7MATs1tSpnco1K6ayiYE3figslrXA72G2HQ/n76RzvYlofyi5QM+iX4YRs/pu3yzxlVQSST23+dMDknw==
+
+jose@^1.28.0:
+  version "1.28.2"
+  resolved "https://registry.npmjs.org/jose/-/jose-1.28.2.tgz"
+  integrity sha512-wWy51U2MXxYi3g8zk2lsQ8M6O1lartpkxuq1TYexzPKYLgHLZkCjklaATP36I5BUoWjF2sInB9U1Qf18fBZxNA==
+  dependencies:
+    "@panva/asn1.js" "^1.0.0"
 
 js-cookie@^2.2.1:
   version "2.2.1"
