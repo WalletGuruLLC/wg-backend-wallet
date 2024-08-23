@@ -3,7 +3,11 @@ import * as dynamoose from 'dynamoose';
 import { Model } from 'dynamoose/dist/Model';
 import { WalletSchema } from '../entities/wallet.schema';
 import { Wallet } from '../entities/wallet.entity';
-import { CreateWalletDto, UpdateWalletDto } from '../dto/wallet.dto';
+import {
+	CreateWalletDto,
+	UpdateWalletDto,
+	GetWalletDto,
+} from '../dto/wallet.dto';
 import { plainToInstance, ClassTransformOptions } from 'class-transformer';
 
 @Injectable()
@@ -80,8 +84,13 @@ export class WalletService {
 	}
 
 	//SERVICE TO GET ALL WALLETS
-	async getWallets(pageNumber: number, itemsNumber: number) {
+	async getWallets(getWalletDto: GetWalletDto) {
 		try {
+			const pageNumber =
+				'page' in getWalletDto ? parseInt(String(getWalletDto.page), 10) : 1;
+			const itemsNumber =
+				'items' in getWalletDto ? parseInt(String(getWalletDto.items), 10) : 25;
+
 			const startIndex = (pageNumber - 1) * itemsNumber;
 
 			const modules = await this.dbInstance
