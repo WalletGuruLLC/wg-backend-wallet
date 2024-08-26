@@ -172,6 +172,7 @@ export class WalletController {
 		@Headers('Authorization') token?: string
 	) {
 		try {
+			console.log('here');
 			const instanceVerifier = await this.verifyService.getVerifiedFactory();
 			await instanceVerifier.verify(token.split(' ')[1]);
 		} catch (e) {
