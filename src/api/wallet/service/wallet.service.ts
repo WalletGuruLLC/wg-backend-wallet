@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import * as dynamoose from 'dynamoose';
+import * as AWS from 'aws-sdk';
 import { Model } from 'dynamoose/dist/Model';
 import { WalletSchema } from '../entities/wallet.schema';
 import { Wallet } from '../entities/wallet.entity';
@@ -8,14 +9,14 @@ import {
 	UpdateWalletDto,
 	GetWalletDto,
 } from '../dto/wallet.dto';
-import { plainToInstance, ClassTransformOptions } from 'class-transformer';
 
 @Injectable()
 export class WalletService {
 	private dbInstance: Model<Wallet>;
+	private cognito: AWS.CognitoIdentityServiceProvider;
 
 	constructor() {
-		this.dbInstance = dynamoose.model<Wallet>('wallets', WalletSchema);
+		this.dbInstance = dynamoose.model<Wallet>('Wallets', WalletSchema);
 	}
 
 	//SERVICE TO CREATE A WALLET

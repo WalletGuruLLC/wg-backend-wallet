@@ -136,6 +136,75 @@ export const errorCodes = {
 		descriptionEs:
 			'El token de acceso proporcionado es inválido o ha expirado. Por favor, proporcione un token válido e inténtelo de nuevo.',
 	},
+	WGE0022: {
+		message: 'Inactive user',
+		description: 'The user is inactive.',
+		descriptionEs: 'El usuario se encuentra inactivo.',
+	},
+	WGE0023: {
+		message: 'Invalid page',
+		description: 'The page is invalid.',
+		descriptionEs: 'La pagina es invalida.',
+	},
+	WGE0024: {
+		message: 'Email update not allowed',
+		description:
+			'The account has already been validated, email update is not permitted.',
+		descriptionEs:
+			'La cuenta ya ha sido validada, no se permite la actualización del correo electrónico.',
+	},
+	WGE0025: {
+		message: 'Add role failed',
+		description: 'Failed to add role. Check info and retry.',
+		descriptionEs:
+			'Error al agregar el rol. Verifique la información y vuelva a intentarlo.',
+	},
+	WGE0026: {
+		message: 'Edit role failed',
+		description: 'Failed to edit role. Check inputs, then retry.',
+		descriptionEs:
+			'Error al editar el rol. Verifica los datos e inténtalo de nuevo.',
+	},
+	WGE0027: {
+		message: 'Role not found',
+		description: 'There is no role with the id provided',
+		descriptionEs: 'No hay ningún rol asociado con el id ingresado.',
+	},
+	WGE0032: {
+		message: `Doesn't exist roles`,
+		description: `You haven't created any roles yet. Please click 'Add New Role' to get started`,
+		descriptionEs: `Aún no has creado ningún rol. Por favor, haz clic en 'Agregar Nuevo Rol' para comenzar`,
+	},
+	WGE0033: {
+		message: `Role not found`,
+		description: `The role you are looking for does not exist. Please verify the role ID.`,
+		descriptionEs: `El rol que estás buscando no existe. Por favor, verifica el ID del rol.`,
+	},
+	WGE0035: {
+		message: `Failed to update access level`,
+		description: `An error occurred while trying to update the access level. Please try again later.`,
+		descriptionEs: `Se produjo un error al intentar actualizar el nivel de acceso. Por favor, inténtelo de nuevo más tarde.`,
+	},
+	WGE0036: {
+		message: `Failed to create access level`,
+		description: `An error occurred while trying to create the access level. Please try again later.`,
+		descriptionEs: `Se produjo un error al intentar crear el nivel de acceso. Por favor, inténtelo de nuevo más tarde.`,
+	},
+	WGE0037: {
+		message: `No modules available`,
+		description: `There are no modules available to update for the specified role.`,
+		descriptionEs: `No hay módulos disponibles para actualizar para el rol especificado.`,
+	},
+	WGE0038: {
+		message: `No permission to perform this action`,
+		description: `You do not have permission to perform this action.`,
+		descriptionEs: `No tienes permiso para realizar esta acción.`,
+	},
+	WGE0039: {
+		message: `No permission in the specified module`,
+		description: `You do not have permission in the specified module.`,
+		descriptionEs: `No tienes permisos en el módulo especificado.`,
+	},
 	WGE0070: {
 		message: 'Failed to send OTP email',
 		description:
@@ -213,6 +282,21 @@ export const successCodes = {
 		message: 'Successfully returned user info',
 		description: 'The user`s information has been successfully obtained.',
 		descriptionEs: 'La información del usuario se ha obtenido con éxito.',
+	},
+	WGS0023: {
+		message: 'Add role successful',
+		description: 'The role has been added successfully.',
+		descriptionEs: 'El rol ha sido añadido con éxito.',
+	},
+	WGS0024: {
+		message: 'Edit role successful',
+		description: 'The role has been edited successfully.',
+		descriptionEs: 'El rol ha sido editado con éxito.',
+	},
+	WGS0031: {
+		message: 'Success getting roles',
+		description: 'The users was getting succesfully.',
+		descriptionEs: 'Los roles se han obtenido con éxito.',
 	},
 	WGE0071: {
 		message: 'OTP email sent successfully',

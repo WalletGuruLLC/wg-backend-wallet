@@ -29,7 +29,7 @@ import {
 
 
 @ApiTags('wallet')
-@Controller('api/v1/wallet')
+@Controller('api/v1/wallets')
 export class WalletController {
 	constructor(
 		private readonly walletService: WalletService,
