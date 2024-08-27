@@ -33,4 +33,16 @@ export class GetWalletDto {
 	@IsOptional()
 	@IsBoolean()
 	active?: boolean;
+
+	@IsOptional()
+	@IsString()
+	search?: string;
+
+	@IsOptional()
+	@IsString()
+	items?: number;
+
+	@IsOptional()
+	@IsString()
+	page?: number;
 }

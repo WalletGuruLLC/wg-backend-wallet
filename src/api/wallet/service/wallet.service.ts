@@ -88,16 +88,10 @@ export class WalletService {
 	}
 
 	//SERVICE TO GET ALL WALLETS
-	async getWallets(
-		search = '',
-		pageNumber = 1,
-		itemsNumber = 10,
-		active?: boolean,
-		walletType?: string,
-		walletAddress?: string
-	) {
+	async getWallets(getWalletDto: any) {
 		try {
-			const startIndex = (pageNumber - 1) * itemsNumber;
+			const { search = '', page = 1, items = 10, active, walletType, walletAddress } = getWalletDto;
+			const startIndex = (page - 1) * items;
 
 			// Fetch all wallets
 			const modules = await this.dbInstance
@@ -115,24 +109,16 @@ export class WalletService {
 
 			// Filter wallets based on search query, ID, and other filters
 			const filteredWallets = modules.filter(wallet => {
-				const matchesSearch =
-					wallet.Name.toLowerCase().includes(search.toLowerCase()) ||
-					wallet.Id.toLowerCase().includes(search.toLowerCase());
-				const matchesActive =
-					active !== undefined ? wallet.Active === active : true;
-				const matchesWalletType = walletType
-					? wallet.WalletType === walletType
-					: true;
-				const matchesWalletAddress = walletAddress
-					? wallet.WalletAddress === walletAddress
+				const matchesSearch = search
+					? wallet.Name.toLowerCase().includes(search.toLowerCase()) ||
+					wallet.Id.toLowerCase().includes(search.toLowerCase())
 					: true;
 
-				return (
-					matchesSearch &&
-					matchesActive &&
-					matchesWalletType &&
-					matchesWalletAddress
-				);
+				const matchesActive = active !== undefined ? wallet.Active === active : true;
+				const matchesWalletType = walletType ? wallet.WalletType === walletType : true;
+				const matchesWalletAddress = walletAddress ? wallet.WalletAddress === walletAddress : true;
+
+				return matchesSearch && matchesActive && matchesWalletType && matchesWalletAddress;
 			});
 
 			// Sort active and inactive wallets
@@ -151,28 +137,16 @@ export class WalletService {
 			];
 
 			// Convert the combined wallets to the desired format
-			const convertedWalletsArray: {
-				id: string;
-				name: string;
-				walletType: string;
-				walletAddress: string;
-				active: boolean;
-			}[] = [];
-
-			for (const wallet of combinedWallets) {
-				const convertedWallet = {
-					id: wallet.Id,
-					name: wallet.Name,
-					walletType: wallet.WalletType || '',
-					walletAddress: wallet.WalletAddress || '',
-					active: wallet.Active || false,
-				};
-
-				convertedWalletsArray.push(convertedWallet);
-			}
+			const convertedWalletsArray = combinedWallets.map(wallet => ({
+				id: wallet.Id,
+				name: wallet.Name,
+				walletType: wallet.WalletType || '',
+				walletAddress: wallet.WalletAddress || '',
+				active: wallet.Active || false,
+			}));
 
 			// Return paginated results
-			return convertedWalletsArray.slice(startIndex, startIndex + itemsNumber);
+			return convertedWalletsArray.slice(startIndex, startIndex + items);
 		} catch (error) {
 			Sentry.captureException(error);
 			console.error('Error retrieving Wallets:', error.message);

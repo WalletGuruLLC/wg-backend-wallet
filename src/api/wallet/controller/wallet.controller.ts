@@ -183,12 +183,7 @@ export class WalletController {
 	})
 	@ApiBearerAuth('JWT')
 	async findAll(
-		@Query('search') search = '',
-		@Query('page') page = 1,
-		@Query('items') items = 10,
-		@Query('active') active: string,
-		@Query('walletType') walletType: '',
-		@Query('walletAddress') walletAddress: '',
+		@Query() getWalletDto: GetWalletDto,
 		@Headers() headers: MapOfStringToList
 	) {
 		try {
@@ -209,16 +204,7 @@ export class WalletController {
 		}
 
 		try {
-			const isActive =
-				active === 'true' ? true : active === 'false' ? false : undefined;
-			const walletsReturned = await this.walletService.getWallets(
-				search,
-				Number(page),
-				Number(items),
-				isActive,
-				walletType,
-				walletAddress
-			);
+			const walletsReturned = await this.walletService.getWallets(getWalletDto);
 			return {
 				statusCode: HttpStatus.OK,
 				customCode: 'WGE0077',
