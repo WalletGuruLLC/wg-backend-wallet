@@ -41,23 +41,23 @@ export class WalletService {
 			};
 			return camelCaseWallet;
 		} catch (error) {
-			Sentry.captureException(error)
+			Sentry.captureException(error);
 			console.error('Error creating Wallet:', error.message);
 			throw new Error('Failed to create user. Please try again later.');
 		}
 	}
 
-	// SERVICE TO FIND THE SELECTED WALLET
+	//SERVICE TO FIND THE SELECTED WALLET
 	async findOne(id: string): Promise<Wallet | null> {
 		try {
 			return await this.dbInstance.get({ Id: id });
 		} catch (error) {
-			Sentry.captureException(error)
+			Sentry.captureException(error);
 			throw new Error(`Error retrieving user: ${error.message}`);
 		}
 	}
 
-	//FUNCTION TO UPDATE THE SELECTED WALLET
+	//SERVICE TO UPDATE THE SELECTED WALLET
 	async update(
 		id: string,
 		updateWalletDto: UpdateWalletDto
@@ -68,7 +68,6 @@ export class WalletService {
 				Name: updateWalletDto.name,
 				WalletType: updateWalletDto.walletType,
 				WalletAddress: updateWalletDto.walletAddress,
-				Active: updateWalletDto.active,
 			};
 
 			const updateObject = Object.entries(updateWalletDtoConverted).reduce(
@@ -83,21 +82,24 @@ export class WalletService {
 
 			return await this.dbInstance.update(updateObject);
 		} catch (error) {
-			Sentry.captureException(error)
+			Sentry.captureException(error);
 			throw new Error(`Error updating user: ${error.message}`);
 		}
 	}
 
 	//SERVICE TO GET ALL WALLETS
-	async getWallets(getWalletDto: GetWalletDto) {
+	async getWallets(
+		search = '',
+		pageNumber = 1,
+		itemsNumber = 10,
+		active?: boolean,
+		walletType?: string,
+		walletAddress?: string
+	) {
 		try {
-			const pageNumber =
-				'page' in getWalletDto ? parseInt(String(getWalletDto.page), 10) : 1;
-			const itemsNumber =
-				'items' in getWalletDto ? parseInt(String(getWalletDto.items), 10) : 25;
-
 			const startIndex = (pageNumber - 1) * itemsNumber;
 
+			// Fetch all wallets
 			const modules = await this.dbInstance
 				.scan()
 				.attributes([
@@ -111,18 +113,44 @@ export class WalletService {
 				])
 				.exec();
 
-			const sortedActiveWallets = modules
+			// Filter wallets based on search query, ID, and other filters
+			const filteredWallets = modules.filter(wallet => {
+				const matchesSearch =
+					wallet.Name.toLowerCase().includes(search.toLowerCase()) ||
+					wallet.Id.toLowerCase().includes(search.toLowerCase());
+				const matchesActive =
+					active !== undefined ? wallet.Active === active : true;
+				const matchesWalletType = walletType
+					? wallet.WalletType === walletType
+					: true;
+				const matchesWalletAddress = walletAddress
+					? wallet.WalletAddress === walletAddress
+					: true;
+
+				return (
+					matchesSearch &&
+					matchesActive &&
+					matchesWalletType &&
+					matchesWalletAddress
+				);
+			});
+
+			// Sort active and inactive wallets
+			const sortedActiveWallets = filteredWallets
 				.filter(wallet => wallet.Active)
 				.sort((a, b) => a.Name.localeCompare(b.Name));
-			const sortedInactiveWallets = modules
+
+			const sortedInactiveWallets = filteredWallets
 				.filter(wallet => !wallet.Active)
 				.sort((a, b) => a.Name.localeCompare(b.Name));
 
+			// Combine active and inactive wallets
 			const combinedWallets = [
 				...sortedActiveWallets,
 				...sortedInactiveWallets,
 			];
 
+			// Convert the combined wallets to the desired format
 			const convertedWalletsArray: {
 				id: string;
 				name: string;
@@ -131,24 +159,46 @@ export class WalletService {
 				active: boolean;
 			}[] = [];
 
-			// Loop through each wallet in the combinedWallets array
 			for (const wallet of combinedWallets) {
-				const convertedWallets = {
+				const convertedWallet = {
 					id: wallet.Id,
 					name: wallet.Name,
-					walletType: wallet.WalletType || '', // Handle undefined WalletType
-					walletAddress: wallet.WalletAddress || '', // Handle undefined WalletAddress
-					active: wallet.Active || false, // Handle undefined Active
+					walletType: wallet.WalletType || '',
+					walletAddress: wallet.WalletAddress || '',
+					active: wallet.Active || false,
 				};
 
-				convertedWalletsArray.push(convertedWallets);
+				convertedWalletsArray.push(convertedWallet);
 			}
 
+			// Return paginated results
 			return convertedWalletsArray.slice(startIndex, startIndex + itemsNumber);
 		} catch (error) {
-			Sentry.captureException(error)
-			console.error('Error creating Wallet:', error.message);
-			throw new Error('Failed to create user. Please try again later.');
+			Sentry.captureException(error);
+			console.error('Error retrieving Wallets:', error.message);
+			throw new Error('Failed to retrieve wallets. Please try again later.');
 		}
+	}
+
+	// SERVICE TO TOGGLE (ACTIVATE/INACTIVATE) WALLETS
+	async toggle(id: string) {
+		const role = await this.findOne(id);
+
+		role.Active = !role.Active;
+		const updatedRole = await this.dbInstance.update(id, {
+			Active: role.Active,
+		});
+
+		return {
+			id: updatedRole?.Id,
+			name: updatedRole?.Name,
+			walletType: updatedRole?.WalletType,
+			walletAddress: updatedRole?.WalletAddress,
+			active: updatedRole?.Active,
+		};
+	}
+
+	async findWallet(id: string): Promise<Wallet> {
+		return await this.dbInstance.get(id);
 	}
 }

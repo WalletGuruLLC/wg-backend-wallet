@@ -11,7 +11,6 @@ export class UpdateWalletDto {
 	name?: string;
 	walletType?: string;
 	walletAddress?: string;
-	active?: boolean;
 }
 
 export class GetWalletDto {
