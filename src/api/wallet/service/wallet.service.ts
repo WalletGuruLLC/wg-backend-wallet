@@ -9,6 +9,7 @@ import {
 	UpdateWalletDto,
 	GetWalletDto,
 } from '../dto/wallet.dto';
+import * as Sentry from '@sentry/nestjs';
 
 @Injectable()
 export class WalletService {
@@ -40,6 +41,7 @@ export class WalletService {
 			};
 			return camelCaseWallet;
 		} catch (error) {
+			Sentry.captureException(error)
 			console.error('Error creating Wallet:', error.message);
 			throw new Error('Failed to create user. Please try again later.');
 		}
@@ -50,6 +52,7 @@ export class WalletService {
 		try {
 			return await this.dbInstance.get({ Id: id });
 		} catch (error) {
+			Sentry.captureException(error)
 			throw new Error(`Error retrieving user: ${error.message}`);
 		}
 	}
@@ -80,6 +83,7 @@ export class WalletService {
 
 			return await this.dbInstance.update(updateObject);
 		} catch (error) {
+			Sentry.captureException(error)
 			throw new Error(`Error updating user: ${error.message}`);
 		}
 	}
@@ -142,6 +146,7 @@ export class WalletService {
 
 			return convertedWalletsArray.slice(startIndex, startIndex + itemsNumber);
 		} catch (error) {
+			Sentry.captureException(error)
 			console.error('Error creating Wallet:', error.message);
 			throw new Error('Failed to create user. Please try again later.');
 		}
