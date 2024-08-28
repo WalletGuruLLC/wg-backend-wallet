@@ -37,6 +37,7 @@
 		"@sentry/profiling-node": "^8.26.0",
 		"@southlane/cognito-jwt-verifier": "^0.1.8",
 		"amazon-cognito-identity-js": "^6.3.12",
+		"axios": "^1.7.5",
 		"bcrypt": "^5.1.1",
 		"class-transformer": "^0.5.1",
 		"class-validator": "^0.13.2",
