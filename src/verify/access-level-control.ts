@@ -4,12 +4,19 @@ import {
 	HttpException,
 	HttpStatus,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Request, Response, NextFunction } from 'express';
 import axios from 'axios';
 import { errorCodes } from 'src/utils/constants';
 
 @Injectable()
 export class AccessControlMiddleware implements NestMiddleware {
+	private readonly authUrl: string;
+
+	constructor(private configService: ConfigService) {
+		this.authUrl = this.configService.get<string>('AUTH_URL');
+	}
+
 	async use(req: Request, res: Response, next: NextFunction): Promise<void> {
 		const authHeader = req.headers.authorization;
 
@@ -32,7 +39,7 @@ export class AccessControlMiddleware implements NestMiddleware {
 
 		try {
 			const response = await axios.post(
-				'https://dev.auth.walletguru.co/api/v1/users/validate-access',
+				this.authUrl + '/api/v1/users/validate-access',
 				body,
 				{
 					headers: {
