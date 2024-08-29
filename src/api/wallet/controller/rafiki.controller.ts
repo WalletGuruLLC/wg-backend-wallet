@@ -26,7 +26,7 @@ import { CreateRafikiWalletAddressDto } from '../dto/create-rafiki-wallet-addres
 import { customValidationPipe } from '../../validation.pipe';
 
 @ApiTags('wallet-rafiki')
-@Controller('api/v1/wallets/rafiki')
+@Controller('api/v1/wallets-rafiki')
 @ApiBearerAuth('JWT')
 export class RafikiWalletController {
 	constructor(
