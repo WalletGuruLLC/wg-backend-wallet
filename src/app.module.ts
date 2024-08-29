@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
-import { WalletModule } from './api/wallet/wallet.module';
 import { ConfigModule } from '@nestjs/config';
-import {SentryModule} from "@sentry/nestjs/setup";
+import { SentryModule } from '@sentry/nestjs/setup';
+import { ApolloClientService } from './graphql/apollo-client.service';
 
+import { WalletModule } from './api/wallet/wallet.module';
 @Module({
-	imports: [SentryModule.forRoot(),ConfigModule.forRoot(), WalletModule],
+	imports: [SentryModule.forRoot(), ConfigModule.forRoot(), WalletModule],
 	controllers: [],
-	providers: [],
+	providers: [ApolloClientService],
 })
 export class AppModule {}

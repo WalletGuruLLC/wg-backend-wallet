@@ -231,8 +231,25 @@ export const errorCodes = {
 	WGE0078: {
 		message: 'Wallet returning error',
 		description: 'An error has occurred. Please try again later.',
-		descriptionEs: 'Ocurrió un error. Por favor, intente nuevamente más tarde.'
-	}
+		descriptionEs: 'Ocurrió un error. Por favor, intente nuevamente más tarde.',
+	},
+	WGE0080: {
+		message: 'AssetId not found',
+		description: 'There is no asset with that id provided.',
+		descriptionEs: 'No hay ningún asset asociado con el id ingresado.',
+	},
+	WGE0081: {
+		message: 'Wallet address name is already taken',
+		description:
+			'This wallet address name is already in use. Please choose a different name.',
+		descriptionEs:
+			'Este nombre de dirección de la billetera ya está en uso. Por favor, elige un nombre diferente',
+	},
+	WGE0082: {
+		message: 'Wallet creation failed',
+		description: 'A user can have only one wallet address',
+		descriptionEs: 'Un usuario solo puede tener una dirección de billetera.',
+	},
 };
 
 export const successCodes = {
@@ -313,11 +330,17 @@ export const successCodes = {
 		message: 'Sucessful Wallet Update',
 		description: 'The wallet $variable was Sucessfully updated.',
 		descriptionEs: 'La billetera $variable se atualizó correctamente.',
-	}
-	,
+	},
 	WGE0077: {
 		message: 'Sucessful returned wallets',
 		description: 'The wallets was getting succesfully.',
 		descriptionEs: 'Las billeteras se estaban procesando con éxito.',
-	}
+	},
+	WGS0080: {
+		message: 'Sucessful wallet address creation',
+		description:
+			'Success! Your wallet address is ready. You can easily share it by checking your profile.',
+		descriptionEs:
+			'¡Creación Exitosa! Tu dirección de billetera está lista. Puedes compartirla fácilmente desde tu perfil.',
+	},
 };

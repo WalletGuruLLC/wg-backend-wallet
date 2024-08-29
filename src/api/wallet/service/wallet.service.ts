@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import * as dynamoose from 'dynamoose';
 import * as AWS from 'aws-sdk';
 import { Model } from 'dynamoose/dist/Model';
@@ -10,24 +11,50 @@ import {
 	GetWalletDto,
 } from '../dto/wallet.dto';
 import * as Sentry from '@sentry/nestjs';
+import { ApolloError } from '@apollo/client/errors';
+import axios from 'axios';
+
+import { GraphqlService } from '../../../graphql/graphql.service';
+import { CreateRafikiWalletAddressDto } from '../dto/create-rafiki-wallet-address.dto';
+import { errorCodes } from 'src/utils/constants';
 
 @Injectable()
 export class WalletService {
 	private dbInstance: Model<Wallet>;
-	private cognito: AWS.CognitoIdentityServiceProvider;
+	private readonly AUTH_MICRO_URL: string;
+	private readonly DOMAIN_WALLET_URL: string;
 
-	constructor() {
+	constructor(
+		private configService: ConfigService,
+		private readonly graphqlService: GraphqlService
+	) {
 		this.dbInstance = dynamoose.model<Wallet>('Wallets', WalletSchema);
+		this.AUTH_MICRO_URL = this.configService.get<string>('AUTH_URL');
+		this.DOMAIN_WALLET_URL = this.configService.get<string>(
+			'DOMAIN_WALLET_URL',
+			'https://cloud-nine-wallet-backend/accounts'
+		);
 	}
 
 	//SERVICE TO CREATE A WALLET
-	async create(createWalletDto: CreateWalletDto) {
+	async create(
+		createWalletDto: CreateWalletDto,
+		rafikiId?: string,
+		userId?: string
+	) {
 		try {
 			const createWalletDtoConverted = {
 				Name: createWalletDto.name,
 				WalletType: createWalletDto.walletType,
 				WalletAddress: createWalletDto.walletAddress,
-			};
+			} as any;
+
+			if (rafikiId) {
+				createWalletDtoConverted.RafikiId = rafikiId;
+			}
+			if (userId) {
+				createWalletDtoConverted.UserId = userId;
+			}
 
 			const createdWallet = await this.dbInstance.create(
 				createWalletDtoConverted
@@ -38,7 +65,15 @@ export class WalletService {
 				walletType: createdWallet?.WalletType,
 				walletAddress: createdWallet?.WalletAddress,
 				active: createdWallet?.Active,
-			};
+			} as any;
+
+			if (rafikiId) {
+				camelCaseWallet.rafikiId = createdWallet.RafikiId;
+			}
+
+			if (userId) {
+				camelCaseWallet.userId = createdWallet.UserId;
+			}
 			return camelCaseWallet;
 		} catch (error) {
 			Sentry.captureException(error);
@@ -90,7 +125,14 @@ export class WalletService {
 	//SERVICE TO GET ALL WALLETS
 	async getWallets(getWalletDto: any) {
 		try {
-			const { search = '', page = 1, items = 10, active, walletType, walletAddress } = getWalletDto;
+			const {
+				search = '',
+				page = 1,
+				items = 10,
+				active,
+				walletType,
+				walletAddress,
+			} = getWalletDto;
 			const startIndex = (page - 1) * items;
 
 			// Fetch all wallets
@@ -111,14 +153,24 @@ export class WalletService {
 			const filteredWallets = modules.filter(wallet => {
 				const matchesSearch = search
 					? wallet.Name.toLowerCase().includes(search.toLowerCase()) ||
-					wallet.Id.toLowerCase().includes(search.toLowerCase())
+					  wallet.Id.toLowerCase().includes(search.toLowerCase())
 					: true;
 
-				const matchesActive = active !== undefined ? wallet.Active === active : true;
-				const matchesWalletType = walletType ? wallet.WalletType === walletType : true;
-				const matchesWalletAddress = walletAddress ? wallet.WalletAddress === walletAddress : true;
+				const matchesActive =
+					active !== undefined ? wallet.Active === active : true;
+				const matchesWalletType = walletType
+					? wallet.WalletType === walletType
+					: true;
+				const matchesWalletAddress = walletAddress
+					? wallet.WalletAddress === walletAddress
+					: true;
 
-				return matchesSearch && matchesActive && matchesWalletType && matchesWalletAddress;
+				return (
+					matchesSearch &&
+					matchesActive &&
+					matchesWalletType &&
+					matchesWalletAddress
+				);
 			});
 
 			// Sort active and inactive wallets
@@ -174,5 +226,143 @@ export class WalletService {
 
 	async findWallet(id: string): Promise<Wallet> {
 		return await this.dbInstance.get(id);
+	}
+
+	async createWalletAddress(
+		createRafikiWalletAddressDto: CreateRafikiWalletAddressDto,
+		token: string
+	) {
+		let userInfo = await axios.get(
+			this.AUTH_MICRO_URL + '/api/v1/users/current-user',
+			{
+				headers: {
+					Authorization: token,
+				},
+			}
+		);
+		userInfo = userInfo.data;
+
+		const userId = userInfo?.data?.id;
+		if (userId && (await this.isUserIdExists(userId))) {
+			throw new HttpException(
+				{
+					statusCode: HttpStatus.BAD_REQUEST,
+					customCode: 'WGE0082',
+					customMessage: errorCodes.WGE0082?.description,
+					customMessageEs: errorCodes.WGE0082?.descriptionEs,
+				},
+				HttpStatus.BAD_REQUEST
+			);
+		}
+		const walletAddress = `${this.DOMAIN_WALLET_URL}/${createRafikiWalletAddressDto.addressName}`;
+
+		const isWalletAddressTakenLocally = await this.isWalletAddressTakenLocally(
+			walletAddress
+		);
+		if (isWalletAddressTakenLocally) {
+			throw new HttpException(
+				{
+					statusCode: HttpStatus.BAD_REQUEST,
+					customCode: 'WGE0081',
+					customMessage: errorCodes.WGE0081?.description,
+					customMessageEs: errorCodes.WGE0081?.descriptionEs,
+				},
+				HttpStatus.BAD_REQUEST
+			);
+		}
+
+		const createRafikiWalletAddressInput = {
+			walletAddress,
+			assetId: createRafikiWalletAddressDto.assetId,
+		};
+
+		let createdRafikiWalletAddress;
+		try {
+			createdRafikiWalletAddress = await this.createWalletAddressGraphQL(
+				createRafikiWalletAddressInput
+			);
+		} catch (error) {
+			if (error instanceof ApolloError) {
+				if (
+					error.message.includes(
+						'duplicate key value violates unique constraint "walletaddresses_url_unique"'
+					)
+				) {
+					throw new HttpException(
+						{
+							statusCode: HttpStatus.BAD_REQUEST,
+							customCode: 'WGE0081',
+							customMessage: errorCodes.WGE0081?.description,
+							customMessageEs: errorCodes.WGE0081?.descriptionEs,
+						},
+						HttpStatus.BAD_REQUEST
+					);
+				} else if (error.message.includes('unknown asset')) {
+					throw new HttpException(
+						{
+							statusCode: HttpStatus.BAD_REQUEST,
+							customCode: 'WGE0080',
+							customMessage: errorCodes.WGE0080?.description,
+							customMessageEs: errorCodes.WGE0080?.descriptionEs,
+						},
+						HttpStatus.BAD_REQUEST
+					);
+				}
+			}
+			throw error;
+		}
+
+		const wallet = {
+			name: 'Wallet Guru',
+			walletType: 'Native',
+			walletAddress: createRafikiWalletAddressInput.walletAddress,
+			rafikiId:
+				createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
+			userId,
+		};
+
+		return await this.create(wallet, wallet.rafikiId, wallet.userId);
+	}
+
+	private async isUserIdExists(userId: string): Promise<boolean> {
+		const existingWallet = await this.dbInstance
+			.scan()
+			.filter('UserId')
+			.eq(userId)
+			.exec();
+		return existingWallet.count > 0;
+	}
+
+	private async isWalletAddressTakenLocally(
+		walletAddress: string
+	): Promise<boolean> {
+		const existingWallet = await this.dbInstance
+			.query('WalletAddress')
+			.eq(walletAddress)
+			.using('WalletAddressIndex')
+			.exec();
+		return existingWallet.count > 0;
+	}
+
+	private async createWalletAddressGraphQL(
+		createRafikiWalletAddressInput: any
+	) {
+		//TODO: improve remaining input values, for now some things are hardcoded for reaching the US
+		const input = {
+			assetId: createRafikiWalletAddressInput.assetId,
+			url: createRafikiWalletAddressInput.walletAddress,
+			publicName: 'account',
+			additionalProperties: [
+				{
+					key: 'iban',
+					value: 'NL93 8601 1117 947',
+					visibleInOpenPayments: true,
+				},
+				{ key: 'mobile', value: '+31121212', visibleInOpenPayments: false },
+			],
+		};
+
+		const result = await this.graphqlService.createWalletAddress(input);
+		return result;
 	}
 }
