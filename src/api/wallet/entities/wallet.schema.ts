@@ -33,6 +33,16 @@ export const WalletSchema = new dynamoose.Schema(
 				}
 				return true;
 			},
+			index: {
+				global: true,
+				name: 'WalletAddressIndex',
+			},
+		},
+		RafikiId: {
+			type: String,
+		},
+		UserId: {
+			type: String,
 		},
 		Active: {
 			type: Boolean,

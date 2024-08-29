@@ -62,7 +62,7 @@ export class AccessControlMiddleware implements NestMiddleware {
 			GET: 8,
 			POST: 4,
 			PUT: 2,
-			PATCH: 2,
+			PATCH: 1,
 			DELETE: 1,
 		};
 

@@ -10,11 +10,21 @@ import { UserModule } from '../user/user.module';
 import { CognitoAuthGuard } from '../user/guard/cognito-auth.guard';
 
 import { AccessControlMiddleware } from '../user/guard/access-control-guard';
+import { ApolloClientService } from 'src/graphql/apollo-client.service';
+import { GraphqlService } from 'src/graphql/graphql.service';
+import { RafikiWalletController } from './controller/rafiki.controller';
 
 @Module({
 	imports: [ConfigModule, VerifyModule, UserModule],
-	controllers: [WalletController, RoleController],
-	providers: [WalletService, VerifyService, RoleService, CognitoAuthGuard],
+	controllers: [WalletController, RafikiWalletController, RoleController],
+	providers: [
+		WalletService,
+		VerifyService,
+		RoleService,
+		CognitoAuthGuard,
+		ApolloClientService,
+		GraphqlService,
+	],
 })
 export class WalletModule implements NestModule {
 	configure(consumer: MiddlewareConsumer) {
