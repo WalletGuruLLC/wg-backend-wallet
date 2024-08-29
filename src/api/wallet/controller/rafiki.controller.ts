@@ -4,6 +4,7 @@ import {
 	HttpException,
 	HttpStatus,
 	Post,
+	Get,
 	Headers,
 	UsePipes,
 } from '@nestjs/common';
@@ -26,7 +27,7 @@ import { CreateRafikiWalletAddressDto } from '../dto/create-rafiki-wallet-addres
 import { customValidationPipe } from '../../validation.pipe';
 
 @ApiTags('wallet-rafiki')
-@Controller('api/v1/wallets/rafiki')
+@Controller('api/v1/wallets-rafiki')
 @ApiBearerAuth('JWT')
 export class RafikiWalletController {
 	constructor(
@@ -99,6 +100,64 @@ export class RafikiWalletController {
 						customCode: 'WGE0073',
 						customMessage: errorCodes.WGE0073?.description,
 						customMessageEs: errorCodes.WGE0073?.descriptionEs,
+					},
+					HttpStatus.INTERNAL_SERVER_ERROR
+				);
+			}
+			throw error;
+		}
+	}
+
+	@Get('assets')
+	@ApiOperation({ summary: 'List all rafiki assets' })
+	@ApiResponse({
+		status: 200,
+		description: successCodes.WGS0081?.description,
+	})
+	@ApiResponse({
+		status: 500,
+		description: errorCodes.WGE0083?.description,
+	})
+	async getRafikiAssets(@Headers() headers: MapOfStringToList) {
+		let token;
+		try {
+			token = headers.authorization ?? '';
+			const instanceVerifier = await this.verifyService.getVerifiedFactory();
+			await instanceVerifier.verify(token.toString().split(' ')[1]);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new HttpException(
+				{
+					statusCode: HttpStatus.UNAUTHORIZED,
+					customCode: 'WGE0021',
+					customMessage: errorCodes.WGE0021?.description,
+					customMessageEs: errorCodes.WGE0021?.descriptionEs,
+				},
+				HttpStatus.UNAUTHORIZED
+			);
+		}
+
+		try {
+			const rafikiAssets = await this.walletService.getRafikiAssets();
+			return {
+				statusCode: HttpStatus.OK,
+				customCode: 'WGS0081',
+				customMessage: successCodes.WGS0081?.description,
+				customMessageEs: successCodes.WGS0081?.descriptionEs,
+				data: { rafikiAssets },
+			};
+		} catch (error) {
+			Sentry.captureException(error);
+			if (
+				error instanceof HttpException &&
+				error.getStatus() === HttpStatus.INTERNAL_SERVER_ERROR
+			) {
+				throw new HttpException(
+					{
+						statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+						customCode: 'WGE0083',
+						customMessage: errorCodes.WGE0083?.description,
+						customMessageEs: errorCodes.WGE0083?.descriptionEs,
 					},
 					HttpStatus.INTERNAL_SERVER_ERROR
 				);

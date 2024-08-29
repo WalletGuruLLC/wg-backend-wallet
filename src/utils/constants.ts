@@ -250,6 +250,11 @@ export const errorCodes = {
 		description: 'A user can have only one wallet address',
 		descriptionEs: 'Un usuario solo puede tener una dirección de billetera.',
 	},
+	WGE0083: {
+		message: 'Rafiki assets returning error',
+		description: 'An error has occurred. Please try again later.',
+		descriptionEs: 'Ocurrió un error. Por favor, intente nuevamente más tarde.',
+	},
 };
 
 export const successCodes = {
@@ -342,5 +347,10 @@ export const successCodes = {
 			'Success! Your wallet address is ready. You can easily share it by checking your profile.',
 		descriptionEs:
 			'¡Creación Exitosa! Tu dirección de billetera está lista. Puedes compartirla fácilmente desde tu perfil.',
+	},
+	WGS0081: {
+		message: 'Sucessful returned rafiki assets',
+		description: 'The rafiki assets were retrieved succesfully.',
+		descriptionEs: 'Los assets de Rafiki se devolvieron con éxito.',
 	},
 };
