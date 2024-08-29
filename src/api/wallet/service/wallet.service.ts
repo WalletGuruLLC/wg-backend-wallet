@@ -372,4 +372,12 @@ export class WalletService {
 		const result = await this.graphqlService.createWalletAddress(input);
 		return result;
 	}
+
+	async getRafikiAssets() {
+		const assets = await this.graphqlService.getAssets(null, null, null, null);
+		return assets.map(asset => ({
+			code: asset.code,
+			id: asset.id,
+		}));
+	}
 }
