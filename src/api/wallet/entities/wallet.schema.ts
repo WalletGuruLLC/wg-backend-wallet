@@ -22,6 +22,12 @@ export const WalletSchema = new dynamoose.Schema(
 		WalletType: {
 			type: String,
 			required: true,
+			validate: (value: string) => {
+				if (value.length < 3) {
+					throw new Error('Name must be at least 3 characters long');
+				}
+				return true;
+			},
 		},
 		WalletAddress: {
 			type: String,

@@ -56,6 +56,16 @@ export class WalletService {
 				createWalletDtoConverted.UserId = userId;
 			}
 
+			// Check if the WalletAddress already exists
+			const existingWallets = await this.dbInstance
+				.scan('WalletAddress')
+				.eq(createWalletDto.walletAddress)
+				.exec();
+
+			if (existingWallets.count > 0) {
+				throw new Error('WalletAddress must be unique');
+			}
+
 			const createdWallet = await this.dbInstance.create(
 				createWalletDtoConverted
 			);
@@ -132,11 +142,18 @@ export class WalletService {
 				active,
 				walletType,
 				walletAddress,
+				orderBy = 'ASC/Name', // Default sort by Name in ascending order
 			} = getWalletDto;
 
 			const pageNumber = parseInt(page, 10);
 			const itemsNumber = parseInt(items, 10);
-			const activeBoolean = active === 'true';
+			const activeBoolean = active
+				? active.toLowerCase() === 'true'
+				: undefined;
+
+			const [sortDirection, sortField] = orderBy.split('/');
+			const sortFieldCamelCase =
+				sortField.charAt(0).toUpperCase() + sortField.slice(1);
 
 			const startIndex = (pageNumber - 1) * itemsNumber;
 
@@ -162,14 +179,16 @@ export class WalletService {
 					: true;
 
 				const matchesActive =
-					active !== undefined ? wallet.Active === activeBoolean : true;
+					active !== undefined
+						? wallet.Active.toString().toLowerCase() === active.toLowerCase()
+						: true;
 
 				const matchesWalletType = walletType
-					? wallet.WalletType === walletType
+					? wallet.WalletType.toLowerCase() === walletType.toLowerCase()
 					: true;
 
 				const matchesWalletAddress = walletAddress
-					? wallet.WalletAddress === walletAddress
+					? wallet.WalletAddress.toLowerCase() === walletAddress.toLowerCase()
 					: true;
 
 				return (
@@ -180,23 +199,22 @@ export class WalletService {
 				);
 			});
 
-			// Sort active and inactive wallets
-			const sortedActiveWallets = filteredWallets
-				.filter(wallet => wallet.Active)
-				.sort((a, b) => a.Name.localeCompare(b.Name));
+			// Sort wallets based on the orderBy parameter
+			const sortedWallets = filteredWallets.sort((a, b) => {
+				if (!a[sortFieldCamelCase] || !b[sortFieldCamelCase]) return 0;
 
-			const sortedInactiveWallets = filteredWallets
-				.filter(wallet => !wallet.Active)
-				.sort((a, b) => a.Name.localeCompare(b.Name));
+				const aValue = a[sortFieldCamelCase].toString().toLowerCase();
+				const bValue = b[sortFieldCamelCase].toString().toLowerCase();
 
-			// Combine active and inactive wallets
-			const combinedWallets = [
-				...sortedActiveWallets,
-				...sortedInactiveWallets,
-			];
+				if (sortDirection.toUpperCase() === 'ASC') {
+					return aValue.localeCompare(bValue);
+				} else {
+					return bValue.localeCompare(aValue);
+				}
+			});
 
-			// Convert the combined wallets to the desired format
-			const convertedWalletsArray = combinedWallets.map(wallet => ({
+			// Convert the sorted wallets to the desired format
+			const convertedWalletsArray = sortedWallets.map(wallet => ({
 				id: wallet.Id,
 				name: wallet.Name,
 				walletType: wallet.WalletType || '',
