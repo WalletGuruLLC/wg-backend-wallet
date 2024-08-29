@@ -13,6 +13,7 @@ import {
 	ApiOperation,
 	ApiResponse,
 	ApiBearerAuth,
+	ApiBody,
 } from '@nestjs/swagger';
 
 import { WalletService } from '../service/wallet.service';
@@ -36,6 +37,10 @@ export class RafikiWalletController {
 	@Post('address')
 	@UsePipes(customValidationPipe('WGE0025', errorCodes.WGE0025))
 	@ApiOperation({ summary: 'Create a new wallet address' })
+	@ApiBody({
+		type: CreateRafikiWalletAddressDto,
+		description: 'Data required to create a new wallet address',
+	})
 	@ApiResponse({
 		status: 201,
 		description: 'Wallet Address Created Successfully',
@@ -43,6 +48,10 @@ export class RafikiWalletController {
 	@ApiResponse({
 		status: 400,
 		description: 'Invalid Address Name or Address Name Already in Use',
+	})
+	@ApiResponse({
+		status: 500,
+		description: 'Internal Server Error',
 	})
 	async createWalletAddress(
 		@Body() createRafikiWalletAddressDto: CreateRafikiWalletAddressDto,
