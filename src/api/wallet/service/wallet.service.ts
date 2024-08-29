@@ -127,16 +127,21 @@ export class WalletService {
 		try {
 			const {
 				search = '',
-				page = 1,
-				items = 10,
+				page = '1',
+				items = '10',
 				active,
 				walletType,
 				walletAddress,
 			} = getWalletDto;
-			const startIndex = (page - 1) * items;
+
+			const pageNumber = parseInt(page, 10);
+			const itemsNumber = parseInt(items, 10);
+			const activeBoolean = active === 'true';
+
+			const startIndex = (pageNumber - 1) * itemsNumber;
 
 			// Fetch all wallets
-			const modules = await this.dbInstance
+			const wallets = await this.dbInstance
 				.scan()
 				.attributes([
 					'Id',
@@ -150,17 +155,19 @@ export class WalletService {
 				.exec();
 
 			// Filter wallets based on search query, ID, and other filters
-			const filteredWallets = modules.filter(wallet => {
+			const filteredWallets = wallets.filter(wallet => {
 				const matchesSearch = search
 					? wallet.Name.toLowerCase().includes(search.toLowerCase()) ||
 					  wallet.Id.toLowerCase().includes(search.toLowerCase())
 					: true;
 
 				const matchesActive =
-					active !== undefined ? wallet.Active === active : true;
+					active !== undefined ? wallet.Active === activeBoolean : true;
+
 				const matchesWalletType = walletType
 					? wallet.WalletType === walletType
 					: true;
+
 				const matchesWalletAddress = walletAddress
 					? wallet.WalletAddress === walletAddress
 					: true;
@@ -198,7 +205,7 @@ export class WalletService {
 			}));
 
 			// Return paginated results
-			return convertedWalletsArray.slice(startIndex, startIndex + items);
+			return convertedWalletsArray.slice(startIndex, startIndex + itemsNumber);
 		} catch (error) {
 			Sentry.captureException(error);
 			console.error('Error retrieving Wallets:', error.message);
