@@ -333,8 +333,8 @@ export const successCodes = {
 	},
 	WGE0077: {
 		message: 'Sucessful returned wallets',
-		description: 'The wallets was getting succesfully.',
-		descriptionEs: 'Las billeteras se estaban procesando con éxito.',
+		description: 'The wallet was successfully retrieved.',
+		descriptionEs: 'La billetera se obtuvo con éxito.',
 	},
 	WGS0080: {
 		message: 'Sucessful wallet address creation',
