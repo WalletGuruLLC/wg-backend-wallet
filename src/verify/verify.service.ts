@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import process from 'node:process';
 import { ConfigService } from '@nestjs/config';
+import { verifierFactory } from '@southlane/cognito-jwt-verifier';
 
 @Injectable()
 export class VerifyService {
 	constructor(private readonly config: ConfigService) {}
 	getVerifiedFactory() {
-		const { verifierFactory } = require('@southlane/cognito-jwt-verifier');
 		// get a verifier instance. Put your config values here.
 		return verifierFactory({
 			region: this.config.get<string>('AWS_REGION'),

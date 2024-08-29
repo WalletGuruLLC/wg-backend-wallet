@@ -22,6 +22,7 @@ import { errorCodes } from 'src/utils/constants';
 export class WalletService {
 	private dbInstance: Model<Wallet>;
 	private readonly AUTH_MICRO_URL: string;
+	private readonly DOMAIN_WALLET_URL: string;
 
 	constructor(
 		private configService: ConfigService,
@@ -29,6 +30,10 @@ export class WalletService {
 	) {
 		this.dbInstance = dynamoose.model<Wallet>('Wallets', WalletSchema);
 		this.AUTH_MICRO_URL = this.configService.get<string>('AUTH_URL');
+		this.DOMAIN_WALLET_URL = this.configService.get<string>(
+			'DOMAIN_WALLET_URL',
+			'https://cloud-nine-wallet-backend/accounts'
+		);
 	}
 
 	//SERVICE TO CREATE A WALLET
@@ -249,7 +254,7 @@ export class WalletService {
 				HttpStatus.BAD_REQUEST
 			);
 		}
-		const walletAddress = `https://cloud-nine-wallet-backend/accounts/${createRafikiWalletAddressDto.addressName}`;
+		const walletAddress = `${this.DOMAIN_WALLET_URL}/${createRafikiWalletAddressDto.addressName}`;
 
 		const isWalletAddressTakenLocally = await this.isWalletAddressTakenLocally(
 			walletAddress
