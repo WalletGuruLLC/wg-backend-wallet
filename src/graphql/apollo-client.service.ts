@@ -9,7 +9,8 @@ export class ApolloClientService {
 	constructor() {
 		this.client = new ApolloClient({
 			link: new HttpLink({
-				uri: 'http://18.191.192.12:3001/graphql',
+				uri:
+					process.env.RAFIKI_GRAPHQL_URL || 'http://18.191.192.12:3001/graphql',
 				fetch,
 			}),
 			cache: new InMemoryCache(),

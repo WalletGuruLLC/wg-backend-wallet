@@ -1,4 +1,4 @@
-import { IsString, Matches, Length } from 'class-validator';
+import { IsString, Matches, Length, IsUUID } from 'class-validator';
 
 export class CreateRafikiWalletAddressDto {
 	@IsString()
@@ -10,5 +10,6 @@ export class CreateRafikiWalletAddressDto {
 	addressName: string;
 
 	@IsString()
+	@IsUUID()
 	assetId: string;
 }

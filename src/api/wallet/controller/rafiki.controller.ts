@@ -35,7 +35,7 @@ export class RafikiWalletController {
 	) {}
 
 	@Post('address')
-	@UsePipes(customValidationPipe('WGE0025', errorCodes.WGE0025))
+	@UsePipes(customValidationPipe('WGE0073', errorCodes.WGE0073))
 	@ApiOperation({ summary: 'Create a new wallet address' })
 	@ApiBody({
 		type: CreateRafikiWalletAddressDto,
@@ -57,8 +57,9 @@ export class RafikiWalletController {
 		@Body() createRafikiWalletAddressDto: CreateRafikiWalletAddressDto,
 		@Headers() headers: MapOfStringToList
 	) {
+		let token;
 		try {
-			const token = headers.authorization ?? '';
+			token = headers.authorization ?? '';
 			const instanceVerifier = await this.verifyService.getVerifiedFactory();
 			await instanceVerifier.verify(token.toString().split(' ')[1]);
 		} catch (error) {
@@ -73,10 +74,11 @@ export class RafikiWalletController {
 				HttpStatus.UNAUTHORIZED
 			);
 		}
-
+		token = token || '';
 		try {
 			const wallet = await this.walletService.createWalletAddress(
-				createRafikiWalletAddressDto
+				createRafikiWalletAddressDto,
+				token
 			);
 			return {
 				statusCode: HttpStatus.CREATED,
@@ -86,7 +88,6 @@ export class RafikiWalletController {
 				data: { wallet },
 			};
 		} catch (error) {
-			console.log(error); //just for testing purposes
 			Sentry.captureException(error);
 			if (
 				error instanceof HttpException &&

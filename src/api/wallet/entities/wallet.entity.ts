@@ -5,7 +5,7 @@ export class Wallet extends Document {
 	Name = '';
 	WalletType = '';
 	WalletAddress = '';
-	RafikiId = '';
-	UserId = '';
+	RafikiId?: string;
+	UserId?: string;
 	Active = true;
 }

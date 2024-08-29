@@ -245,6 +245,11 @@ export const errorCodes = {
 		descriptionEs:
 			'Este nombre de dirección de la billetera ya está en uso. Por favor, elige un nombre diferente',
 	},
+	WGE0082: {
+		message: 'Wallet creation failed',
+		description: 'A user can have only one wallet address',
+		descriptionEs: 'Un usuario solo puede tener una dirección de billetera.',
+	},
 };
 
 export const successCodes = {

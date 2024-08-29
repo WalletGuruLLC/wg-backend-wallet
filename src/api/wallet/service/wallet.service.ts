@@ -1,4 +1,5 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import * as dynamoose from 'dynamoose';
 import * as AWS from 'aws-sdk';
 import { Model } from 'dynamoose/dist/Model';
@@ -11,6 +12,8 @@ import {
 } from '../dto/wallet.dto';
 import * as Sentry from '@sentry/nestjs';
 import { ApolloError } from '@apollo/client/errors';
+import axios from 'axios';
+
 import { GraphqlService } from '../../../graphql/graphql.service';
 import { CreateRafikiWalletAddressDto } from '../dto/create-rafiki-wallet-address.dto';
 import { errorCodes } from 'src/utils/constants';
@@ -18,20 +21,35 @@ import { errorCodes } from 'src/utils/constants';
 @Injectable()
 export class WalletService {
 	private dbInstance: Model<Wallet>;
-	private cognito: AWS.CognitoIdentityServiceProvider;
+	private readonly AUTH_MICRO_URL: string;
 
-	constructor(private readonly graphqlService: GraphqlService) {
+	constructor(
+		private configService: ConfigService,
+		private readonly graphqlService: GraphqlService
+	) {
 		this.dbInstance = dynamoose.model<Wallet>('Wallets', WalletSchema);
+		this.AUTH_MICRO_URL = this.configService.get<string>('AUTH_URL');
 	}
 
 	//SERVICE TO CREATE A WALLET
-	async create(createWalletDto: CreateWalletDto) {
+	async create(
+		createWalletDto: CreateWalletDto,
+		rafikiId?: string,
+		userId?: string
+	) {
 		try {
 			const createWalletDtoConverted = {
 				Name: createWalletDto.name,
 				WalletType: createWalletDto.walletType,
 				WalletAddress: createWalletDto.walletAddress,
-			};
+			} as any;
+
+			if (rafikiId) {
+				createWalletDtoConverted.RafikiId = rafikiId;
+			}
+			if (userId) {
+				createWalletDtoConverted.UserId = userId;
+			}
 
 			const createdWallet = await this.dbInstance.create(
 				createWalletDtoConverted
@@ -42,7 +60,15 @@ export class WalletService {
 				walletType: createdWallet?.WalletType,
 				walletAddress: createdWallet?.WalletAddress,
 				active: createdWallet?.Active,
-			};
+			} as any;
+
+			if (rafikiId) {
+				camelCaseWallet.rafikiId = createdWallet.RafikiId;
+			}
+
+			if (userId) {
+				camelCaseWallet.userId = createdWallet.UserId;
+			}
 			return camelCaseWallet;
 		} catch (error) {
 			Sentry.captureException(error);
@@ -198,8 +224,31 @@ export class WalletService {
 	}
 
 	async createWalletAddress(
-		createRafikiWalletAddressDto: CreateRafikiWalletAddressDto
+		createRafikiWalletAddressDto: CreateRafikiWalletAddressDto,
+		token: string
 	) {
+		let userInfo = await axios.get(
+			this.AUTH_MICRO_URL + '/api/v1/users/current-user',
+			{
+				headers: {
+					Authorization: token,
+				},
+			}
+		);
+		userInfo = userInfo.data;
+
+		const userId = userInfo?.data?.id;
+		if (userId && (await this.isUserIdExists(userId))) {
+			throw new HttpException(
+				{
+					statusCode: HttpStatus.BAD_REQUEST,
+					customCode: 'WGE0082',
+					customMessage: errorCodes.WGE0082?.description,
+					customMessageEs: errorCodes.WGE0082?.descriptionEs,
+				},
+				HttpStatus.BAD_REQUEST
+			);
+		}
 		const walletAddress = `https://cloud-nine-wallet-backend/accounts/${createRafikiWalletAddressDto.addressName}`;
 
 		const isWalletAddressTakenLocally = await this.isWalletAddressTakenLocally(
@@ -258,17 +307,25 @@ export class WalletService {
 			throw error;
 		}
 
-		// const userId = hit the /users/current-user API to get the user id
 		const wallet = {
 			name: 'Wallet Guru',
 			walletType: 'Native',
 			walletAddress: createRafikiWalletAddressInput.walletAddress,
 			rafikiId:
-				createdRafikiWalletAddress.creteWalletAddress?.walletAddress?.id,
-			//userId,
+				createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
+			userId,
 		};
 
-		return await this.create(wallet);
+		return await this.create(wallet, wallet.rafikiId, wallet.userId);
+	}
+
+	private async isUserIdExists(userId: string): Promise<boolean> {
+		const existingWallet = await this.dbInstance
+			.scan()
+			.filter('UserId')
+			.eq(userId)
+			.exec();
+		return existingWallet.count > 0;
 	}
 
 	private async isWalletAddressTakenLocally(
