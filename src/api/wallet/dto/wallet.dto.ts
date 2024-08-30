@@ -15,10 +15,21 @@ export class CreateWalletDto {
 }
 
 export class UpdateWalletDto {
-	id?: string;
-	name?: string;
-	walletType?: string;
-	walletAddress?: string;
+	@IsNotEmpty()
+	@IsString()
+	id: string;
+
+	@IsNotEmpty()
+	@IsString()
+	name: string;
+
+	@IsNotEmpty()
+	@IsString()
+	walletType: string;
+
+	@IsNotEmpty()
+	@IsString()
+	walletAddress: string;
 }
 
 export class GetWalletDto {
