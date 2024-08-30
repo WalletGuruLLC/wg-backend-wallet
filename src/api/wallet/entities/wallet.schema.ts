@@ -33,7 +33,7 @@ export const WalletSchema = new dynamoose.Schema(
 			type: String,
 			required: true,
 			validate: (value: string) => {
-				const urlRegex = /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/i;
+				const urlRegex = /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*\.[^\s]{2,}$/i;
 				if (!urlRegex.test(value)) {
 					throw new Error('WalletAddress must be a valid URL');
 				}
