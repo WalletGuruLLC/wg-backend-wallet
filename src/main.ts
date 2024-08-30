@@ -25,6 +25,7 @@ async function bootstrap() {
 		)
 		.addServer('http://localhost:3000/', 'Local environment')
 		.addServer('https://dev.wallet.walletguru.co/', 'Dev environment')
+		.addServer('https://qa.wallet.walletguru.co/', 'QA environment')
 		.setVersion('1.0')
 		.addBearerAuth(
 			{ type: 'http', scheme: 'bearer', bearerFormat: 'JWT', in: 'header' },
