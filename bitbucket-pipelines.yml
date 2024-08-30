@@ -66,3 +66,42 @@ pipelines:
                         - "deployment/backend-wallet"
                         - "backend-wallet=${IMAGE}:${BITBUCKET_BRANCH}-${BITBUCKET_BUILD_NUMBER}"
                       DEBUG: "true"
+    "qa":
+      - stage:
+          name: Build with Docker
+          deployment: QA
+          steps:
+            - step:
+                name: Build with Docker
+                size: 2x
+                script:
+                  - pip3 install awscli
+                  - TAG=${BITBUCKET_BRANCH}-${BITBUCKET_BUILD_NUMBER}
+                  - TAG_LATEST=${BITBUCKET_BRANCH}-latest
+                  - aws configure set aws_access_key_id "${AWS_KEY}"
+                  - aws configure set aws_secret_access_key "${AWS_SECRET}"
+                  - eval $(aws ecr get-login --no-include-email --region us-east-2 | sed 's;https://;;g')
+                  - docker build --build-arg NODE_ENV=$NODE_ENV --build-arg AWS_REGION=$AWS_REGION --build-arg AWS_KEY_ID=$AWS_KEY_ID --build-arg AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY --build-arg COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID --build-arg COGNITO_CLIENT_ID=$COGNITO_CLIENT_ID --build-arg SENTRY_DSN=$SENTRY_DSN --build-arg AUTH_URL=$AUTH_URL --build-arg RAFIKI_GRAPHQL_URL=$RAFIKI_GRAPHQL_URL --build-arg DOMAIN_WALLET_URL=$DOMAIN_WALLET_URL -t ${IMAGE}:$TAG .
+                  - docker build --build-arg NODE_ENV=$NODE_ENV --build-arg AWS_REGION=$AWS_REGION --build-arg AWS_KEY_ID=$AWS_KEY_ID --build-arg AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY --build-arg COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID --build-arg COGNITO_CLIENT_ID=$COGNITO_CLIENT_ID --build-arg SENTRY_DSN=$SENTRY_DSN --build-arg AUTH_URL=$AUTH_URL --build-arg RAFIKI_GRAPHQL_URL=$RAFIKI_GRAPHQL_URL --build-arg DOMAIN_WALLET_URL=$DOMAIN_WALLET_URL -t ${IMAGE}:$TAG_LATEST .
+                  - docker push ${IMAGE}:$TAG
+                  - docker push ${IMAGE}:$TAG_LATEST
+                caches:
+                  - pip
+                services:
+                  - docker
+            - step:
+                name: Deploy to QA
+                script:
+                  - pipe: atlassian/aws-eks-kubectl-run:1.2.0
+                    variables:
+                      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID_TERRAFORM}
+                      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY_TERRAFORM}
+                      AWS_DEFAULT_REGION: "us-east-2"
+                      CLUSTER_NAME: ${CLUSTER_NAME}
+                      KUBECTL_COMMAND: "set"
+                      KUBECTL_ARGS:
+                        - "image"
+                        - "--namespace=qa"
+                        - "deployment/backend-wallet"
+                        - "backend-wallet=${IMAGE}:${BITBUCKET_BRANCH}-${BITBUCKET_BUILD_NUMBER}"
+                      DEBUG: "true"
