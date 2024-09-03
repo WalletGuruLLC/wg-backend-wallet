@@ -1,5 +1,7 @@
 import * as dynamoose from 'dynamoose';
 import { v4 as uuidv4 } from 'uuid';
+import { HttpException, HttpStatus } from "@nestjs/common";
+import { errorCodes } from "../../../utils/constants";
 
 export const WalletSchema = new dynamoose.Schema(
 	{
@@ -14,7 +16,15 @@ export const WalletSchema = new dynamoose.Schema(
 			required: true,
 			validate: (value: string) => {
 				if (value.length < 4) {
-					throw new Error('Name must be at least 4 characters long');
+					throw new HttpException(
+						{
+							statusCode: HttpStatus.BAD_REQUEST,
+							customCode: 'WGE0073',
+							customMessage: errorCodes.WGE0073?.description,
+							customMessageEs: errorCodes.WGE0073?.descriptionEs,
+						},
+						HttpStatus.BAD_REQUEST
+					);
 				}
 				return true;
 			},
@@ -22,23 +32,25 @@ export const WalletSchema = new dynamoose.Schema(
 		WalletType: {
 			type: String,
 			required: true,
-			validate: (value: string) => {
-				if (value.length < 3) {
-					throw new Error('Name must be at least 3 characters long');
-				}
-				return true;
-			},
 		},
 		WalletAddress: {
 			type: String,
 			required: true,
-			validate: (value: string) => {
-				const urlRegex = /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/i;
-				if (!urlRegex.test(value)) {
-					throw new Error('WalletAddress must be a valid URL');
-				}
-				return true;
-			},
+			// validate: (value: string) => {
+			// 	const urlRegex = /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/i;
+			// 	if (!urlRegex.test(value)) {
+			// 		throw new HttpException(
+			// 			{
+			// 				statusCode: HttpStatus.BAD_REQUEST,
+			// 				customCode: 'WGE0084',
+			// 				customMessage: errorCodes.WGE0084?.description,
+			// 				customMessageEs: errorCodes.WGE0084?.descriptionEs,
+			// 			},
+			// 			HttpStatus.BAD_REQUEST
+			// 		);
+			// 	}
+			// 	return true;
+			// },
 			index: {
 				global: true,
 				name: 'WalletAddressIndex',

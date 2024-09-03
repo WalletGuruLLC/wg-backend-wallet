@@ -43,6 +43,21 @@ export class WalletService {
 		userId?: string
 	) {
 		try {
+			if (!rafikiId && !userId) {
+				const urlRegex = /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*\.[^\s]{2,}$/i;
+				if (!urlRegex.test(createWalletDto.walletAddress)) {
+					throw new HttpException(
+						{
+							statusCode: HttpStatus.BAD_REQUEST,
+							customCode: 'WGE0084',
+							customMessage: errorCodes.WGE0084?.description,
+							customMessageEs: errorCodes.WGE0084?.descriptionEs,
+						},
+						HttpStatus.BAD_REQUEST
+					);
+				}
+			}
+
 			const createWalletDtoConverted = {
 				Name: createWalletDto.name,
 				WalletType: createWalletDto.walletType,
@@ -63,7 +78,15 @@ export class WalletService {
 				.exec();
 
 			if (existingWallets.count > 0) {
-				throw new Error('WalletAddress must be unique');
+				throw new HttpException(
+					{
+						statusCode: HttpStatus.BAD_REQUEST,
+						customCode: 'WGE0086',
+						customMessage: errorCodes.WGE0086?.description,
+						customMessageEs: errorCodes.WGE0086?.descriptionEs,
+					},
+					HttpStatus.BAD_REQUEST
+				);
 			}
 
 			const createdWallet = await this.dbInstance.create(
@@ -87,8 +110,21 @@ export class WalletService {
 			return camelCaseWallet;
 		} catch (error) {
 			Sentry.captureException(error);
-			console.error('Error creating Wallet:', error.message);
-			throw new Error('Failed to create user. Please try again later.');
+			if (
+				error instanceof HttpException &&
+				error.getStatus() === HttpStatus.INTERNAL_SERVER_ERROR
+			) {
+				throw new HttpException(
+					{
+						statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+						customCode: 'WGE0085',
+						customMessage: errorCodes.WGE0085?.description,
+						customMessageEs: errorCodes.WGE0085?.descriptionEs,
+					},
+					HttpStatus.INTERNAL_SERVER_ERROR
+				);
+			}
+			throw error;
 		}
 	}
 
@@ -108,6 +144,20 @@ export class WalletService {
 		updateWalletDto: UpdateWalletDto
 	): Promise<Wallet | null> {
 		try {
+			const urlRegex = /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*\.[^\s]{2,}$/i;
+			if (!urlRegex.test(updateWalletDto.walletAddress)) {
+				console.log('updateWalletDto', updateWalletDto);
+				throw new HttpException(
+					{
+						statusCode: HttpStatus.BAD_REQUEST,
+						customCode: 'WGE0084',
+						customMessage: errorCodes.WGE0084?.description,
+						customMessageEs: errorCodes.WGE0084?.descriptionEs,
+					},
+					HttpStatus.BAD_REQUEST
+				);
+			}
+
 			const updateWalletDtoConverted = {
 				Id: id,
 				Name: updateWalletDto.name.trim(),
@@ -142,18 +192,12 @@ export class WalletService {
 				active,
 				walletType,
 				walletAddress,
-				orderBy = 'ASC/Name', // Default sort by Name in ascending order
 			} = getWalletDto;
 
 			const pageNumber = parseInt(page, 10);
 			const itemsNumber = parseInt(items, 10);
-			const activeBoolean = active
-				? active.toLowerCase() === 'true'
-				: undefined;
-
-			const [sortDirection, sortField] = orderBy.split('/');
-			const sortFieldCamelCase =
-				sortField.charAt(0).toUpperCase() + sortField.slice(1);
+			const activeBoolean =
+				active !== undefined ? active === 'true' : undefined;
 
 			const startIndex = (pageNumber - 1) * itemsNumber;
 
@@ -171,7 +215,7 @@ export class WalletService {
 				])
 				.exec();
 
-			// Filter wallets based on search query, ID, and other filters
+			// Filter wallets based on the search query and other filters
 			const filteredWallets = wallets.filter(wallet => {
 				const matchesSearch = search
 					? wallet.Name.toLowerCase().includes(search.toLowerCase()) ||
@@ -179,16 +223,14 @@ export class WalletService {
 					: true;
 
 				const matchesActive =
-					active !== undefined
-						? wallet.Active.toString().toLowerCase() === active.toLowerCase()
-						: true;
+					activeBoolean !== undefined ? wallet.Active === activeBoolean : true;
 
 				const matchesWalletType = walletType
-					? wallet.WalletType.toLowerCase() === walletType.toLowerCase()
+					? wallet.WalletType === walletType
 					: true;
 
 				const matchesWalletAddress = walletAddress
-					? wallet.WalletAddress.toLowerCase() === walletAddress.toLowerCase()
+					? wallet.WalletAddress === walletAddress
 					: true;
 
 				return (
@@ -199,21 +241,15 @@ export class WalletService {
 				);
 			});
 
-			// Sort wallets based on the orderBy parameter
+			// Sort by active (true first, false after) and by name (A-Z)
 			const sortedWallets = filteredWallets.sort((a, b) => {
-				if (!a[sortFieldCamelCase] || !b[sortFieldCamelCase]) return 0;
-
-				const aValue = a[sortFieldCamelCase].toString().toLowerCase();
-				const bValue = b[sortFieldCamelCase].toString().toLowerCase();
-
-				if (sortDirection.toUpperCase() === 'ASC') {
-					return aValue.localeCompare(bValue);
-				} else {
-					return bValue.localeCompare(aValue);
+				if (a.Active === b.Active) {
+					return a.Name.localeCompare(b.Name);
 				}
+				return a.Active ? -1 : 1;
 			});
 
-			// Convert the sorted wallets to the desired format
+			// Convert and paginate the wallets
 			const convertedWalletsArray = sortedWallets.map(wallet => ({
 				id: wallet.Id,
 				name: wallet.Name,
@@ -222,11 +258,15 @@ export class WalletService {
 				active: wallet.Active || false,
 			}));
 
-			// Return paginated results
-			return convertedWalletsArray.slice(startIndex, startIndex + itemsNumber);
+			// Paginate the results
+			const paginatedWallets = convertedWalletsArray.slice(
+				startIndex,
+				startIndex + itemsNumber
+			);
+
+			return paginatedWallets;
 		} catch (error) {
 			Sentry.captureException(error);
-			console.error('Error retrieving Wallets:', error.message);
 			throw new Error('Failed to retrieve wallets. Please try again later.');
 		}
 	}
