@@ -108,7 +108,6 @@ export class WalletService {
 				camelCaseWallet.userId = createdWallet.UserId;
 			}
 			return camelCaseWallet;
-
 		} catch (error) {
 			Sentry.captureException(error);
 			if (
@@ -145,6 +144,20 @@ export class WalletService {
 		updateWalletDto: UpdateWalletDto
 	): Promise<Wallet | null> {
 		try {
+			const urlRegex = /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*\.[^\s]{2,}$/i;
+			if (!urlRegex.test(updateWalletDto.walletAddress)) {
+				console.log('updateWalletDto', updateWalletDto);
+				throw new HttpException(
+					{
+						statusCode: HttpStatus.BAD_REQUEST,
+						customCode: 'WGE0084',
+						customMessage: errorCodes.WGE0084?.description,
+						customMessageEs: errorCodes.WGE0084?.descriptionEs,
+					},
+					HttpStatus.BAD_REQUEST
+				);
+			}
+
 			const updateWalletDtoConverted = {
 				Id: id,
 				Name: updateWalletDto.name.trim(),

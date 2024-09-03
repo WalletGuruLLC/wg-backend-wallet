@@ -36,13 +36,21 @@ export const WalletSchema = new dynamoose.Schema(
 		WalletAddress: {
 			type: String,
 			required: true,
-			validate: (value: string) => {
-				const urlRegex = /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/i;
-				if (!urlRegex.test(value)) {
-					throw new Error('WalletAddress must be a valid URL');
-				}
-				return true;
-			},
+			// validate: (value: string) => {
+			// 	const urlRegex = /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/i;
+			// 	if (!urlRegex.test(value)) {
+			// 		throw new HttpException(
+			// 			{
+			// 				statusCode: HttpStatus.BAD_REQUEST,
+			// 				customCode: 'WGE0084',
+			// 				customMessage: errorCodes.WGE0084?.description,
+			// 				customMessageEs: errorCodes.WGE0084?.descriptionEs,
+			// 			},
+			// 			HttpStatus.BAD_REQUEST
+			// 		);
+			// 	}
+			// 	return true;
+			// },
 			index: {
 				global: true,
 				name: 'WalletAddressIndex',
