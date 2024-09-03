@@ -110,25 +110,25 @@ export class WalletService {
 		try {
 			const updateWalletDtoConverted = {
 				Id: id,
-				Name: updateWalletDto.name,
-				WalletType: updateWalletDto.walletType,
-				WalletAddress: updateWalletDto.walletAddress,
+				Name: updateWalletDto.name.trim(),
+				WalletType: updateWalletDto.walletType.trim(),
+				WalletAddress: updateWalletDto.walletAddress.trim(),
 			};
 
 			const updateObject = Object.entries(updateWalletDtoConverted).reduce(
 				(acc, [key, value]) => {
-					if (value !== undefined) {
+					if (value !== undefined && value !== '') {
 						acc[key] = value;
 					}
 					return acc;
 				},
-				{ Id: id }
+				{ Id: id } as any // Type as `any` to allow dynamic key assignment
 			);
 
 			return await this.dbInstance.update(updateObject);
 		} catch (error) {
 			Sentry.captureException(error);
-			throw new Error(`Error updating user: ${error.message}`);
+			throw new Error(`Error updating wallet: ${error.message}`);
 		}
 	}
 
