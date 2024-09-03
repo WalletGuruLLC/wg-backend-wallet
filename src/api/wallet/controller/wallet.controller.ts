@@ -216,7 +216,10 @@ export class WalletController {
 				customCode: 'WGE0077',
 				customMessage: successCodes.WGE0077?.description,
 				customMessageEs: successCodes.WGE0077?.descriptionEs,
-				data: { total: walletsReturned.length, wallet: walletsReturned },
+				data: {
+					total: walletsReturned.totalItems,
+					wallet: walletsReturned.paginatedWallets,
+				},
 			};
 		} catch (error) {
 			Sentry.captureException(error);
