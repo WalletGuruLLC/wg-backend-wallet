@@ -146,7 +146,6 @@ export class WalletService {
 		try {
 			const urlRegex = /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*\.[^\s]{2,}$/i;
 			if (!urlRegex.test(updateWalletDto.walletAddress)) {
-				console.log('updateWalletDto', updateWalletDto);
 				throw new HttpException(
 					{
 						statusCode: HttpStatus.BAD_REQUEST,
@@ -215,6 +214,10 @@ export class WalletService {
 				])
 				.exec();
 
+			const totalWallets = await this.dbInstance.scan().exec();
+
+			const totalItems = totalWallets.count;
+
 			// Filter wallets based on the search query and other filters
 			const filteredWallets = wallets.filter(wallet => {
 				const matchesSearch = search
@@ -226,8 +229,8 @@ export class WalletService {
 					activeBoolean !== undefined ? wallet.Active === activeBoolean : true;
 
 				const matchesWalletType = walletType
-					? wallet.WalletType === walletType
-					: true;
+					? wallet.WalletType === walletType && wallet.WalletType !== 'Native'
+					: wallet.WalletType !== 'Native'; // Exclude 'Native' wallets
 
 				const matchesWalletAddress = walletAddress
 					? wallet.WalletAddress === walletAddress
@@ -264,7 +267,10 @@ export class WalletService {
 				startIndex + itemsNumber
 			);
 
-			return paginatedWallets;
+			return {
+				paginatedWallets,
+				totalItems,
+			};
 		} catch (error) {
 			Sentry.captureException(error);
 			throw new Error('Failed to retrieve wallets. Please try again later.');
