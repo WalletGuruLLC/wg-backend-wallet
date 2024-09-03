@@ -87,15 +87,21 @@ export class WalletController {
 			};
 		} catch (error) {
 			Sentry.captureException(error);
-			throw new HttpException(
-				{
-					statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-					customCode: 'WGE0073',
-					customMessage: errorCodes.WGE0073?.description,
-					customMessageEs: errorCodes.WGE0073?.descriptionEs,
-				},
-				HttpStatus.INTERNAL_SERVER_ERROR
-			);
+			if (
+				error instanceof HttpException &&
+				error.getStatus() === HttpStatus.INTERNAL_SERVER_ERROR
+			) {
+				throw new HttpException(
+					{
+						statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+						customCode: 'WGE0073',
+						customMessage: errorCodes.WGE0073?.description,
+						customMessageEs: errorCodes.WGE0073?.descriptionEs,
+					},
+					HttpStatus.INTERNAL_SERVER_ERROR
+				);
+			}
+			throw error;
 		}
 	}
 
@@ -210,7 +216,7 @@ export class WalletController {
 				customCode: 'WGE0077',
 				customMessage: successCodes.WGE0077?.description,
 				customMessageEs: successCodes.WGE0077?.descriptionEs,
-				data: { wallet: walletsReturned },
+				data: { total: walletsReturned.length, wallet: walletsReturned },
 			};
 		} catch (error) {
 			Sentry.captureException(error);

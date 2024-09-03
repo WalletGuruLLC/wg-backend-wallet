@@ -64,8 +64,4 @@ export class GetWalletDto {
 	@IsOptional()
 	@IsString()
 	page?: number;
-
-	@IsOptional()
-	@IsString()
-	orderBy?: string;
 }
