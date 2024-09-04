@@ -215,7 +215,8 @@ export const errorCodes = {
 	WGE0073: {
 		message: 'Wallet creation failed',
 		description: 'The wallet name must be at least 4 characters long',
-		descriptionEs: 'El nombre de la billetera debe tener al menos 4 caracteres.',
+		descriptionEs:
+			'El nombre de la billetera debe tener al menos 4 caracteres.',
 	},
 	WGE0074: {
 		message: 'Wallet not found',
@@ -263,13 +264,14 @@ export const errorCodes = {
 	WGE0085: {
 		message: 'Wallet creation failed',
 		description: 'The wallet name must be at least 3 characters long',
-		descriptionEs: 'El nombre de la billetera debe tener al menos 3 caracteres.',
+		descriptionEs:
+			'El nombre de la billetera debe tener al menos 3 caracteres.',
 	},
 	WGE0086: {
 		message: 'Wallet creation failed',
 		description: 'The wallet Address must be unique',
 		descriptionEs: 'La dirección de la billetera debe ser única',
-	}
+	},
 };
 
 export const successCodes = {
