@@ -220,6 +220,8 @@ export class WalletService {
 				wallet => wallet.WalletType !== 'Native'
 			);
 
+			const totalCount = walletsCountNotNative.length;
+
 			// Filter wallets based on the search query and other filters
 			const filteredWallets = wallets.filter(wallet => {
 				const matchesSearch = search
@@ -271,7 +273,7 @@ export class WalletService {
 
 			return {
 				paginatedWallets,
-				walletsCountNotNative,
+				totalCount,
 			};
 		} catch (error) {
 			Sentry.captureException(error);
