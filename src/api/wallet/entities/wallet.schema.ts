@@ -1,7 +1,7 @@
 import * as dynamoose from 'dynamoose';
 import { v4 as uuidv4 } from 'uuid';
-import { HttpException, HttpStatus } from "@nestjs/common";
-import { errorCodes } from "../../../utils/constants";
+import { HttpException, HttpStatus } from '@nestjs/common';
+import { errorCodes } from '../../../utils/constants';
 
 export const WalletSchema = new dynamoose.Schema(
 	{

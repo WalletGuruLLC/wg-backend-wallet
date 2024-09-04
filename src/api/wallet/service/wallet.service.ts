@@ -392,6 +392,15 @@ export class WalletService {
 			userId,
 		};
 
+		userInfo = await axios.put(
+			this.AUTH_MICRO_URL + `/api/v1/users/${userId}/toggle-first`,
+			{},
+			{
+				headers: {
+					Authorization: token,
+				},
+			}
+		);
 		return await this.create(wallet, wallet.rafikiId, wallet.userId);
 	}
 
