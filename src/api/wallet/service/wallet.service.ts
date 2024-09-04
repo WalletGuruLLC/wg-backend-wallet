@@ -216,7 +216,9 @@ export class WalletService {
 
 			const totalWallets = await this.dbInstance.scan().exec();
 
-			const totalItems = totalWallets.count;
+			const walletsCountNotNative = totalWallets.filter(
+				wallet => wallet.WalletType !== 'Native'
+			);
 
 			// Filter wallets based on the search query and other filters
 			const filteredWallets = wallets.filter(wallet => {
@@ -269,7 +271,7 @@ export class WalletService {
 
 			return {
 				paginatedWallets,
-				totalItems,
+				walletsCountNotNative,
 			};
 		} catch (error) {
 			Sentry.captureException(error);
