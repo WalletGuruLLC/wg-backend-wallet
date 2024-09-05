@@ -1,15 +1,31 @@
 image: python:3.7.4-alpine3.10
 
-
 definitions:
   services:
     docker:
       memory: 7168
 
+  steps:
+    -step: &build-image
+      name: Push to ECR
+      size: 2x
+      services:
+        - docker
+      script:
+        - TAG=${BITBUCKET_BRANCH}-${BITBUCKET_BUILD_NUMBER}
+        - TAG_LATEST=${BITBUCKET_BRANCH}-latest
+        - docker build --build-arg NODE_ENV=$NODE_ENV --build-arg AWS_REGION=$AWS_REGION --build-arg AWS_KEY_ID=$AWS_KEY_ID --build-arg AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY --build-arg COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID --build-arg COGNITO_CLIENT_ID=$COGNITO_CLIENT_ID --build-arg SENTRY_DSN=$SENTRY_DSN --build-arg AUTH_URL=$AUTH_URL --build-arg RAFIKI_GRAPHQL_URL=$RAFIKI_GRAPHQL_URL --build-arg DOMAIN_WALLET_URL=$DOMAIN_WALLET_URL -t ${IMAGE}:$TAG -t ${IMAGE}:$TAG_LATEST .
+        - pipe: atlassian/aws-ecr-push-image:2.4.2
+          variables:
+            AWS_ACCESS_KEY_ID: $AWS_KEY
+            AWS_SECRET_ACCESS_KEY: $AWS_SECRET
+            AWS_DEFAULT_REGION: us-east-2
+            IMAGE_NAME: ${IMAGE}
+            TAGS: '${BITBUCKET_BRANCH}-${BITBUCKET_BUILD_NUMBER} ${BITBUCKET_BRANCH}-latest'
+
 options:
   docker: true
   size: 2x
-
 pipelines:
   pull-requests:
     "**":
@@ -32,24 +48,7 @@ pipelines:
           name: Build with Docker
           deployment: Dev
           steps:
-            - step:
-                name: Build with Docker
-                size: 2x
-                script:
-                  - pip3 install awscli
-                  - TAG=${BITBUCKET_BRANCH}-${BITBUCKET_BUILD_NUMBER}
-                  - TAG_LATEST=${BITBUCKET_BRANCH}-latest
-                  - aws configure set aws_access_key_id "${AWS_KEY}"
-                  - aws configure set aws_secret_access_key "${AWS_SECRET}"
-                  - eval $(aws ecr get-login --no-include-email --region us-east-2 | sed 's;https://;;g')
-                  - docker build --build-arg NODE_ENV=$NODE_ENV --build-arg AWS_REGION=$AWS_REGION --build-arg AWS_KEY_ID=$AWS_KEY_ID --build-arg AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY --build-arg COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID --build-arg COGNITO_CLIENT_ID=$COGNITO_CLIENT_ID --build-arg SENTRY_DSN=$SENTRY_DSN --build-arg AUTH_URL=$AUTH_URL --build-arg RAFIKI_GRAPHQL_URL=$RAFIKI_GRAPHQL_URL --build-arg DOMAIN_WALLET_URL=$DOMAIN_WALLET_URL -t ${IMAGE}:$TAG .
-                  - docker build --build-arg NODE_ENV=$NODE_ENV --build-arg AWS_REGION=$AWS_REGION --build-arg AWS_KEY_ID=$AWS_KEY_ID --build-arg AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY --build-arg COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID --build-arg COGNITO_CLIENT_ID=$COGNITO_CLIENT_ID --build-arg SENTRY_DSN=$SENTRY_DSN --build-arg AUTH_URL=$AUTH_URL --build-arg RAFIKI_GRAPHQL_URL=$RAFIKI_GRAPHQL_URL --build-arg DOMAIN_WALLET_URL=$DOMAIN_WALLET_URL -t ${IMAGE}:$TAG_LATEST .
-                  - docker push ${IMAGE}:$TAG
-                  - docker push ${IMAGE}:$TAG_LATEST
-                caches:
-                  - pip
-                services:
-                  - docker
+            - step: *build-image
             - step:
                 name: Deploy to DEV
                 script:
@@ -71,24 +70,7 @@ pipelines:
           name: Build with Docker
           deployment: QA
           steps:
-            - step:
-                name: Build with Docker
-                size: 2x
-                script:
-                  - pip3 install awscli
-                  - TAG=${BITBUCKET_BRANCH}-${BITBUCKET_BUILD_NUMBER}
-                  - TAG_LATEST=${BITBUCKET_BRANCH}-latest
-                  - aws configure set aws_access_key_id "${AWS_KEY}"
-                  - aws configure set aws_secret_access_key "${AWS_SECRET}"
-                  - eval $(aws ecr get-login --no-include-email --region us-east-2 | sed 's;https://;;g')
-                  - docker build --build-arg NODE_ENV=$NODE_ENV --build-arg AWS_REGION=$AWS_REGION --build-arg AWS_KEY_ID=$AWS_KEY_ID --build-arg AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY --build-arg COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID --build-arg COGNITO_CLIENT_ID=$COGNITO_CLIENT_ID --build-arg SENTRY_DSN=$SENTRY_DSN --build-arg AUTH_URL=$AUTH_URL --build-arg RAFIKI_GRAPHQL_URL=$RAFIKI_GRAPHQL_URL --build-arg DOMAIN_WALLET_URL=$DOMAIN_WALLET_URL -t ${IMAGE}:$TAG .
-                  - docker build --build-arg NODE_ENV=$NODE_ENV --build-arg AWS_REGION=$AWS_REGION --build-arg AWS_KEY_ID=$AWS_KEY_ID --build-arg AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY --build-arg COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID --build-arg COGNITO_CLIENT_ID=$COGNITO_CLIENT_ID --build-arg SENTRY_DSN=$SENTRY_DSN --build-arg AUTH_URL=$AUTH_URL --build-arg RAFIKI_GRAPHQL_URL=$RAFIKI_GRAPHQL_URL --build-arg DOMAIN_WALLET_URL=$DOMAIN_WALLET_URL -t ${IMAGE}:$TAG_LATEST .
-                  - docker push ${IMAGE}:$TAG
-                  - docker push ${IMAGE}:$TAG_LATEST
-                caches:
-                  - pip
-                services:
-                  - docker
+            - step: *build-image
             - step:
                 name: Deploy to QA
                 script:
