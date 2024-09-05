@@ -63,7 +63,7 @@ pipelines:
                         - "image"
                         - "--namespace=dev"
                         - "deployment/backend-wallet"
-                        - "backend-wallet=${IMAGE}:${BITBUCKET_BRANCH}-${BITBUCKET_BUILD_NUMBER}"
+                        - "backend-wallet=${IMAGE_URL}:${BITBUCKET_BRANCH}-${BITBUCKET_BUILD_NUMBER}"
                       DEBUG: "true"
     "qa":
       - stage:
@@ -85,5 +85,5 @@ pipelines:
                         - "image"
                         - "--namespace=qa"
                         - "deployment/backend-wallet"
-                        - "backend-wallet=${IMAGE}:${BITBUCKET_BRANCH}-${BITBUCKET_BUILD_NUMBER}"
+                        - "backend-wallet=${IMAGE_URL}:${BITBUCKET_BRANCH}-${BITBUCKET_BUILD_NUMBER}"
                       DEBUG: "true"
