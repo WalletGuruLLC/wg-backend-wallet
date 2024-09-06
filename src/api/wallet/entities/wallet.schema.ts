@@ -62,6 +62,9 @@ export const WalletSchema = new dynamoose.Schema(
 		UserId: {
 			type: String,
 		},
+		ProviderId: {
+			type: String,
+		},
 		Active: {
 			type: Boolean,
 			required: true,
