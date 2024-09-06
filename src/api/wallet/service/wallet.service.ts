@@ -395,16 +395,17 @@ export class WalletService {
 				createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
 			userId,
 		};
-
-		userInfo = await axios.put(
-			this.AUTH_MICRO_URL + `/api/v1/users/${userId}/toggle-first`,
-			{},
-			{
-				headers: {
-					Authorization: token,
-				},
-			}
-		);
+		if (userInfo?.data?.first) {
+			userInfo = await axios.put(
+				this.AUTH_MICRO_URL + `/api/v1/users/${userId}/toggle-first`,
+				{},
+				{
+					headers: {
+						Authorization: token,
+					},
+				}
+			);
+		}
 		return await this.create(wallet, wallet.rafikiId, wallet.userId);
 	}
 
@@ -431,11 +432,11 @@ export class WalletService {
 	private async createWalletAddressGraphQL(
 		createRafikiWalletAddressInput: any
 	) {
-		//TODO: improve remaining input values, for now some things are hardcoded for reaching the US
+		//TODO: improve remaining input values, for now some things are hardcoded
 		const input = {
 			assetId: createRafikiWalletAddressInput.assetId,
 			url: createRafikiWalletAddressInput.walletAddress,
-			publicName: 'account',
+			publicName: 'account', //TODO: Complete username
 			additionalProperties: [
 				{
 					key: 'iban',
