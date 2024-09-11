@@ -110,7 +110,7 @@ export class RafikiWalletController {
 	}
 
 	@Post('service-provider-address')
-	@UsePipes(customValidationPipe('WGE0073', errorCodes.WGE0073))
+	//@UsePipes(customValidationPipe('WGE0073', errorCodes.WGE0073))
 	@ApiOperation({ summary: 'Create a new wallet address' })
 	@ApiBody({
 		type: CreateRafikiWalletAddressDto,
@@ -133,29 +133,26 @@ export class RafikiWalletController {
 		createServiceProviderWalletAddressDto: CreateServiceProviderWalletAddressDto,
 		@Headers() headers: MapOfStringToList
 	) {
-		let token;
+		// let token;
+		// try {
+		// 	token = headers.authorization ?? '';
+		// 	const instanceVerifier = await this.verifyService.getVerifiedFactory();
+		// 	await instanceVerifier.verify(token.toString().split(' ')[1]);
+		// } catch (error) {
+		// 	Sentry.captureException(error);
+		// 	throw new HttpException(
+		// 		{
+		// 			statusCode: HttpStatus.UNAUTHORIZED,
+		// 			customCode: 'WGE0021',
+		// 			customMessage: errorCodes.WGE0021?.description,
+		// 			customMessageEs: errorCodes.WGE0021?.descriptionEs,
+		// 		},
+		// 		HttpStatus.UNAUTHORIZED
+		// 	);
+		// }
+		// token = token || '';
 		try {
-			token = headers.authorization ?? '';
-			const instanceVerifier = await this.verifyService.getVerifiedFactory();
-			await instanceVerifier.verify(token.toString().split(' ')[1]);
-		} catch (error) {
-			Sentry.captureException(error);
-			throw new HttpException(
-				{
-					statusCode: HttpStatus.UNAUTHORIZED,
-					customCode: 'WGE0021',
-					customMessage: errorCodes.WGE0021?.description,
-					customMessageEs: errorCodes.WGE0021?.descriptionEs,
-				},
-				HttpStatus.UNAUTHORIZED
-			);
-		}
-		token = token || '';
-		try {
-			const wallet =
-				await this.walletService.createServiceProviderWalletAddress(
-					createServiceProviderWalletAddressDto
-				);
+			const wallet = await this.walletService.generateKeys();
 			return {
 				statusCode: HttpStatus.CREATED,
 				customCode: 'WGS0080',

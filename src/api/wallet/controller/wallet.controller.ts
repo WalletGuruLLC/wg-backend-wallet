@@ -218,7 +218,7 @@ export class WalletController {
 				customMessageEs: successCodes.WGE0077?.descriptionEs,
 				data: {
 					wallet: walletsReturned.paginatedWallets,
-					total: walletsReturned.totalCount
+					total: walletsReturned.totalCount,
 				},
 			};
 		} catch (error) {

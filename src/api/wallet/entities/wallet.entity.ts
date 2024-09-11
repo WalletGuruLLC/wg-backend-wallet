@@ -9,4 +9,6 @@ export class Wallet extends Document {
 	UserId?: string;
 	ProviderId?: string;
 	Active = true;
+	PrivateKey?: string;
+	PublicKey?: string;
 }

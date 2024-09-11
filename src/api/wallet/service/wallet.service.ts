@@ -2,6 +2,7 @@ import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as dynamoose from 'dynamoose';
 import * as AWS from 'aws-sdk';
+import { v4 as uuidv4 } from 'uuid';
 import { Model } from 'dynamoose/dist/Model';
 import { WalletSchema } from '../entities/wallet.schema';
 import { Wallet } from '../entities/wallet.entity';
@@ -18,6 +19,8 @@ import { GraphqlService } from '../../../graphql/graphql.service';
 import { CreateRafikiWalletAddressDto } from '../dto/create-rafiki-wallet-address.dto';
 import { CreateServiceProviderWalletAddressDto } from '../dto/create-rafiki-service-provider-wallet-address.dto';
 import { errorCodes } from 'src/utils/constants';
+import { generatePublicKeyRafiki } from 'src/utils/helpers/generatePublicKeyRafiki';
+import { generateJwk } from 'src/utils/helpers/jwk';
 
 @Injectable()
 export class WalletService {
@@ -312,6 +315,19 @@ export class WalletService {
 		return await this.dbInstance.get(id);
 	}
 
+	async generateKeys() {
+		const pairs = await generatePublicKeyRafiki();
+		return pairs;
+	}
+
+	async updateKeys(id, pairs) {
+		await this.dbInstance.update(id, {
+			PrivateKey: pairs?.privateKeyPEM,
+			PublicKey: pairs?.publicKeyPEM,
+		});
+		return pairs;
+	}
+
 	async createWalletAddress(
 		createRafikiWalletAddressDto: CreateRafikiWalletAddressDto,
 		token: string
@@ -362,9 +378,14 @@ export class WalletService {
 		};
 
 		let createdRafikiWalletAddress;
+		const pairs = await this.generateKeys();
+		const keyId = uuidv4();
+		const jwk = await generateJwk(pairs?.privateKey, keyId);
+
 		try {
 			createdRafikiWalletAddress = await this.createWalletAddressGraphQL(
-				createRafikiWalletAddressInput
+				createRafikiWalletAddressInput,
+				jwk
 			);
 		} catch (error) {
 			if (error instanceof ApolloError) {
@@ -416,7 +437,13 @@ export class WalletService {
 				}
 			);
 		}
-		return await this.create(wallet, wallet.rafikiId, wallet.userId);
+		const walletCreated = await this.create(
+			wallet,
+			wallet.rafikiId,
+			wallet.userId
+		);
+		await this.updateKeys(walletCreated?.id, pairs);
+		return walletCreated;
 	}
 
 	async createServiceProviderWalletAddress(
@@ -461,10 +488,14 @@ export class WalletService {
 			publicName: `${createServiceProviderWalletAddressDto.providerName}`,
 		};
 
+		const pairs = await this.generateKeys();
+		const keyId = uuidv4();
+		const jwk = await generateJwk(pairs?.privateKey, keyId);
 		let createdRafikiWalletAddress;
 		try {
 			createdRafikiWalletAddress = await this.createWalletAddressGraphQL(
-				createRafikiWalletAddressInput
+				createRafikiWalletAddressInput,
+				jwk
 			);
 		} catch (error) {
 			if (error instanceof ApolloError) {
@@ -505,7 +536,14 @@ export class WalletService {
 				createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
 			providerId: createServiceProviderWalletAddressDto.providerId,
 		};
-		return await this.create(wallet, wallet.rafikiId, null, wallet.providerId);
+		const walletCreated = await this.create(
+			wallet,
+			wallet.rafikiId,
+			null,
+			wallet.providerId
+		);
+		await this.updateKeys(walletCreated?.id, pairs);
+		return walletCreated;
 	}
 
 	private async isProviderIdExists(providerId: string): Promise<boolean> {
@@ -538,7 +576,8 @@ export class WalletService {
 	}
 
 	private async createWalletAddressGraphQL(
-		createRafikiWalletAddressInput: any
+		createRafikiWalletAddressInput: any,
+		jwk
 	) {
 		//TODO: improve remaining input values, for now some things are hardcoded
 		const input = {
@@ -556,6 +595,14 @@ export class WalletService {
 		};
 
 		const result = await this.graphqlService.createWalletAddress(input);
+
+		const inputWalletKey = {
+			walletAddressId: result?.createWalletAddress?.walletAddress?.id,
+			jwk,
+		};
+
+		await this.graphqlService.createWalletAddressKey(inputWalletKey);
+
 		return result;
 	}
 
