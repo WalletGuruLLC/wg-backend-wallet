@@ -33,6 +33,7 @@ import {
 } from '../dto/wallet.dto';
 import * as Sentry from '@sentry/nestjs';
 import { MapOfStringToList } from 'aws-sdk/clients/apigateway';
+import { convertToCamelCase } from 'src/utils/helpers/convertCamelCase';
 
 @ApiTags('wallet')
 @Controller('api/v1/wallets')
@@ -218,7 +219,7 @@ export class WalletController {
 				customMessageEs: successCodes.WGE0077?.descriptionEs,
 				data: {
 					wallet: walletsReturned.paginatedWallets,
-					total: walletsReturned.totalCount
+					total: walletsReturned.totalCount,
 				},
 			};
 		} catch (error) {
@@ -325,6 +326,55 @@ export class WalletController {
 				},
 				HttpStatus.INTERNAL_SERVER_ERROR
 			);
+		}
+	}
+
+	// CONTROLLER TO GET ALL ROUTES
+	@Get('wallet/token')
+	@ApiOkResponse({
+		description: 'Successfully returned wallet',
+	})
+	@ApiBearerAuth('JWT')
+	async findWalletByToken(@Headers('authorization') token: string) {
+		try {
+			const instanceVerifier = await this.verifyService.getVerifiedFactory();
+			await instanceVerifier.verify(token.toString().split(' ')[1]);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new HttpException(
+				{
+					statusCode: HttpStatus.UNAUTHORIZED,
+					customCode: 'WGE0021',
+					customMessage: errorCodes.WGE0021?.description,
+					customMessageEs: errorCodes.WGE0021?.descriptionEs,
+				},
+				HttpStatus.UNAUTHORIZED
+			);
+		}
+
+		try {
+			if (token) {
+				const walletsReturned = await this.walletService.getWalletByToken(
+					token
+				);
+				return {
+					statusCode: HttpStatus.OK,
+					customCode: 'WGE0077',
+					customMessage: successCodes.WGE0077?.description,
+					customMessageEs: successCodes.WGE0077?.descriptionEs,
+					wallet: {
+						wallet: convertToCamelCase(walletsReturned),
+					},
+				};
+			}
+		} catch (error) {
+			Sentry.captureException(error);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0078',
+				customMessage: errorCodes.WGE0078?.description,
+				customMessageEs: errorCodes.WGE0078?.descriptionEs,
+			};
 		}
 	}
 }
