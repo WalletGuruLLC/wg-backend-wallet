@@ -470,4 +470,23 @@ export class WalletService {
 			id: asset.id,
 		}));
 	}
+
+	async getWalletByToken(token: string): Promise<Wallet> {
+		let userInfo = await axios.get(
+			this.AUTH_MICRO_URL + '/api/v1/users/current-user',
+			{
+				headers: {
+					Authorization: token,
+				},
+			}
+		);
+		userInfo = userInfo.data;
+		// const walletByUserId = await this.dbInstance.get({ UserId: String(userInfo.data.id) });
+		const walletByUserId = await this.dbInstance
+			.scan('UserId')
+			.eq(userInfo.data.id)
+			.exec();
+
+		return walletByUserId[0];
+	}
 }
