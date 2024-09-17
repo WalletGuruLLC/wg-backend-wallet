@@ -2,6 +2,7 @@ import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as dynamoose from 'dynamoose';
 import * as AWS from 'aws-sdk';
+import { v4 as uuidv4 } from 'uuid';
 import { Model } from 'dynamoose/dist/Model';
 import { WalletSchema } from '../entities/wallet.schema';
 import { Wallet } from '../entities/wallet.entity';
@@ -16,7 +17,10 @@ import axios from 'axios';
 
 import { GraphqlService } from '../../../graphql/graphql.service';
 import { CreateRafikiWalletAddressDto } from '../dto/create-rafiki-wallet-address.dto';
+import { CreateServiceProviderWalletAddressDto } from '../dto/create-rafiki-service-provider-wallet-address.dto';
 import { errorCodes } from 'src/utils/constants';
+import { generatePublicKeyRafiki } from 'src/utils/helpers/generatePublicKeyRafiki';
+import { generateJwk } from 'src/utils/helpers/jwk';
 
 @Injectable()
 export class WalletService {
@@ -41,7 +45,8 @@ export class WalletService {
 	async create(
 		createWalletDto: CreateWalletDto,
 		rafikiId?: string,
-		userId?: string
+		userId?: string,
+		providerId?: string
 	) {
 		try {
 			if (!rafikiId && !userId) {
@@ -78,6 +83,9 @@ export class WalletService {
 			if (userId) {
 				existingUser = await this.dbInstance.scan('UserId').eq(userId).exec();
 				createWalletDtoConverted.UserId = userId;
+			}
+			if (providerId) {
+				createWalletDtoConverted.ProviderId = providerId;
 			}
 
 			// Check if the WalletAddress already exists
@@ -119,6 +127,10 @@ export class WalletService {
 
 			if (userId) {
 				camelCaseWallet.userId = createdWallet.UserId;
+			}
+
+			if (providerId) {
+				camelCaseWallet.providerId = createdWallet.ProviderId;
 			}
 			return camelCaseWallet;
 		} catch (error) {
@@ -316,6 +328,31 @@ export class WalletService {
 		return await this.dbInstance.get(id);
 	}
 
+	async getWalletAddressExist(address: string) {
+		const wallets = await this.dbInstance
+			.scan('WalletAddress')
+			.eq(address)
+			.exec();
+		if (wallets?.[0]) {
+			return 'exist';
+		} else {
+			return 'don’t found';
+		}
+	}
+
+	async generateKeys() {
+		const pairs = await generatePublicKeyRafiki();
+		return pairs;
+	}
+
+	async updateKeys(id, pairs) {
+		await this.dbInstance.update(id, {
+			PrivateKey: pairs?.privateKeyPEM,
+			PublicKey: pairs?.publicKeyPEM,
+		});
+		return pairs;
+	}
+
 	async createWalletAddress(
 		createRafikiWalletAddressDto: CreateRafikiWalletAddressDto,
 		token: string
@@ -358,16 +395,22 @@ export class WalletService {
 				HttpStatus.BAD_REQUEST
 			);
 		}
-
+		//TODO: replace publicName with a default value when there are no names
 		const createRafikiWalletAddressInput = {
 			walletAddress,
 			assetId: createRafikiWalletAddressDto.assetId,
+			publicName: `${userInfo?.data?.firstName} ${userInfo?.data?.lastName}`,
 		};
 
 		let createdRafikiWalletAddress;
+		const pairs = await this.generateKeys();
+		const keyId = uuidv4();
+		const jwk = await generateJwk(pairs?.privateKey, keyId);
+
 		try {
 			createdRafikiWalletAddress = await this.createWalletAddressGraphQL(
-				createRafikiWalletAddressInput
+				createRafikiWalletAddressInput,
+				jwk
 			);
 		} catch (error) {
 			if (error instanceof ApolloError) {
@@ -408,17 +451,133 @@ export class WalletService {
 				createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
 			userId,
 		};
-
-		userInfo = await axios.put(
-			this.AUTH_MICRO_URL + `/api/v1/users/${userId}/toggle-first`,
-			{},
-			{
-				headers: {
-					Authorization: token,
-				},
-			}
+		if (userInfo?.data?.first) {
+			userInfo = await axios.put(
+				this.AUTH_MICRO_URL + `/api/v1/users/${userId}/toggle-first`,
+				{},
+				{
+					headers: {
+						Authorization: token,
+					},
+				}
+			);
+		}
+		const walletCreated = await this.create(
+			wallet,
+			wallet.rafikiId,
+			wallet.userId
 		);
-		return await this.create(wallet, wallet.rafikiId, wallet.userId);
+		await this.updateKeys(walletCreated?.id, pairs);
+		return walletCreated;
+	}
+
+	async createServiceProviderWalletAddress(
+		createServiceProviderWalletAddressDto: CreateServiceProviderWalletAddressDto
+	) {
+		if (
+			createServiceProviderWalletAddressDto.providerId &&
+			(await this.isProviderIdExists(
+				createServiceProviderWalletAddressDto.providerId
+			))
+		) {
+			throw new HttpException(
+				{
+					statusCode: HttpStatus.BAD_REQUEST,
+					customCode: 'WGE0082',
+					customMessage: errorCodes.WGE0082?.description,
+					customMessageEs: errorCodes.WGE0082?.descriptionEs,
+				},
+				HttpStatus.BAD_REQUEST
+			);
+		}
+		const walletAddress = `${this.DOMAIN_WALLET_URL}/${createServiceProviderWalletAddressDto.addressName}`;
+
+		const isWalletAddressTakenLocally = await this.isWalletAddressTakenLocally(
+			walletAddress
+		);
+		if (isWalletAddressTakenLocally) {
+			throw new HttpException(
+				{
+					statusCode: HttpStatus.BAD_REQUEST,
+					customCode: 'WGE0081',
+					customMessage: errorCodes.WGE0081?.description,
+					customMessageEs: errorCodes.WGE0081?.descriptionEs,
+				},
+				HttpStatus.BAD_REQUEST
+			);
+		}
+
+		const createRafikiWalletAddressInput = {
+			walletAddress,
+			assetId: createServiceProviderWalletAddressDto.assetId,
+			publicName: `${createServiceProviderWalletAddressDto.providerName}`,
+		};
+
+		const pairs = await this.generateKeys();
+		const keyId = uuidv4();
+		const jwk = await generateJwk(pairs?.privateKey, keyId);
+		let createdRafikiWalletAddress;
+		try {
+			createdRafikiWalletAddress = await this.createWalletAddressGraphQL(
+				createRafikiWalletAddressInput,
+				jwk
+			);
+		} catch (error) {
+			if (error instanceof ApolloError) {
+				if (
+					error.message.includes(
+						'duplicate key value violates unique constraint "walletaddresses_url_unique"'
+					)
+				) {
+					throw new HttpException(
+						{
+							statusCode: HttpStatus.BAD_REQUEST,
+							customCode: 'WGE0081',
+							customMessage: errorCodes.WGE0081?.description,
+							customMessageEs: errorCodes.WGE0081?.descriptionEs,
+						},
+						HttpStatus.BAD_REQUEST
+					);
+				} else if (error.message.includes('unknown asset')) {
+					throw new HttpException(
+						{
+							statusCode: HttpStatus.BAD_REQUEST,
+							customCode: 'WGE0080',
+							customMessage: errorCodes.WGE0080?.description,
+							customMessageEs: errorCodes.WGE0080?.descriptionEs,
+						},
+						HttpStatus.BAD_REQUEST
+					);
+				}
+			}
+			throw error;
+		}
+
+		const wallet = {
+			name: 'Wallet Guru',
+			walletType: 'Native',
+			walletAddress: createRafikiWalletAddressInput.walletAddress,
+			rafikiId:
+				createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
+			providerId: createServiceProviderWalletAddressDto.providerId,
+		};
+		const walletCreated = await this.create(
+			wallet,
+			wallet.rafikiId,
+			null,
+			wallet.providerId
+		);
+		await this.updateKeys(walletCreated?.id, pairs);
+		return walletCreated;
+	}
+
+	private async isProviderIdExists(providerId: string): Promise<boolean> {
+		const existingWallet = await this.dbInstance
+			.scan()
+			.filter('ProviderId')
+			.eq(providerId)
+			.exec();
+		return existingWallet.count > 0;
 	}
 
 	private async isUserIdExists(userId: string): Promise<boolean> {
@@ -442,13 +601,14 @@ export class WalletService {
 	}
 
 	private async createWalletAddressGraphQL(
-		createRafikiWalletAddressInput: any
+		createRafikiWalletAddressInput: any,
+		jwk
 	) {
-		//TODO: improve remaining input values, for now some things are hardcoded for reaching the US
+		//TODO: improve remaining input values, for now some things are hardcoded
 		const input = {
 			assetId: createRafikiWalletAddressInput.assetId,
 			url: createRafikiWalletAddressInput.walletAddress,
-			publicName: 'account',
+			publicName: createRafikiWalletAddressInput.publicName,
 			additionalProperties: [
 				{
 					key: 'iban',
@@ -460,6 +620,14 @@ export class WalletService {
 		};
 
 		const result = await this.graphqlService.createWalletAddress(input);
+
+		const inputWalletKey = {
+			walletAddressId: result?.createWalletAddress?.walletAddress?.id,
+			jwk,
+		};
+
+		await this.graphqlService.createWalletAddressKey(inputWalletKey);
+
 		return result;
 	}
 
