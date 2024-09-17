@@ -315,6 +315,18 @@ export class WalletService {
 		return await this.dbInstance.get(id);
 	}
 
+	async getWalletAddressExist(address: string) {
+		const wallets = await this.dbInstance
+			.scan('WalletAddress')
+			.eq(address)
+			.exec();
+		if (wallets?.[0]) {
+			return 'exist';
+		} else {
+			return 'don’t found';
+		}
+	}
+
 	async generateKeys() {
 		const pairs = await generatePublicKeyRafiki();
 		return pairs;

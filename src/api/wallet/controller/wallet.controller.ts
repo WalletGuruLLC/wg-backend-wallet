@@ -21,6 +21,7 @@ import {
 	ApiOperation,
 	ApiParam,
 	ApiResponse,
+	ApiQuery,
 } from '@nestjs/swagger';
 
 import { WalletService } from '../service/wallet.service';
@@ -41,6 +42,31 @@ export class WalletController {
 		private readonly walletService: WalletService,
 		private readonly verifyService: VerifyService
 	) {}
+
+	@ApiOperation({ summary: 'Obtener si existe una wallet address' })
+	@ApiQuery({ name: 'address', required: false, type: String })
+	@Get('/exist')
+	async getWalletAddressExist(@Query('address') address: string) {
+		try {
+			const wallet = await this.walletService.getWalletAddressExist(address);
+			return {
+				statusCode: HttpStatus.OK,
+				customCode: 'WGE0077',
+				data: wallet,
+			};
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new HttpException(
+				{
+					statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+					customCode: 'WGE0078',
+					customMessage: errorCodes.WGE0078?.description,
+					customMessageEs: errorCodes.WGE0078?.descriptionEs,
+				},
+				HttpStatus.INTERNAL_SERVER_ERROR
+			);
+		}
+	}
 
 	//CONTROLLER TO ADD A WALLET
 	@Post('/')
