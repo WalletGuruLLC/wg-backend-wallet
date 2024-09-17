@@ -10,6 +10,7 @@ import {
 	Get,
 	Query,
 	Headers,
+	Res,
 } from '@nestjs/common';
 
 import {
@@ -34,6 +35,7 @@ import {
 } from '../dto/wallet.dto';
 import * as Sentry from '@sentry/nestjs';
 import { MapOfStringToList } from 'aws-sdk/clients/apigateway';
+import { convertToCamelCase } from 'src/utils/helpers/convertCamelCase';
 
 @ApiTags('wallet')
 @Controller('api/v1/wallets')
@@ -77,7 +79,8 @@ export class WalletController {
 	@ApiBearerAuth('JWT')
 	async create(
 		@Body() createWalletDto: CreateWalletDto,
-		@Headers() headers: MapOfStringToList
+		@Headers() headers: MapOfStringToList,
+		@Res() res
 	) {
 		try {
 			const token = headers.authorization ?? '';
@@ -85,49 +88,25 @@ export class WalletController {
 			await instanceVerifier.verify(token.toString().split(' ')[1]);
 		} catch (error) {
 			Sentry.captureException(error);
-			throw new HttpException(
-				{
-					statusCode: HttpStatus.UNAUTHORIZED,
-					customCode: 'WGE0021',
-					customMessage: errorCodes.WGE0021?.description,
-					customMessageEs: errorCodes.WGE0021?.descriptionEs,
-				},
-				HttpStatus.UNAUTHORIZED
-			);
+			return res.status(HttpStatus.UNAUTHORIZED).send({
+				statusCode: HttpStatus.UNAUTHORIZED,
+				customCode: 'WGE0001',
+			});
 		}
 
 		try {
 			const result = await this.walletService.create(createWalletDto);
-			return {
-				statusCode: HttpStatus.OK,
+			return res.status(HttpStatus.CREATED).send({
+				statusCode: HttpStatus.CREATED,
 				customCode: 'WGE0072',
-				customMessage: successCodes.WGE0072?.description.replace(
-					'$variable',
-					result.name
-				),
-				customMessageEs: successCodes.WGE0072?.descriptionEs.replace(
-					'$variable',
-					result.name
-				),
 				data: { wallet: result },
-			};
+			});
 		} catch (error) {
 			Sentry.captureException(error);
-			if (
-				error instanceof HttpException &&
-				error.getStatus() === HttpStatus.INTERNAL_SERVER_ERROR
-			) {
-				throw new HttpException(
-					{
-						statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-						customCode: 'WGE0073',
-						customMessage: errorCodes.WGE0073?.description,
-						customMessageEs: errorCodes.WGE0073?.descriptionEs,
-					},
-					HttpStatus.INTERNAL_SERVER_ERROR
-				);
-			}
-			throw error;
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0073',
+			});
 		}
 	}
 
@@ -141,7 +120,8 @@ export class WalletController {
 	async update(
 		@Param('id') id: string,
 		@Body() updateWalletDto: UpdateWalletDto,
-		@Headers() headers: MapOfStringToList
+		@Headers() headers: MapOfStringToList,
+		@Res() res
 	) {
 		try {
 			const token = headers.authorization ?? '';
@@ -149,26 +129,19 @@ export class WalletController {
 			await instanceVerifier.verify(token.toString().split(' ')[1]);
 		} catch (error) {
 			Sentry.captureException(error);
-			throw new HttpException(
-				{
-					statusCode: HttpStatus.UNAUTHORIZED,
-					customCode: 'WGE0022',
-					customMessage: errorCodes.WGE0021?.description,
-					customMessageEs: errorCodes.WGE0021?.descriptionEs,
-				},
-				HttpStatus.UNAUTHORIZED
-			);
+			return res.status(HttpStatus.UNAUTHORIZED).send({
+				statusCode: HttpStatus.UNAUTHORIZED,
+				customCode: 'WGE0001',
+			});
 		}
 
 		try {
 			const walletFind = await this.walletService.findOne(id);
 			if (!walletFind) {
-				return {
+				return res.status(HttpStatus.NOT_FOUND).send({
 					statusCode: HttpStatus.NOT_FOUND,
 					customCode: 'WGE0074',
-					customMessage: errorCodes.WGE0074?.description,
-					customMessageEs: errorCodes.WGE0074?.descriptionEs,
-				};
+				});
 			}
 			const walletUpdated = await this.walletService.update(
 				id,
@@ -181,30 +154,17 @@ export class WalletController {
 				walletAddress: walletUpdated?.WalletAddress,
 				active: walletUpdated?.Active,
 			};
-			return {
+			return res.status(HttpStatus.OK).send({
 				statusCode: HttpStatus.OK,
 				customCode: 'WGE0076',
-				customMessage: successCodes.WGE0076?.description.replace(
-					'$variable',
-					walletCamelCase.name
-				),
-				customMessageEs: successCodes.WGE0076?.descriptionEs.replace(
-					'$variable',
-					walletCamelCase.name
-				),
 				data: { wallet: walletCamelCase },
-			};
+			});
 		} catch (error) {
 			Sentry.captureException(error);
-			throw new HttpException(
-				{
-					statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-					customCode: 'WGE0075',
-					customMessage: errorCodes.WGE0075?.description,
-					customMessageEs: errorCodes.WGE0075?.descriptionEs,
-				},
-				HttpStatus.INTERNAL_SERVER_ERROR
-			);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0087',
+			});
 		}
 	}
 
@@ -216,7 +176,8 @@ export class WalletController {
 	@ApiBearerAuth('JWT')
 	async findAll(
 		@Query() getWalletDto: GetWalletDto,
-		@Headers() headers: MapOfStringToList
+		@Headers() headers: MapOfStringToList,
+		@Res() res
 	) {
 		try {
 			const token = headers.authorization ?? '';
@@ -224,37 +185,28 @@ export class WalletController {
 			await instanceVerifier.verify(token.toString().split(' ')[1]);
 		} catch (error) {
 			Sentry.captureException(error);
-			throw new HttpException(
-				{
-					statusCode: HttpStatus.UNAUTHORIZED,
-					customCode: 'WGE0021',
-					customMessage: errorCodes.WGE0021?.description,
-					customMessageEs: errorCodes.WGE0021?.descriptionEs,
-				},
-				HttpStatus.UNAUTHORIZED
-			);
+			return res.status(HttpStatus.UNAUTHORIZED).send({
+				statusCode: HttpStatus.UNAUTHORIZED,
+				customCode: 'WGE0001',
+			});
 		}
 
 		try {
 			const walletsReturned = await this.walletService.getWallets(getWalletDto);
-			return {
+			return res.status(HttpStatus.OK).send({
 				statusCode: HttpStatus.OK,
 				customCode: 'WGE0077',
-				customMessage: successCodes.WGE0077?.description,
-				customMessageEs: successCodes.WGE0077?.descriptionEs,
 				data: {
 					wallet: walletsReturned.paginatedWallets,
 					total: walletsReturned.totalCount,
 				},
-			};
+			});
 		} catch (error) {
 			Sentry.captureException(error);
-			return {
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-				customCode: 'WGE0078',
-				customMessage: errorCodes.WGE0078?.description,
-				customMessageEs: errorCodes.WGE0078?.descriptionEs,
-			};
+				customCode: 'WGE0074',
+			});
 		}
 	}
 
@@ -270,33 +222,19 @@ export class WalletController {
 		status: 404,
 		description: 'Wallet not found.',
 	})
-	async toggle(@Param('id') id: string) {
+	async toggle(@Param('id') id: string, @Res() res) {
 		try {
 			const wallet = await this.walletService.toggle(id);
-			return {
+			return res.status(HttpStatus.OK).send({
 				statusCode: HttpStatus.OK,
-				customCode: 'WGE0076',
-				customMessage: successCodes.WGE0076?.description,
-				customMessageEs: successCodes.WGE0076?.descriptionEs,
+				customCode: 'WGE0090',
 				data: { wallet: wallet },
-			};
+			});
 		} catch (error) {
-			if (
-				error instanceof HttpException &&
-				error.getStatus() === HttpStatus.INTERNAL_SERVER_ERROR
-			) {
-				Sentry.captureException(error);
-				throw new HttpException(
-					{
-						statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-						customCode: 'WGE0075',
-						customMessage: errorCodes.WGE0075?.description,
-						customMessageEs: errorCodes.WGE0075?.descriptionEs,
-					},
-					HttpStatus.INTERNAL_SERVER_ERROR
-				);
-			}
-			throw error;
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0089',
+			});
 		}
 	}
 
@@ -309,7 +247,7 @@ export class WalletController {
 	})
 	@ApiResponse({ status: 404, description: 'Wallet not found' })
 	@Get('/:id')
-	async listAccessLevels(@Param('id') walletID: string) {
+	async listAccessLevels(@Res() res, @Param('id') walletID: string) {
 		try {
 			const wallet = await this.walletService.findWallet(walletID);
 
@@ -322,35 +260,63 @@ export class WalletController {
 			};
 
 			if (!wallet) {
-				throw new HttpException(
-					{
-						statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-						customCode: 'WGE0078',
-						customMessage: errorCodes.WGE0078?.description,
-						customMessageEs: errorCodes.WGE0078?.descriptionEs,
-					},
-					HttpStatus.INTERNAL_SERVER_ERROR
-				);
+				return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+					statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+					customCode: 'WGE0074',
+				});
 			}
 
 			return {
 				statusCode: HttpStatus.OK,
 				customCode: 'WGE0077',
-				customMessage: successCodes.WGE0077?.description,
-				customMessageEs: successCodes.WGE0077?.descriptionEs,
 				data: { wallet: walletResponse },
 			};
 		} catch (error) {
 			Sentry.captureException(error);
-			throw new HttpException(
-				{
-					statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-					customCode: 'WGE0078',
-					customMessage: errorCodes.WGE0078?.description,
-					customMessageEs: errorCodes.WGE0078?.descriptionEs,
-				},
-				HttpStatus.INTERNAL_SERVER_ERROR
-			);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0074',
+			});
+		}
+	}
+
+	// CONTROLLER TO GET ALL ROUTES
+	@Get('wallet/token')
+	@ApiOkResponse({
+		description: 'Successfully returned wallet',
+	})
+	@ApiBearerAuth('JWT')
+	async findWalletByToken(@Headers('authorization') token: string, @Res() res) {
+		try {
+			const instanceVerifier = await this.verifyService.getVerifiedFactory();
+			await instanceVerifier.verify(token.toString().split(' ')[1]);
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.UNAUTHORIZED).send({
+				statusCode: HttpStatus.UNAUTHORIZED,
+				customCode: 'WGE0001',
+			});
+		}
+
+		try {
+			if (token) {
+				const walletsReturned = await this.walletService.getWalletByToken(
+					token
+				);
+				return res.status(HttpStatus.OK).send({
+					statusCode: HttpStatus.OK,
+					customCode: 'WGE0077',
+					wallet: {
+						wallet: convertToCamelCase(walletsReturned),
+					},
+				});
+			}
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0074',
+			});
 		}
 	}
 }

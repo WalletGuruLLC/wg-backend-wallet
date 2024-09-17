@@ -41,6 +41,7 @@ export class WalletService {
 	}
 
 	//SERVICE TO CREATE A WALLET
+	//SERVICE TO CREATE A WALLET
 	async create(
 		createWalletDto: CreateWalletDto,
 		rafikiId?: string,
@@ -66,13 +67,21 @@ export class WalletService {
 			const createWalletDtoConverted = {
 				Name: createWalletDto.name,
 				WalletType: createWalletDto.walletType,
-				WalletAddress: createWalletDto.walletAddress,
+				WalletAddress: createWalletDto.walletAddress.toLowerCase(),
 			} as any;
 
+			let existingRafikiUser: any = [];
+			let existingUser: any = [];
+
 			if (rafikiId) {
+				existingRafikiUser = await this.dbInstance
+					.scan('RafikiId')
+					.eq(rafikiId)
+					.exec();
 				createWalletDtoConverted.RafikiId = rafikiId;
 			}
 			if (userId) {
+				existingUser = await this.dbInstance.scan('UserId').eq(userId).exec();
 				createWalletDtoConverted.UserId = userId;
 			}
 			if (providerId) {
@@ -82,10 +91,14 @@ export class WalletService {
 			// Check if the WalletAddress already exists
 			const existingWallets = await this.dbInstance
 				.scan('WalletAddress')
-				.eq(createWalletDto.walletAddress)
+				.eq(createWalletDto.walletAddress.toLowerCase())
 				.exec();
 
-			if (existingWallets.count > 0) {
+			if (
+				existingWallets.count > 0 ||
+				existingRafikiUser.count > 0 ||
+				existingUser.count > 0
+			) {
 				throw new HttpException(
 					{
 						statusCode: HttpStatus.BAD_REQUEST,
@@ -624,5 +637,24 @@ export class WalletService {
 			code: asset.code,
 			id: asset.id,
 		}));
+	}
+
+	async getWalletByToken(token: string): Promise<Wallet> {
+		let userInfo = await axios.get(
+			this.AUTH_MICRO_URL + '/api/v1/users/current-user',
+			{
+				headers: {
+					Authorization: token,
+				},
+			}
+		);
+		userInfo = userInfo.data;
+		// const walletByUserId = await this.dbInstance.get({ UserId: String(userInfo.data.id) });
+		const walletByUserId = await this.dbInstance
+			.scan('UserId')
+			.eq(userInfo.data.id)
+			.exec();
+
+		return walletByUserId[0];
 	}
 }
