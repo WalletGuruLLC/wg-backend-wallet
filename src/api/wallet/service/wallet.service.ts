@@ -1,16 +1,11 @@
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as dynamoose from 'dynamoose';
-import * as AWS from 'aws-sdk';
 import { v4 as uuidv4 } from 'uuid';
 import { Model } from 'dynamoose/dist/Model';
 import { WalletSchema } from '../entities/wallet.schema';
 import { Wallet } from '../entities/wallet.entity';
-import {
-	CreateWalletDto,
-	UpdateWalletDto,
-	GetWalletDto,
-} from '../dto/wallet.dto';
+import { CreateWalletDto, UpdateWalletDto } from '../dto/wallet.dto';
 import * as Sentry from '@sentry/nestjs';
 import { ApolloError } from '@apollo/client/errors';
 import axios from 'axios';
@@ -21,6 +16,9 @@ import { CreateServiceProviderWalletAddressDto } from '../dto/create-rafiki-serv
 import { errorCodes } from 'src/utils/constants';
 import { generatePublicKeyRafiki } from 'src/utils/helpers/generatePublicKeyRafiki';
 import { generateJwk } from 'src/utils/helpers/jwk';
+import { tigerBeetleClient } from '../../../config/tigerBeetleClient';
+import { AccountFilterFlags } from 'tigerbeetle-node';
+import { convertToCamelCase } from '../../../utils/helpers/convertCamelCase';
 
 @Injectable()
 export class WalletService {
@@ -639,7 +637,84 @@ export class WalletService {
 		}));
 	}
 
-	async getWalletByToken(token: string): Promise<Wallet> {
+	async getWalletByToken(
+		token: string
+	): Promise<{ walletDb: Wallet; balance: any; reserved: number }> {
+		const walletDb = await this.getUserByToken(token);
+		const idBigInt = this.uuidToBigInt(walletDb.RafikiId);
+
+		const accounts = await tigerBeetleClient.lookupAccounts([idBigInt]);
+
+		return {
+			walletDb: walletDb,
+			balance: parseInt(
+				this.serializeBigInt(
+					accounts[0].credits_posted - accounts[0].debits_posted
+				)
+			),
+			reserved: accounts[0].reserved,
+		};
+	}
+
+	async listTransactions(token: string, filter: string) {
+		if (!filter) {
+			filter = 'all';
+		}
+
+		const walletDb = await this.getUserByToken(token);
+		const idBigInt = await this.uuidToBigInt(walletDb.RafikiId);
+
+		// Common query template
+		const baseQuery = {
+			account_id: idBigInt,
+			user_data_128: BigInt(0), // No filter by UserData.
+			user_data_64: BigInt(0),
+			user_data_32: 0,
+			code: 0, // No filter by Code.
+			timestamp_min: BigInt(0), // No filter by Timestamp.
+			timestamp_max: BigInt(0), // No filter by Timestamp.
+			limit: 10, // Limit to ten balances at most.
+		};
+
+		let creditQuery = [];
+		let debitQuery = [];
+
+		if (filter === 'credit') {
+			const creditFlagsQuery = {
+				...baseQuery,
+				flags: AccountFilterFlags.credits | AccountFilterFlags.reversed,
+			};
+			creditQuery = await tigerBeetleClient.getAccountTransfers(
+				creditFlagsQuery
+			);
+		} else if (filter === 'debit') {
+			const debitFlagsQuery = {
+				...baseQuery,
+				flags: AccountFilterFlags.debits | AccountFilterFlags.reversed,
+			};
+			debitQuery = await tigerBeetleClient.getAccountTransfers(debitFlagsQuery);
+		} else {
+			const creditFlagsQuery = {
+				...baseQuery,
+				flags: AccountFilterFlags.credits | AccountFilterFlags.reversed,
+			};
+			const debitFlagsQuery = {
+				...baseQuery,
+				flags: AccountFilterFlags.debits | AccountFilterFlags.reversed,
+			};
+			creditQuery = await tigerBeetleClient.getAccountTransfers(
+				creditFlagsQuery
+			);
+			debitQuery = await tigerBeetleClient.getAccountTransfers(debitFlagsQuery);
+		}
+
+		return {
+			credits: convertToCamelCase(this.serializeBigInt(creditQuery)),
+			debits: convertToCamelCase(this.serializeBigInt(debitQuery)),
+		};
+	}
+
+	async getUserByToken(token: string) {
 		let userInfo = await axios.get(
 			this.AUTH_MICRO_URL + '/api/v1/users/current-user',
 			{
@@ -649,7 +724,6 @@ export class WalletService {
 			}
 		);
 		userInfo = userInfo.data;
-		// const walletByUserId = await this.dbInstance.get({ UserId: String(userInfo.data.id) });
 		const walletByUserId = await this.dbInstance
 			.scan('UserId')
 			.eq(userInfo.data.id)
@@ -657,4 +731,34 @@ export class WalletService {
 
 		return walletByUserId[0];
 	}
+
+	uuidToBigInt(id: string): bigint {
+		return BigInt(`0x${id.replace(/-/g, '')}`);
+	}
+
+	fromTigerBeetleId(bi: bigint): string {
+		let str = bi.toString(16);
+		while (str.length < 32) str = '0' + str;
+		if (str.length === 32) {
+			str = `${str.substring(0, 8)}-${str.substring(8, 12)}-${str.substring(
+				12,
+				16
+			)}-${str.substring(16, 20)}-${str.substring(20)}`;
+		}
+		return str;
+	}
+
+	serializeBigInt = (obj: any) => {
+		return JSON.parse(
+			JSON.stringify(obj, (key, value) => {
+				if (typeof value === 'bigint') {
+					if (key === 'credit_account_id' || key === 'debitit_account_id') {
+						return this.fromTigerBeetleId(value);
+					}
+					return value.toString();
+				}
+				return value;
+			})
+		);
+	};
 }
