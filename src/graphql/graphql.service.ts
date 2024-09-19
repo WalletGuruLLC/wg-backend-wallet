@@ -120,13 +120,22 @@ export class GraphqlService {
 		return result.data.assets.edges.map(edge => edge.node);
 	}
 
-	async listTransactions(walletAddressId: string) {
+	async listWalletInfo(walletAddressId: string) {
 		const query = gql`
 			query WalletAddress($walletAddressId: String!) {
 				walletAddress(id: $walletAddressId) {
 					id
 					publicName
 					url
+					asset {
+						code
+						id
+						liquidity
+						liquidityThreshold
+						scale
+						withdrawalThreshold
+						__typename
+					}
 					incomingPayments {
 						edges {
 							node {
