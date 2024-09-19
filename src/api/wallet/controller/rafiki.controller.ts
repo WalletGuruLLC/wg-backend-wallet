@@ -7,6 +7,8 @@ import {
 	Get,
 	Headers,
 	UsePipes,
+	Res,
+	Query,
 } from '@nestjs/common';
 
 import {
@@ -235,6 +237,51 @@ export class RafikiWalletController {
 				);
 			}
 			throw error;
+		}
+	}
+
+	@Get('list-transactions')
+	@ApiOperation({ summary: 'List all user transactions' })
+	async listTransactions(
+		@Query('filter') filter: string,
+		@Headers() headers: MapOfStringToList,
+		@Res() res
+	) {
+		let token;
+		try {
+			token = headers.authorization ?? '';
+			const instanceVerifier = await this.verifyService.getVerifiedFactory();
+			await instanceVerifier.verify(token.toString().split(' ')[1]);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new HttpException(
+				{
+					statusCode: HttpStatus.UNAUTHORIZED,
+					customCode: 'WGE0021',
+					customMessage: errorCodes.WGE0021?.description,
+					customMessageEs: errorCodes.WGE0021?.descriptionEs,
+				},
+				HttpStatus.UNAUTHORIZED
+			);
+		}
+
+		try {
+			const transactions = await this.walletService.listTransactions(
+				token,
+				filter
+			);
+			return res.status(HttpStatus.OK).send({
+				statusCode: HttpStatus.OK,
+				customCode: 'WGS0081',
+				data: { transactions: transactions },
+			});
+		} catch (error) {
+			Sentry.captureException(error);
+			console.log('error', error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0083',
+			});
 		}
 	}
 }
