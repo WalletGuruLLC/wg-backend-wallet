@@ -272,7 +272,7 @@ export class RafikiWalletController {
 			);
 			return res.status(HttpStatus.OK).send({
 				statusCode: HttpStatus.OK,
-				customCode: 'WGS0081',
+				customCode: 'WGS0138',
 				data: { transactions: transactions },
 			});
 		} catch (error) {
@@ -280,7 +280,7 @@ export class RafikiWalletController {
 			console.log('error', error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-				customCode: 'WGE0083',
+				customCode: 'WGE0137',
 			});
 		}
 	}
