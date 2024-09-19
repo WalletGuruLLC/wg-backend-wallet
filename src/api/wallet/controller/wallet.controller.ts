@@ -306,7 +306,7 @@ export class WalletController {
 				return res.status(HttpStatus.OK).send({
 					statusCode: HttpStatus.OK,
 					customCode: 'WGE0077',
-					wallet: {
+					data: {
 						wallet: convertToCamelCase(walletsReturned),
 					},
 				});

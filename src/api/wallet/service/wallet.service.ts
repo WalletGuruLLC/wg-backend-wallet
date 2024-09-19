@@ -639,14 +639,18 @@ export class WalletService {
 
 	async getWalletByToken(
 		token: string
-	): Promise<{ walletDb: Wallet; balance: any; reserved: number }> {
+	): Promise<{ walletDb: Wallet; balance: number; walletAsset: any; reserved: number }> {
 		const walletDb = await this.getUserByToken(token);
 		const idBigInt = this.uuidToBigInt(walletDb.RafikiId);
 
+		const walletInfo = await this.graphqlService.listWalletInfo(
+			walletDb.RafikiId
+		);
 		const accounts = await tigerBeetleClient.lookupAccounts([idBigInt]);
 
 		return {
 			walletDb: walletDb,
+			walletAsset: walletInfo.data.walletAddress.asset,
 			balance: parseInt(
 				this.serializeBigInt(
 					accounts[0].credits_posted - accounts[0].debits_posted
@@ -662,7 +666,7 @@ export class WalletService {
 		}
 
 		const walletDb = await this.getUserByToken(token);
-		const idBigInt = await this.uuidToBigInt(walletDb.RafikiId);
+		const idBigInt = this.uuidToBigInt(walletDb.RafikiId);
 
 		// Common query template
 		const baseQuery = {
