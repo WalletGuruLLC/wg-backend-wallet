@@ -76,6 +76,9 @@ export const WalletSchema = new dynamoose.Schema(
 		PublicKey: {
 			type: String,
 		},
+		KeyId: {
+			type: String,
+		},
 	},
 	{
 		timestamps: {

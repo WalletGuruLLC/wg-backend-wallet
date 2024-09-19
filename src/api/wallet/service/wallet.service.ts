@@ -345,10 +345,11 @@ export class WalletService {
 		return pairs;
 	}
 
-	async updateKeys(id, pairs) {
+	async updateKeys(id, pairs, keyId) {
 		await this.dbInstance.update(id, {
 			PrivateKey: pairs?.privateKeyPEM,
 			PublicKey: pairs?.publicKeyPEM,
+			KeyId: keyId,
 		});
 		return pairs;
 	}
@@ -467,7 +468,7 @@ export class WalletService {
 			wallet.rafikiId,
 			wallet.userId
 		);
-		await this.updateKeys(walletCreated?.id, pairs);
+		await this.updateKeys(walletCreated?.id, pairs, keyId);
 		return walletCreated;
 	}
 
@@ -567,7 +568,7 @@ export class WalletService {
 			null,
 			wallet.providerId
 		);
-		await this.updateKeys(walletCreated?.id, pairs);
+		await this.updateKeys(walletCreated?.id, pairs, keyId);
 		return walletCreated;
 	}
 
