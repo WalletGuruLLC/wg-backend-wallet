@@ -1892,7 +1892,7 @@
     "@types/node" "*"
     form-data "^4.0.0"
 
-"@types/node@*", "@types/node@^16.18.108":
+"@types/node@*", "@types/node@^16.0.0":
   version "16.18.108"
   resolved "https://registry.npmjs.org/@types/node/-/node-16.18.108.tgz"
   integrity sha512-fj42LD82fSv6yN9C6Q4dzS+hujHj+pTv0IpRR3kI20fnYeS0ytBpjFO9OjmDowSPPt4lNKN46JLaKbCyP+BW2A==
