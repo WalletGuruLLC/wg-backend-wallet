@@ -19,7 +19,6 @@ import { generateJwk } from 'src/utils/helpers/jwk';
 import { tigerBeetleClient } from '../../../config/tigerBeetleClient';
 import { AccountFilterFlags } from 'tigerbeetle-node';
 import { convertToCamelCase } from '../../../utils/helpers/convertCamelCase';
-import { ApolloQueryResult } from '@apollo/client';
 
 @Injectable()
 export class WalletService {
@@ -344,10 +343,11 @@ export class WalletService {
 		return pairs;
 	}
 
-	async updateKeys(id, pairs) {
+	async updateKeys(id, pairs, keyId) {
 		await this.dbInstance.update(id, {
 			PrivateKey: pairs?.privateKeyPEM,
 			PublicKey: pairs?.publicKeyPEM,
+			KeyId: keyId,
 		});
 		return pairs;
 	}
@@ -466,7 +466,7 @@ export class WalletService {
 			wallet.rafikiId,
 			wallet.userId
 		);
-		await this.updateKeys(walletCreated?.id, pairs);
+		await this.updateKeys(walletCreated?.id, pairs, keyId);
 		return walletCreated;
 	}
 
@@ -566,7 +566,7 @@ export class WalletService {
 			null,
 			wallet.providerId
 		);
-		await this.updateKeys(walletCreated?.id, pairs);
+		await this.updateKeys(walletCreated?.id, pairs, keyId);
 		return walletCreated;
 	}
 

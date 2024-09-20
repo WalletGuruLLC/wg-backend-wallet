@@ -135,26 +135,29 @@ export class RafikiWalletController {
 		createServiceProviderWalletAddressDto: CreateServiceProviderWalletAddressDto,
 		@Headers() headers: MapOfStringToList
 	) {
-		// let token;
-		// try {
-		// 	token = headers.authorization ?? '';
-		// 	const instanceVerifier = await this.verifyService.getVerifiedFactory();
-		// 	await instanceVerifier.verify(token.toString().split(' ')[1]);
-		// } catch (error) {
-		// 	Sentry.captureException(error);
-		// 	throw new HttpException(
-		// 		{
-		// 			statusCode: HttpStatus.UNAUTHORIZED,
-		// 			customCode: 'WGE0021',
-		// 			customMessage: errorCodes.WGE0021?.description,
-		// 			customMessageEs: errorCodes.WGE0021?.descriptionEs,
-		// 		},
-		// 		HttpStatus.UNAUTHORIZED
-		// 	);
-		// }
-		// token = token || '';
+		let token;
 		try {
-			const wallet = await this.walletService.generateKeys();
+			token = headers.authorization ?? '';
+			const instanceVerifier = await this.verifyService.getVerifiedFactory();
+			await instanceVerifier.verify(token.toString().split(' ')[1]);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new HttpException(
+				{
+					statusCode: HttpStatus.UNAUTHORIZED,
+					customCode: 'WGE0021',
+					customMessage: errorCodes.WGE0021?.description,
+					customMessageEs: errorCodes.WGE0021?.descriptionEs,
+				},
+				HttpStatus.UNAUTHORIZED
+			);
+		}
+		token = token || '';
+		try {
+			const wallet =
+				await this.walletService.createServiceProviderWalletAddress(
+					createServiceProviderWalletAddressDto
+				);
 			return {
 				statusCode: HttpStatus.CREATED,
 				customCode: 'WGS0080',

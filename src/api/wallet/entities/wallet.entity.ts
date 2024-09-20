@@ -11,4 +11,5 @@ export class Wallet extends Document {
 	Active = true;
 	PrivateKey?: string;
 	PublicKey?: string;
+	KeyId?: string;
 }
