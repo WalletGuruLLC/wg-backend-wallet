@@ -36,12 +36,14 @@
 		"@nestjs/platform-express": "^9.0.0",
 		"@nestjs/schematics": "^9.0.0",
 		"@nestjs/swagger": "^7.4.0",
+		"@noble/ed25519": "^2.1.0",
 		"@sentry/nestjs": "^8.26.0",
 		"@sentry/profiling-node": "^8.26.0",
 		"@southlane/cognito-jwt-verifier": "^0.1.8",
 		"amazon-cognito-identity-js": "^6.3.12",
 		"apollo-server-express": "^3.13.0",
 		"axios": "^1.7.5",
+		"base64url": "^3.0.1",
 		"bcrypt": "^5.1.1",
 		"class-transformer": "^0.5.1",
 		"class-validator": "^0.13.2",
@@ -54,7 +56,8 @@
 		"otp-generator": "^4.0.1",
 		"reflect-metadata": "^0.1.13",
 		"rimraf": "^3.0.2",
-		"rxjs": "^7.2.0"
+		"rxjs": "^7.2.0",
+		"tigerbeetle-node": "^0.16.2"
 	},
 	"devDependencies": {
 		"@nestjs/cli": "^9.0.0",

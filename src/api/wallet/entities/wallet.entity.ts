@@ -7,5 +7,8 @@ export class Wallet extends Document {
 	WalletAddress = '';
 	RafikiId?: string;
 	UserId?: string;
+	ProviderId?: string;
 	Active = true;
+	PrivateKey?: string;
+	PublicKey?: string;
 }

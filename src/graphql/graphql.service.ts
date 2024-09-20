@@ -39,6 +39,33 @@ export class GraphqlService {
 		return result.data;
 	}
 
+	async createWalletAddressKey(input: any) {
+		const mutation = gql`
+			mutation CreateWalletAddressKey($input: CreateWalletAddressKeyInput!) {
+				createWalletAddressKey(input: $input) {
+					walletAddressKey {
+						id
+						revoked
+						walletAddressId
+						createdAt
+						jwk {
+							alg
+							crv
+							kid
+							kty
+							x
+						}
+					}
+				}
+			}
+		`;
+
+		const variables = { input };
+		const client = this.apolloClientService.getClient();
+		const result = await client.mutate({ mutation, variables });
+		return result.data;
+	}
+
 	async getAssets(
 		after: string | null,
 		before: string | null,
@@ -91,5 +118,38 @@ export class GraphqlService {
 		const client = this.apolloClientService.getClient();
 		const result = await client.query({ query, variables });
 		return result.data.assets.edges.map(edge => edge.node);
+	}
+
+	async listTransactions(walletAddressId: string) {
+		const query = gql`
+			query WalletAddress($walletAddressId: String!) {
+				walletAddress(id: $walletAddressId) {
+					id
+					publicName
+					url
+					incomingPayments {
+						edges {
+							node {
+								receivedAmount {
+									value
+									assetScale
+									assetCode
+								}
+								id
+								incomingAmount {
+									value
+									assetScale
+									assetCode
+								}
+							}
+						}
+					}
+				}
+			}
+		`;
+
+		const variables = { walletAddressId };
+		const client = this.apolloClientService.getClient();
+		return await client.query({ query, variables });
 	}
 }
