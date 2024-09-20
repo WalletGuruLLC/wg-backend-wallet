@@ -19,7 +19,6 @@ import { generateJwk } from 'src/utils/helpers/jwk';
 import { tigerBeetleClient } from '../../../config/tigerBeetleClient';
 import { AccountFilterFlags } from 'tigerbeetle-node';
 import { convertToCamelCase } from '../../../utils/helpers/convertCamelCase';
-import { ApolloQueryResult } from '@apollo/client';
 
 @Injectable()
 export class WalletService {

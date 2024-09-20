@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import process from 'node:process';
 import { ConfigService } from '@nestjs/config';
 import { verifierFactory } from '@southlane/cognito-jwt-verifier';
 
