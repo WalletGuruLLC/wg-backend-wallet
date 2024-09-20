@@ -343,10 +343,11 @@ export class WalletService {
 		return pairs;
 	}
 
-	async updateKeys(id, pairs) {
+	async updateKeys(id, pairs, keyId) {
 		await this.dbInstance.update(id, {
 			PrivateKey: pairs?.privateKeyPEM,
 			PublicKey: pairs?.publicKeyPEM,
+			KeyId: keyId,
 		});
 		return pairs;
 	}
@@ -465,7 +466,7 @@ export class WalletService {
 			wallet.rafikiId,
 			wallet.userId
 		);
-		await this.updateKeys(walletCreated?.id, pairs);
+		await this.updateKeys(walletCreated?.id, pairs, keyId);
 		return walletCreated;
 	}
 
@@ -565,7 +566,7 @@ export class WalletService {
 			null,
 			wallet.providerId
 		);
-		await this.updateKeys(walletCreated?.id, pairs);
+		await this.updateKeys(walletCreated?.id, pairs, keyId);
 		return walletCreated;
 	}
 
@@ -637,16 +638,24 @@ export class WalletService {
 		}));
 	}
 
-	async getWalletByToken(
-		token: string
-	): Promise<{ walletDb: Wallet; balance: any; reserved: number }> {
+	async getWalletByToken(token: string): Promise<{
+		walletDb: Wallet;
+		balance: number;
+		walletAsset: any;
+		reserved: number;
+	}> {
 		const walletDb = await this.getUserByToken(token);
 		const idBigInt = this.uuidToBigInt(walletDb.RafikiId);
-
+		const walletInfo = await this.graphqlService.listWalletInfo(
+			walletDb.RafikiId
+		);
 		const accounts = await tigerBeetleClient.lookupAccounts([idBigInt]);
-
+		if (walletDb.RafikiId) {
+			delete walletDb.RafikiId;
+		}
 		return {
 			walletDb: walletDb,
+			walletAsset: walletInfo.data.walletAddress.asset,
 			balance: parseInt(
 				this.serializeBigInt(
 					accounts[0].credits_posted - accounts[0].debits_posted
@@ -662,7 +671,7 @@ export class WalletService {
 		}
 
 		const walletDb = await this.getUserByToken(token);
-		const idBigInt = await this.uuidToBigInt(walletDb.RafikiId);
+		const idBigInt = this.uuidToBigInt(walletDb.RafikiId);
 
 		// Common query template
 		const baseQuery = {
@@ -727,6 +736,16 @@ export class WalletService {
 		const walletByUserId = await this.dbInstance
 			.scan('UserId')
 			.eq(userInfo.data.id)
+			.attributes([
+				'UserId',
+				'CreateDate',
+				'UpdateDate',
+				'WalletType',
+				'Id',
+				'Active',
+				'Name',
+				'RafikiId',
+			]) // Apenas traga estas colunas
 			.exec();
 
 		return walletByUserId[0];

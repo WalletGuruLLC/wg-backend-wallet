@@ -38,15 +38,11 @@ export class AccessControlMiddleware implements NestMiddleware {
 		};
 
 		try {
-			const response = await axios.post(
-				this.authUrl + '/api/v1/users/validate-access',
-				body,
-				{
-					headers: {
-						Authorization: authHeader,
-					},
-				}
-			);
+			await axios.post(this.authUrl + '/api/v1/users/validate-access', body, {
+				headers: {
+					Authorization: authHeader,
+				},
+			});
 			next();
 		} catch (error) {
 			const errorMessage = error.response?.data || error.message;
