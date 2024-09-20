@@ -227,7 +227,7 @@ export class WalletController {
 			const wallet = await this.walletService.toggle(id);
 			return res.status(HttpStatus.OK).send({
 				statusCode: HttpStatus.OK,
-				customCode: 'WGE0090',
+				customCode: 'WGE0088',
 				data: { wallet: wallet },
 			});
 		} catch (error) {
