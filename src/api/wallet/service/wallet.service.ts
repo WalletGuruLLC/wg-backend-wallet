@@ -19,6 +19,7 @@ import { generateJwk } from 'src/utils/helpers/jwk';
 import { tigerBeetleClient } from '../../../config/tigerBeetleClient';
 import { AccountFilterFlags } from 'tigerbeetle-node';
 import { convertToCamelCase } from '../../../utils/helpers/convertCamelCase';
+import { ApolloQueryResult } from '@apollo/client';
 
 @Injectable()
 export class WalletService {
@@ -637,17 +638,21 @@ export class WalletService {
 		}));
 	}
 
-	async getWalletByToken(
-		token: string
-	): Promise<{ walletDb: Wallet; balance: number; walletAsset: any; reserved: number }> {
+	async getWalletByToken(token: string): Promise<{
+		walletDb: Wallet;
+		balance: number;
+		walletAsset: any;
+		reserved: number;
+	}> {
 		const walletDb = await this.getUserByToken(token);
 		const idBigInt = this.uuidToBigInt(walletDb.RafikiId);
-
 		const walletInfo = await this.graphqlService.listWalletInfo(
 			walletDb.RafikiId
 		);
 		const accounts = await tigerBeetleClient.lookupAccounts([idBigInt]);
-
+		if (walletDb.RafikiId) {
+			delete walletDb.RafikiId;
+		}
 		return {
 			walletDb: walletDb,
 			walletAsset: walletInfo.data.walletAddress.asset,
@@ -731,6 +736,16 @@ export class WalletService {
 		const walletByUserId = await this.dbInstance
 			.scan('UserId')
 			.eq(userInfo.data.id)
+			.attributes([
+				'UserId',
+				'CreateDate',
+				'UpdateDate',
+				'WalletType',
+				'Id',
+				'Active',
+				'Name',
+				'RafikiId',
+			]) // Apenas traga estas colunas
 			.exec();
 
 		return walletByUserId[0];

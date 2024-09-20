@@ -131,9 +131,7 @@ export class GraphqlService {
 						code
 						id
 						liquidity
-						liquidityThreshold
 						scale
-						withdrawalThreshold
 						__typename
 					}
 					incomingPayments {
