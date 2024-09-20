@@ -91,7 +91,7 @@ pipelines:
     "stg":
       - stage:
           name: Build with Docker
-          deployment: QA
+          deployment: Stg
           steps:
             - step: *build-image
             - step:
