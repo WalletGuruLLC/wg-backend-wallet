@@ -87,3 +87,26 @@ pipelines:
                         - "deployment/backend-wallet"
                         - "backend-wallet=${IMAGE_URL}:${BITBUCKET_BRANCH}-${BITBUCKET_BUILD_NUMBER}"
                       DEBUG: "true"
+
+    "stg":
+      - stage:
+          name: Build with Docker
+          deployment: Stg
+          steps:
+            - step: *build-image
+            - step:
+                name: Deploy to Staging
+                script:
+                  - pipe: atlassian/aws-eks-kubectl-run:1.2.0
+                    variables:
+                      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID_TERRAFORM}
+                      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY_TERRAFORM}
+                      AWS_DEFAULT_REGION: "us-east-2"
+                      CLUSTER_NAME: ${CLUSTER_NAME}
+                      KUBECTL_COMMAND: "set"
+                      KUBECTL_ARGS:
+                        - "image"
+                        - "--namespace=stg"
+                        - "deployment/backend-wallet"
+                        - "backend-wallet=${IMAGE_URL}:${BITBUCKET_BRANCH}-${BITBUCKET_BUILD_NUMBER}"
+                      DEBUG: "true"
