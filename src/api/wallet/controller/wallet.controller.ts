@@ -225,11 +225,19 @@ export class WalletController {
 	async toggle(@Param('id') id: string, @Res() res) {
 		try {
 			const wallet = await this.walletService.toggle(id);
-			return res.status(HttpStatus.OK).send({
-				statusCode: HttpStatus.OK,
-				customCode: 'WGE0088',
-				data: { wallet: wallet },
-			});
+			if (wallet.active === true) {
+				return res.status(HttpStatus.OK).send({
+					statusCode: HttpStatus.OK,
+					customCode: 'WGE0088',
+					data: { wallet: wallet },
+				});
+			} else {
+				return res.status(HttpStatus.OK).send({
+					statusCode: HttpStatus.OK,
+					customCode: 'WGE0090',
+					data: { wallet: wallet },
+				});
+			}
 		} catch (error) {
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
