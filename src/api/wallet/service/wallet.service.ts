@@ -640,87 +640,58 @@ export class WalletService {
 
 	async getWalletByToken(token: string): Promise<{
 		walletDb: Wallet;
-		balance: number;
 		walletAsset: any;
+		balance: number;
 		reserved: number;
 	}> {
 		const walletDb = await this.getUserByToken(token);
-		const idBigInt = this.uuidToBigInt(walletDb.RafikiId);
 		const walletInfo = await this.graphqlService.listWalletInfo(
 			walletDb.RafikiId
 		);
-		const accounts = await tigerBeetleClient.lookupAccounts([idBigInt]);
 		if (walletDb.RafikiId) {
 			delete walletDb.RafikiId;
 		}
 		return {
 			walletDb: walletDb,
 			walletAsset: walletInfo.data.walletAddress.asset,
-			balance: parseInt(
-				this.serializeBigInt(
-					accounts[0].credits_posted - accounts[0].debits_posted
-				)
-			),
-			reserved: accounts[0].reserved,
+			balance: 0,
+			reserved: 0,
 		};
 	}
 
-	async listTransactions(token: string, filter: string) {
-		if (!filter) {
-			filter = 'all';
+	async listTransactions(token: string, search: string) {
+		if (!search) {
+			search = 'all';
 		}
 
 		const walletDb = await this.getUserByToken(token);
-		const idBigInt = this.uuidToBigInt(walletDb.RafikiId);
 
-		// Common query template
-		const baseQuery = {
-			account_id: idBigInt,
-			user_data_128: BigInt(0), // No filter by UserData.
-			user_data_64: BigInt(0),
-			user_data_32: 0,
-			code: 0, // No filter by Code.
-			timestamp_min: BigInt(0), // No filter by Timestamp.
-			timestamp_max: BigInt(0), // No filter by Timestamp.
-			limit: 10, // Limit to ten balances at most.
-		};
+		const transactions = await this.graphqlService.listTransactions(
+			walletDb.RafikiId
+		);
+		const completedIncomingPayments = this.extractAndSortCompletedPayments(
+			transactions.data.walletAddress.incomingPayments.edges,
+			walletDb.Id
+		);
+		const completedOutgoingPayments = this.extractAndSortCompletedPayments(
+			transactions.data.walletAddress.outgoingPayments.edges,
+			walletDb.Id
+		);
 
-		let creditQuery = [];
-		let debitQuery = [];
-
-		if (filter === 'credit') {
-			const creditFlagsQuery = {
-				...baseQuery,
-				flags: AccountFilterFlags.credits | AccountFilterFlags.reversed,
-			};
-			creditQuery = await tigerBeetleClient.getAccountTransfers(
-				creditFlagsQuery
-			);
-		} else if (filter === 'debit') {
-			const debitFlagsQuery = {
-				...baseQuery,
-				flags: AccountFilterFlags.debits | AccountFilterFlags.reversed,
-			};
-			debitQuery = await tigerBeetleClient.getAccountTransfers(debitFlagsQuery);
+		if (search === 'credit') {
+			return convertToCamelCase({
+				completedIncomingPayments,
+			});
+		} else if (search === 'debit') {
+			return convertToCamelCase({
+				completedOutgoingPayments,
+			});
 		} else {
-			const creditFlagsQuery = {
-				...baseQuery,
-				flags: AccountFilterFlags.credits | AccountFilterFlags.reversed,
-			};
-			const debitFlagsQuery = {
-				...baseQuery,
-				flags: AccountFilterFlags.debits | AccountFilterFlags.reversed,
-			};
-			creditQuery = await tigerBeetleClient.getAccountTransfers(
-				creditFlagsQuery
-			);
-			debitQuery = await tigerBeetleClient.getAccountTransfers(debitFlagsQuery);
+			return convertToCamelCase({
+				completedIncomingPayments,
+				completedOutgoingPayments,
+			});
 		}
-
-		return {
-			credits: convertToCamelCase(this.serializeBigInt(creditQuery)),
-			debits: convertToCamelCase(this.serializeBigInt(debitQuery)),
-		};
 	}
 
 	async getUserByToken(token: string) {
@@ -751,35 +722,34 @@ export class WalletService {
 		return walletByUserId[0];
 	}
 
-	uuidToBigInt(id: string): bigint {
-		return BigInt(`0x${id.replace(/-/g, '')}`);
-	}
-
-	fromTigerBeetleId(bi: bigint): string {
-		let str = bi.toString(16);
-		while (str.length < 32) str = '0' + str;
-		if (str.length === 32) {
-			str = `${str.substring(0, 8)}-${str.substring(8, 12)}-${str.substring(
-				12,
-				16
-			)}-${str.substring(16, 20)}-${str.substring(20)}`;
-		}
-		return str;
-	}
-
-	serializeBigInt = (obj: any) => {
-		return JSON.parse(
-			JSON.stringify(obj, (key, value) => {
-				if (typeof value === 'bigint') {
-					if (key === 'credit_account_id' || key === 'debitit_account_id') {
-						return this.fromTigerBeetleId(value);
-					}
-					return value.toString();
+	extractAndSortCompletedPayments(edges: any[], walletAddressId: string) {
+		return edges
+			.filter(edge => edge.node.state === 'COMPLETED')
+			.map(edge => {
+				const node = edge.node;
+				let creditAccountId: string | undefined;
+				let debitAccountId: string | undefined;
+				if (edge.__typename === 'IncomingPaymentEdge') {
+					creditAccountId = walletAddressId;
+					debitAccountId = 'EMPTY';
+				} else if (edge.__typename === 'OutgoingPaymentEdge') {
+					debitAccountId = walletAddressId;
+					creditAccountId = 'EMPTY';
 				}
-				return value;
+				return {
+					id: node.id,
+					state: node.state,
+					description: node.metadata?.description || '',
+					value: node.receivedAmount?.value || node.debitAmount?.value || 0,
+					assetCode:
+						node.receivedAmount?.assetCode || node.debitAmount?.assetCode || '',
+					createdAt: new Date(node.createdAt).getTime(),
+					debitAccountId,
+					creditAccountId,
+				};
 			})
-		);
-	};
+			.sort((a, b) => b.createdAt - a.createdAt);
+	}
 
 	async createReceiver(input: any) {
 		try {
