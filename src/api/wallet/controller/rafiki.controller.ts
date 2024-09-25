@@ -17,8 +17,9 @@ import {
 	ApiOperation,
 	ApiResponse,
 	ApiBearerAuth,
-	ApiBody, ApiQuery
-} from "@nestjs/swagger";
+	ApiBody,
+	ApiQuery,
+} from '@nestjs/swagger';
 
 import { WalletService } from '../service/wallet.service';
 import { VerifyService } from '../../../verify/verify.service';
@@ -256,7 +257,7 @@ export class RafikiWalletController {
 	async listTransactions(
 		@Headers() headers: MapOfStringToList,
 		@Res() res,
-		@Query('search') search?: string,
+		@Query('search') search?: string
 	) {
 		let token;
 		try {
