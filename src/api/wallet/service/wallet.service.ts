@@ -780,4 +780,36 @@ export class WalletService {
 			})
 		);
 	};
+
+	async createReceiver(input: any) {
+		try {
+			return await this.graphqlService.createReceiver(input);
+		} catch (error) {
+			throw new Error(`Error creating receiver: ${error.message}`);
+		}
+	}
+
+	async createQuote(input: any) {
+		try {
+			return await this.graphqlService.createQuote(input);
+		} catch (error) {
+			throw new Error(`Error creating quote: ${error.message}`);
+		}
+	}
+
+	async createOutgoingPayment(input: any) {
+		try {
+			return await this.graphqlService.createOutgoingPayment(input);
+		} catch (error) {
+			throw new Error(`Error creating outgoing payment: ${error.message}`);
+		}
+	}
+
+	async getOutgoingPayment(id: string) {
+		try {
+			return await this.graphqlService.getOutgoingPayment(id);
+		} catch (error) {
+			throw new Error(`Error fetching outgoing payment: ${error.message}`);
+		}
+	}
 }

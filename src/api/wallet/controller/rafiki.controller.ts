@@ -9,6 +9,8 @@ import {
 	UsePipes,
 	Res,
 	Query,
+	Param,
+	Req,
 } from '@nestjs/common';
 
 import {
@@ -28,6 +30,15 @@ import { MapOfStringToList } from 'aws-sdk/clients/apigateway';
 import { CreateRafikiWalletAddressDto } from '../dto/create-rafiki-wallet-address.dto';
 import { CreateServiceProviderWalletAddressDto } from '../dto/create-rafiki-service-provider-wallet-address.dto';
 import { customValidationPipe } from '../../validation.pipe';
+import {
+	addApiSignatureHeader,
+	addSignatureHeaders,
+} from 'src/utils/helpers/signatureHelper';
+import {
+	CreateOutgoingPaymentInputDTO,
+	CreateQuoteInputDTO,
+	ReceiverInputDTO,
+} from '../dto/payments-rafiki.dto';
 
 @ApiTags('wallet-rafiki')
 @Controller('api/v1/wallets-rafiki')
@@ -284,6 +295,52 @@ export class RafikiWalletController {
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
 				customCode: 'WGE0137',
+			});
+		}
+	}
+
+	@Post('transaction')
+	@ApiOperation({ summary: 'Create a transaction' })
+	@ApiResponse({
+		status: 201,
+		description: 'transaction created successfully.',
+	})
+	@ApiResponse({ status: 400, description: 'Bad Request' })
+	async createTransaction(
+		@Body() input: ReceiverInputDTO,
+		@Req() req,
+		@Res() res
+	) {
+		try {
+			await addApiSignatureHeader(req, req.body);
+			const inputReceiver = {
+				metadata: input.metadata,
+				incomingAmount: input.incomingAmount,
+				walletAddressUrl: input.walletAddressUrl,
+			};
+
+			const receiver = await this.walletService.createReceiver(inputReceiver);
+			const quoteInput = {
+				walletAddressId: input?.walletAddressId,
+				receiver: receiver?.createReceiver?.receiver?.id,
+			};
+
+			const quote = await this.walletService.createQuote(quoteInput);
+			const inputOutgoing = {
+				walletAddressId: input?.walletAddressId,
+				quoteId: quote?.createQuote?.quote?.id,
+			};
+			const outgoingPayment = await this.walletService.createOutgoingPayment(
+				inputOutgoing
+			);
+			return res.status(200).send({
+				data: outgoingPayment,
+				customCode: 'WGE0150',
+			});
+		} catch (error) {
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0151',
 			});
 		}
 	}
