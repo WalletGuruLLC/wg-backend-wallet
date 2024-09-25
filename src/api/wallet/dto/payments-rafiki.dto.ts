@@ -44,6 +44,20 @@ export class ReceiverInputDTO {
 	walletAddressId: string;
 }
 
+export class GeneralReceiverInputDTO {
+	@ValidateNested()
+	@Type(() => MetadataDTO)
+	metadata: MetadataDTO;
+
+	@ValidateNested()
+	@Type(() => IncomingAmountDTO)
+	incomingAmount: IncomingAmountDTO;
+
+	@IsString()
+	@IsNotEmpty()
+	walletAddressUrl: string;
+}
+
 export class CreateQuoteInputDTO {
 	@IsString()
 	@IsNotEmpty()

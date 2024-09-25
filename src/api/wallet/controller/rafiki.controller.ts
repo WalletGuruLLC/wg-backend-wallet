@@ -9,7 +9,6 @@ import {
 	UsePipes,
 	Res,
 	Query,
-	Param,
 	Req,
 } from '@nestjs/common';
 
@@ -30,13 +29,10 @@ import { MapOfStringToList } from 'aws-sdk/clients/apigateway';
 import { CreateRafikiWalletAddressDto } from '../dto/create-rafiki-wallet-address.dto';
 import { CreateServiceProviderWalletAddressDto } from '../dto/create-rafiki-service-provider-wallet-address.dto';
 import { customValidationPipe } from '../../validation.pipe';
+import { addApiSignatureHeader } from 'src/utils/helpers/signatureHelper';
 import {
-	addApiSignatureHeader,
-	addSignatureHeaders,
-} from 'src/utils/helpers/signatureHelper';
-import {
-	CreateOutgoingPaymentInputDTO,
 	CreateQuoteInputDTO,
+	GeneralReceiverInputDTO,
 	ReceiverInputDTO,
 } from '../dto/payments-rafiki.dto';
 
@@ -350,7 +346,7 @@ export class RafikiWalletController {
 	@ApiResponse({ status: 201, description: 'Receiver created successfully.' })
 	@ApiResponse({ status: 400, description: 'Bad Request' })
 	async createReceiver(
-		@Body() input: ReceiverInputDTO,
+		@Body() input: GeneralReceiverInputDTO,
 		@Req() req,
 		@Res() res
 	) {
