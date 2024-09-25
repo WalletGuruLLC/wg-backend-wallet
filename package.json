@@ -51,6 +51,7 @@
 		"dynamoose": "^2.8.6",
 		"graphql": "^16.9.0",
 		"husky": "^8.0.0",
+		"json-canonicalize": "^1.0.6",
 		"lint-staged": "^15.2.7",
 		"nodemailer": "^6.9.14",
 		"otp-generator": "^4.0.1",
