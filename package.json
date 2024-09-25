@@ -32,10 +32,13 @@
 		"@nestjs/core": "^9.0.0",
 		"@nestjs/graphql": "^12.2.0",
 		"@nestjs/mapped-types": "*",
+		"@nestjs/microservices": "^10.4.4",
 		"@nestjs/mongoose": "^10.0.10",
 		"@nestjs/platform-express": "^9.0.0",
+		"@nestjs/platform-socket.io": "^10.4.4",
 		"@nestjs/schematics": "^9.0.0",
 		"@nestjs/swagger": "^7.4.0",
+		"@nestjs/websockets": "^10.4.4",
 		"@noble/ed25519": "^2.1.0",
 		"@sentry/nestjs": "^8.26.0",
 		"@sentry/profiling-node": "^8.26.0",
@@ -58,7 +61,10 @@
 		"reflect-metadata": "^0.1.13",
 		"rimraf": "^3.0.2",
 		"rxjs": "^7.2.0",
-		"tigerbeetle-node": "^0.16.2"
+		"selfsigned": "^2.4.1",
+		"socket.io": "^4.8.0",
+		"tigerbeetle-node": "^0.16.2",
+		"webpack": "^5.94.0"
 	},
 	"devDependencies": {
 		"@nestjs/cli": "^9.0.0",

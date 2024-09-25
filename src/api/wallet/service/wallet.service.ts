@@ -9,7 +9,7 @@ import { CreateWalletDto, UpdateWalletDto } from '../dto/wallet.dto';
 import * as Sentry from '@sentry/nestjs';
 import { ApolloError } from '@apollo/client/errors';
 import axios from 'axios';
-
+import { createSign, createVerify } from 'crypto';
 import { GraphqlService } from '../../../graphql/graphql.service';
 import { CreateRafikiWalletAddressDto } from '../dto/create-rafiki-wallet-address.dto';
 import { CreateServiceProviderWalletAddressDto } from '../dto/create-rafiki-service-provider-wallet-address.dto';
@@ -793,5 +793,66 @@ export class WalletService {
 		} catch (error) {
 			throw new Error(`Error fetching outgoing payment: ${error.message}`);
 		}
+	}
+
+	private readonly privateKey = `-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEAv3+AxDN5lV+EvbDG9cMBbInT+bjWJ6nNPi/lAzOqpmfrIz5z
+Ww5/MBZDR2fyYLNQdYzBesuTtlBsR8NkqrV7mbFPmWCUjE/ERCK3A/BrbC/K8u0e
+CoOVplZlIHH0vkvFG2q54ecOqa6JiXCJKzoEfA5r5/lyt5IGDQZUcW315D4NDJnG
+ejVvASew/k5FFaM9nr+ZBIw7kSbG0JiqslXE0NdzjVaVChtpDR7W7dIK56/ciDa7
+59Xg8lq4t2CMAkqByQyeBibVqBiaoIpk7irCbJh+g89whUUKrWoAGLWBZIQcV4OW
+I861MWUe9Bf740XAOpwCjh7yqo7kYJHeGBRmRwIDAQABAoIBAEOfPDLMdI49VSwA
+7Tkiu/F+eDayQRlvejUQB6BKUeQCRUPETUrlwx8RdX+VIr9oAq0H39jDY61ZF+t9
+gaJQhM2Akfm446vqjQV8dsEy2FQzSkjfV6Dh12oODxbWdtTt/7QPS4WMqJ5drl60
+uRNlIOlH1G3tpcdSDsXxqscFS/PlIuRwQAGVxlHmXo+4dS6A9RGdXW19o5EVDbX9
+hWweU7s7j06fP0TmvWgvk86Mf/MIoI+o4xtlKj3NyMmw/4zK5avcHgXToen+bg+r
+x14G9xdH7Lyvs2BeKrZib712IKuEXy40E43R3raa7An0uD3F+Y+CYdwgUODofVU0
+f24NU/0CgYEA6toUdcQCaipotbGPah/dhE7rDz6pNEdqEbwU6G/j1iuPxi828BTc
+n99bGQWz4UhIefxeyrZexiVY+ko+vTeTuoDmucejGjYaNZXhon4kX7+ILU6JwAFz
+dMtdgO1C5jtCyx8Bc5GShT9eaYCyKxZNWPa8UIj7u6ljIDODP7oiPu0CgYEA0L4C
+fgon75kbZhF4WncoBOQ3HDvwTVcxTr2QymvzuomzD2bYZsLFC9auE8G39Mj+6OgM
+8TqTxo8rpp2m5Ayy4/16HNZl9NmAa9JLilyHux5kiWr75RdjtO16yb02N72gwGoD
+Vc45gSEEAhKGm0AF0sPMvgWqpUigczkOPEk9n4MCgYEAoqtfVJrp2UN6t68/WRCt
+TMGlCzAp3y5AB/ywtrcZpvURZwK5GN46WvpIjTJn//kjSmtF9T8QskqYMPVQM5vV
+VW+HYNMo5DTpPoiMexLIexGdb1RhEX9vy0w5fd3ZYsNVZoAZb0U7qdPUv1sHDdUq
+yh5NHbNkOf3/zQQhOvjgU5kCgYBdHDReZkdUD7Zx+970c2wtamLOvEm/JeJ/nf0k
+3axVC7EMcLKce8qLMlJpy6IzlShnWYLUY22hRyGQa4gS9zsgiWNb06Kc6hvnfGFn
+sUh2BeOQjGEZ2ioGfVuk+zpg+LvouCEOuDNcTw7LodnbDF7MmbwNEtgAa/nuC4g3
+CfBr4wKBgQDcKMICsm0De30u4anJPGRSRHxMumUHJrGVfYaT8x0KXqq2yYgWl0OZ
+mlTGP1hm30TRScNvFGXevW+ElmB0sTB0xe7sxorYNWh6OS9qMhf0f67YklbiE7nf
+/+f5mGYZecAgTjEC7fKVSOWZDJe/UKD2QqmAipRB+mxwKgNmLdoQ5Q==
+-----END RSA PRIVATE KEY-----`;
+
+	private readonly publicKey = `-----BEGIN CERTIFICATE-----
+MIIC8DCCAdigAwIBAgIJKR/CmYanSKqmMA0GCSqGSIb3DQEBBQUAMBQxEjAQBgNV
+BAMTCWxvY2FsaG9zdDAeFw0yNDA5MjQwMDQ2MDNaFw0yNTA5MjQwMDQ2MDNaMBQx
+EjAQBgNVBAMTCWxvY2FsaG9zdDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoC
+ggEBAL9/gMQzeZVfhL2wxvXDAWyJ0/m41iepzT4v5QMzqqZn6yM+c1sOfzAWQ0dn
+8mCzUHWMwXrLk7ZQbEfDZKq1e5mxT5lglIxPxEQitwPwa2wvyvLtHgqDlaZWZSBx
+9L5LxRtqueHnDqmuiYlwiSs6BHwOa+f5creSBg0GVHFt9eQ+DQyZxno1bwEnsP5O
+RRWjPZ6/mQSMO5EmxtCYqrJVxNDXc41WlQobaQ0e1u3SCuev3Ig2u+fV4PJauLdg
+jAJKgckMngYm1agYmqCKZO4qwmyYfoPPcIVFCq1qABi1gWSEHFeDliPOtTFlHvQX
+++NFwDqcAo4e8qqO5GCR3hgUZkcCAwEAAaNFMEMwDAYDVR0TBAUwAwEB/zALBgNV
+HQ8EBAMCAvQwJgYDVR0RBB8wHYYbaHR0cDovL2V4YW1wbGUub3JnL3dlYmlkI21l
+MA0GCSqGSIb3DQEBBQUAA4IBAQCKdaVcxRk7t+bV08QqTNfudxAFbkBekUsKRSS2
+XVNtHW0uGf2K1rLvRZwDCPkdcKNptjR0FPaIiDAP1v/onVEcodgKRJXzhAOOM10q
+ScJNyEBheRA79n9Lo57YFvptPPyxOR7SPuNvM5jctSO1TZLkXc8QqP87WouvKhy7
+vf7wohzjOajmqLXqts6MN3NbVluVPO+PydsHiWG1ndbzVQGID7mq+QxDxlJsdJzT
+1yXYexPrPKceUCJ492cOO1iXdNeyX9ghBt+w50YdsCf5HoEWOGIdtPkTTknWsk/D
+qHqA41ZZcLZKkgqdLgNF25k/W3xGKnRiZYNhlxZQRU3izVJY
+-----END CERTIFICATE-----`;
+
+	generateToken(userId: string): string {
+		const sign = createSign('SHA256');
+		sign.update(userId);
+		sign.end();
+		return sign.sign(this.privateKey, 'base64');
+	}
+
+	verifyToken(token: string, userId: string): boolean {
+		const verify = createVerify('SHA256');
+		verify.update(userId);
+		verify.end();
+		return verify.verify(this.publicKey, token, 'base64');
 	}
 }
