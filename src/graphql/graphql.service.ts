@@ -134,23 +134,6 @@ export class GraphqlService {
 						scale
 						__typename
 					}
-					incomingPayments {
-						edges {
-							node {
-								receivedAmount {
-									value
-									assetScale
-									assetCode
-								}
-								id
-								incomingAmount {
-									value
-									assetScale
-									assetCode
-								}
-							}
-						}
-					}
 				}
 			}
 		`;
