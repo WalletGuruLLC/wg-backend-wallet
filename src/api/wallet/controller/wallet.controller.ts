@@ -321,8 +321,8 @@ export class WalletController {
 			}
 		} catch (error) {
 			Sentry.captureException(error);
-			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
-				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+			return res.status(HttpStatus.NOT_FOUND).send({
+				statusCode: HttpStatus.NOT_FOUND,
 				customCode: 'WGE0074',
 			});
 		}
