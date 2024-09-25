@@ -344,4 +344,49 @@ export class RafikiWalletController {
 			});
 		}
 	}
+
+	@Post('receiver')
+	@ApiOperation({ summary: 'Create a receiver' })
+	@ApiResponse({ status: 201, description: 'Receiver created successfully.' })
+	@ApiResponse({ status: 400, description: 'Bad Request' })
+	async createReceiver(
+		@Body() input: ReceiverInputDTO,
+		@Req() req,
+		@Res() res
+	) {
+		try {
+			await addApiSignatureHeader(req, req.body);
+			const receiver = await this.walletService.createReceiver(input);
+			return res.status(200).send({
+				data: receiver,
+			});
+		} catch (error) {
+			console.log('error', error?.message);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0137',
+			});
+		}
+	}
+
+	@Post('quote')
+	@ApiOperation({ summary: 'Create a quote' })
+	@ApiResponse({ status: 201, description: 'Quote created successfully.' })
+	@ApiResponse({ status: 400, description: 'Bad Request' })
+	async createQuote(
+		@Body() input: CreateQuoteInputDTO,
+		@Req() req,
+		@Res() res
+	) {
+		try {
+			await addApiSignatureHeader(req, req.body);
+			const quote = await this.walletService.createQuote(input);
+			return res.status(200).send({ data: quote });
+		} catch (error) {
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0137',
+			});
+		}
+	}
 }
