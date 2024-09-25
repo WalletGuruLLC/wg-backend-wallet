@@ -334,6 +334,7 @@ export class RafikiWalletController {
 				customCode: 'WGE0150',
 			});
 		} catch (error) {
+			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
 				customCode: 'WGE0151',
@@ -355,12 +356,13 @@ export class RafikiWalletController {
 			const receiver = await this.walletService.createReceiver(input);
 			return res.status(200).send({
 				data: receiver,
+				customCode: 'WGE0152',
 			});
 		} catch (error) {
-			console.log('error', error?.message);
+			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-				customCode: 'WGE0137',
+				customCode: 'WGE0153',
 			});
 		}
 	}
@@ -377,11 +379,15 @@ export class RafikiWalletController {
 		try {
 			await addApiSignatureHeader(req, req.body);
 			const quote = await this.walletService.createQuote(input);
-			return res.status(200).send({ data: quote });
+			return res.status(200).send({
+				data: quote,
+				customCode: 'WGE0154',
+			});
 		} catch (error) {
+			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-				customCode: 'WGE0137',
+				customCode: 'WGE0155',
 			});
 		}
 	}
