@@ -159,4 +159,78 @@ export class GraphqlService {
 		const client = this.apolloClientService.getClient();
 		return await client.query({ query, variables });
 	}
+
+	async listTransactions(id: string) {
+		const query = gql`
+			query WalletAddress($id: String!) {
+				walletAddress(id: $id) {
+					incomingPayments {
+						edges {
+							node {
+								id
+								state
+								expiresAt
+								incomingAmount {
+									value
+								}
+								receivedAmount {
+									value
+									assetCode
+									assetScale
+								}
+								metadata
+								createdAt
+							}
+							cursor
+						}
+						pageInfo {
+							endCursor
+							hasNextPage
+							hasPreviousPage
+							startCursor
+						}
+					}
+					outgoingPayments {
+						edges {
+							node {
+								id
+								state
+								error
+								debitAmount {
+									value
+									assetCode
+									assetScale
+								}
+								receiveAmount {
+									value
+									assetCode
+									assetScale
+								}
+								receiver
+								metadata
+								sentAmount {
+									value
+									assetCode
+									assetScale
+								}
+								createdAt
+							}
+							cursor
+						}
+						pageInfo {
+							endCursor
+							hasNextPage
+							hasPreviousPage
+							startCursor
+						}
+					}
+				}
+			}
+		`;
+
+		// const variables = { walletAddressId };
+		const variables = { id };
+		const client = this.apolloClientService.getClient();
+		return await client.query({ query, variables });
+	}
 }

@@ -246,7 +246,7 @@ export class RafikiWalletController {
 	@Get('list-transactions')
 	@ApiOperation({ summary: 'List all user transactions' })
 	async listTransactions(
-		@Query('filter') filter: string,
+		@Query('search') search: string,
 		@Headers() headers: MapOfStringToList,
 		@Res() res
 	) {
@@ -271,7 +271,7 @@ export class RafikiWalletController {
 		try {
 			const transactions = await this.walletService.listTransactions(
 				token,
-				filter
+				search
 			);
 			return res.status(HttpStatus.OK).send({
 				statusCode: HttpStatus.OK,
