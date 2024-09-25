@@ -18,6 +18,7 @@ import {
 	ApiResponse,
 	ApiBearerAuth,
 	ApiBody,
+	ApiQuery,
 } from '@nestjs/swagger';
 
 import { WalletService } from '../service/wallet.service';
@@ -251,11 +252,12 @@ export class RafikiWalletController {
 	}
 
 	@Get('list-transactions')
+	@ApiQuery({ name: 'search', required: false, type: String })
 	@ApiOperation({ summary: 'List all user transactions' })
 	async listTransactions(
-		@Query('search') search: string,
 		@Headers() headers: MapOfStringToList,
-		@Res() res
+		@Res() res,
+		@Query('search') search?: string
 	) {
 		let token;
 		try {
