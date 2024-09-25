@@ -638,6 +638,17 @@ export class WalletService {
 		}));
 	}
 
+	async filterRafikiAssetById(assetId: string) {
+		const assets = await this.getRafikiAssets();
+		const filteredAsset = assets.find(asset => asset?.id === assetId);
+
+		if (!filteredAsset) {
+			return {};
+		}
+
+		return filteredAsset;
+	}
+
 	async getWalletByToken(token: string): Promise<{
 		walletDb: Wallet;
 		walletAsset: any;
