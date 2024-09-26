@@ -134,23 +134,6 @@ export class GraphqlService {
 						scale
 						__typename
 					}
-					incomingPayments {
-						edges {
-							node {
-								receivedAmount {
-									value
-									assetScale
-									assetCode
-								}
-								id
-								incomingAmount {
-									value
-									assetScale
-									assetCode
-								}
-							}
-						}
-					}
 				}
 			}
 		`;
@@ -158,5 +141,223 @@ export class GraphqlService {
 		const variables = { walletAddressId };
 		const client = this.apolloClientService.getClient();
 		return await client.query({ query, variables });
+	}
+
+	async listTransactions(id: string) {
+		const query = gql`
+			query WalletAddress($id: String!) {
+				walletAddress(id: $id) {
+					incomingPayments {
+						edges {
+							node {
+								id
+								state
+								expiresAt
+								incomingAmount {
+									value
+								}
+								receivedAmount {
+									value
+									assetCode
+									assetScale
+								}
+								metadata
+								createdAt
+							}
+							cursor
+						}
+						pageInfo {
+							endCursor
+							hasNextPage
+							hasPreviousPage
+							startCursor
+						}
+					}
+					outgoingPayments {
+						edges {
+							node {
+								id
+								state
+								error
+								debitAmount {
+									value
+									assetCode
+									assetScale
+								}
+								receiveAmount {
+									value
+									assetCode
+									assetScale
+								}
+								receiver
+								metadata
+								sentAmount {
+									value
+									assetCode
+									assetScale
+								}
+								createdAt
+							}
+							cursor
+						}
+						pageInfo {
+							endCursor
+							hasNextPage
+							hasPreviousPage
+							startCursor
+						}
+					}
+				}
+			}
+		`;
+
+		// const variables = { walletAddressId };
+		const variables = { id };
+		const client = this.apolloClientService.getClient();
+		return await client.query({ query, variables });
+	}
+
+	async createReceiver(input: any) {
+		const mutation = gql`
+			mutation CreateReceiver($input: CreateReceiverInput!) {
+				createReceiver(input: $input) {
+					receiver {
+						completed
+						createdAt
+						expiresAt
+						metadata
+						id
+						incomingAmount {
+							assetCode
+							assetScale
+							value
+						}
+						walletAddressUrl
+						receivedAmount {
+							assetCode
+							assetScale
+							value
+						}
+						updatedAt
+					}
+				}
+			}
+		`;
+
+		const variables = { input };
+		const client = this.apolloClientService.getClient();
+		const result = await client.mutate({ mutation, variables });
+		return result.data;
+	}
+
+	async createQuote(input: any) {
+		const mutation = gql`
+			mutation CreateQuote($input: CreateQuoteInput!) {
+				createQuote(input: $input) {
+					quote {
+						createdAt
+						expiresAt
+						id
+						walletAddressId
+						receiveAmount {
+							assetCode
+							assetScale
+							value
+						}
+						receiver
+						debitAmount {
+							assetCode
+							assetScale
+							value
+						}
+					}
+				}
+			}
+		`;
+
+		const variables = { input };
+		const client = this.apolloClientService.getClient();
+		const result = await client.mutate({ mutation, variables });
+		return result.data;
+	}
+
+	async createOutgoingPayment(input: any) {
+		const mutation = gql`
+			mutation CreateOutgoingPayment($input: CreateOutgoingPaymentInput!) {
+				createOutgoingPayment(input: $input) {
+					payment {
+						createdAt
+						error
+						metadata
+						id
+						walletAddressId
+						receiveAmount {
+							assetCode
+							assetScale
+							value
+						}
+						receiver
+						debitAmount {
+							assetCode
+							assetScale
+							value
+						}
+						sentAmount {
+							assetCode
+							assetScale
+							value
+						}
+						state
+						stateAttempts
+					}
+				}
+			}
+		`;
+
+		const variables = { input };
+		const client = this.apolloClientService.getClient();
+		const result = await client.mutate({ mutation, variables });
+		return result.data;
+	}
+
+	async getOutgoingPayment(id: string) {
+		const query = gql`
+			query GetOutgoingPayment($id: String!) {
+				outgoingPayment(id: $id) {
+					createdAt
+					error
+					metadata
+					id
+					grantId
+					walletAddressId
+					quote {
+						id
+					}
+					receiveAmount {
+						assetCode
+						assetScale
+						value
+					}
+					receiver
+					debitAmount {
+						assetCode
+						assetScale
+						value
+					}
+					sentAmount {
+						assetCode
+						assetScale
+						value
+					}
+					state
+					stateAttempts
+				}
+			}
+		`;
+
+		const variables = { id };
+		const client = this.apolloClientService.getClient();
+		const result = await client.query({ query, variables });
+		return result.data;
 	}
 }
