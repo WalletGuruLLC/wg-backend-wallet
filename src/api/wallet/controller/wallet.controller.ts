@@ -260,11 +260,16 @@ export class WalletController {
 			const wallet = await this.walletService.findWallet(walletID);
 
 			const walletResponse = {
-				id: wallet?.Id,
-				name: wallet?.Name,
-				walletType: wallet?.WalletType,
-				walletAddress: wallet?.WalletAddress,
-				active: wallet?.Active,
+				walletDb: {
+					createDate: wallet?.CreateDate,
+					userId: wallet?.UserId,
+					updateDate: wallet?.UpdateDate,
+					id: wallet?.Id,
+					name: wallet?.Name,
+					walletType: wallet?.WalletType,
+					walletAddress: wallet?.WalletAddress,
+					active: wallet?.Active,
+				},
 			};
 
 			if (!wallet) {
@@ -274,11 +279,11 @@ export class WalletController {
 				});
 			}
 
-			return {
+			return res.status(HttpStatus.OK).send({
 				statusCode: HttpStatus.OK,
 				customCode: 'WGE0077',
 				data: { wallet: walletResponse },
-			};
+			});
 		} catch (error) {
 			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({

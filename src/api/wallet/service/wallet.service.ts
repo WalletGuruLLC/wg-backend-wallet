@@ -323,7 +323,8 @@ export class WalletService {
 	}
 
 	async findWallet(id: string): Promise<Wallet> {
-		return await this.dbInstance.get(id);
+		const walletById = await this.dbInstance.scan('Id').eq(id).exec();
+		return walletById[0];
 	}
 
 	async getWalletAddressExist(address: string) {
