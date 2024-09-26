@@ -225,17 +225,32 @@ export class WalletController {
 	async toggle(@Param('id') id: string, @Res() res) {
 		try {
 			const wallet = await this.walletService.toggle(id);
+			const walletValue = await this.walletService.findWallet(wallet?.id);
+
+			const walletResponse = {
+				walletDb: {
+					createDate: walletValue?.CreateDate,
+					userId: walletValue?.UserId,
+					updateDate: walletValue?.UpdateDate,
+					id: walletValue?.Id,
+					name: walletValue?.Name,
+					walletType: walletValue?.WalletType,
+					walletAddress: walletValue?.WalletAddress,
+					active: walletValue?.Active,
+				},
+			};
+
 			if (wallet.active === true) {
 				return res.status(HttpStatus.OK).send({
 					statusCode: HttpStatus.OK,
 					customCode: 'WGE0088',
-					data: { wallet: wallet },
+					data: { wallet: walletResponse },
 				});
 			} else {
 				return res.status(HttpStatus.OK).send({
 					statusCode: HttpStatus.OK,
 					customCode: 'WGE0090',
-					data: { wallet: wallet },
+					data: { wallet: walletResponse },
 				});
 			}
 		} catch (error) {
@@ -260,16 +275,11 @@ export class WalletController {
 			const wallet = await this.walletService.findWallet(walletID);
 
 			const walletResponse = {
-				walletDb: {
-					createDate: wallet?.CreateDate,
-					userId: wallet?.UserId,
-					updateDate: wallet?.UpdateDate,
-					id: wallet?.Id,
-					name: wallet?.Name,
-					walletType: wallet?.WalletType,
-					walletAddress: wallet?.WalletAddress,
-					active: wallet?.Active,
-				},
+				id: wallet?.Id,
+				name: wallet?.Name,
+				walletType: wallet?.WalletType,
+				walletAddress: wallet?.WalletAddress,
+				active: wallet?.Active,
 			};
 
 			if (!wallet) {
