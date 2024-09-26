@@ -47,26 +47,45 @@ export class WalletController {
 
 	@ApiOperation({ summary: 'Obtener si existe una wallet address' })
 	@ApiQuery({ name: 'address', required: false, type: String })
+	@ApiBearerAuth('JWT')
 	@Get('/exist')
-	async getWalletAddressExist(@Query('address') address: string) {
+	async getWalletAddressExist(
+		@Query('address') address: string,
+		@Headers() headers: MapOfStringToList,
+		@Res() res
+	) {
 		try {
+			try {
+				const token = headers.authorization ?? '';
+				const instanceVerifier = await this.verifyService.getVerifiedFactory();
+				await instanceVerifier.verify(token.toString().split(' ')[1]);
+			} catch (error) {
+				Sentry.captureException(error);
+				return res.status(HttpStatus.UNAUTHORIZED).send({
+					statusCode: HttpStatus.UNAUTHORIZED,
+					customCode: 'WGE0001',
+				});
+			}
+
+			if (!address) {
+				return res.status(HttpStatus.PARTIAL_CONTENT).send({
+					statusCode: HttpStatus.PARTIAL_CONTENT,
+					customCode: 'WGE0134',
+				});
+			}
+
 			const wallet = await this.walletService.getWalletAddressExist(address);
-			return {
+			return res.status(HttpStatus.OK).send({
 				statusCode: HttpStatus.OK,
 				customCode: 'WGE0077',
 				data: wallet,
-			};
+			});
 		} catch (error) {
 			Sentry.captureException(error);
-			throw new HttpException(
-				{
-					statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-					customCode: 'WGE0078',
-					customMessage: errorCodes.WGE0078?.description,
-					customMessageEs: errorCodes.WGE0078?.descriptionEs,
-				},
-				HttpStatus.INTERNAL_SERVER_ERROR
-			);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0078',
+			});
 		}
 	}
 
