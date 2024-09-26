@@ -323,7 +323,8 @@ export class WalletService {
 	}
 
 	async findWallet(id: string): Promise<Wallet> {
-		return await this.dbInstance.get(id);
+		const walletById = await this.dbInstance.scan('Id').eq(id).exec();
+		return walletById[0];
 	}
 
 	async getWalletAddressExist(address: string) {
@@ -636,6 +637,17 @@ export class WalletService {
 			code: asset.code,
 			id: asset.id,
 		}));
+	}
+
+	async filterRafikiAssetById(assetId: string) {
+		const assets = await this.getRafikiAssets();
+		const filteredAsset = assets.find(asset => asset?.id === assetId);
+
+		if (!filteredAsset) {
+			return {};
+		}
+
+		return filteredAsset;
 	}
 
 	async getWalletByToken(token: string): Promise<{

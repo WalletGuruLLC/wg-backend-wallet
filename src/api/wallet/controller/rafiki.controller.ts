@@ -36,6 +36,7 @@ import {
 	GeneralReceiverInputDTO,
 	ReceiverInputDTO,
 } from '../dto/payments-rafiki.dto';
+import { isValidStringLength } from 'src/utils/helpers/isValidStringLength';
 
 @ApiTags('wallet-rafiki')
 @Controller('api/v1/wallets-rafiki')
@@ -47,7 +48,6 @@ export class RafikiWalletController {
 	) {}
 
 	@Post('address')
-	@UsePipes(customValidationPipe('WGE0073', errorCodes.WGE0073))
 	@ApiOperation({ summary: 'Create a new wallet address' })
 	@ApiBody({
 		type: CreateRafikiWalletAddressDto,
@@ -67,7 +67,8 @@ export class RafikiWalletController {
 	})
 	async createWalletAddress(
 		@Body() createRafikiWalletAddressDto: CreateRafikiWalletAddressDto,
-		@Headers() headers: MapOfStringToList
+		@Headers() headers: MapOfStringToList,
+		@Res() res
 	) {
 		let token;
 		try {
@@ -88,17 +89,37 @@ export class RafikiWalletController {
 		}
 		token = token || '';
 		try {
+			if (
+				createRafikiWalletAddressDto?.addressName &&
+				!isValidStringLength(createRafikiWalletAddressDto?.addressName)
+			) {
+				return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+					statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+					customCode: 'WGE0155',
+				});
+			}
+
+			if (createRafikiWalletAddressDto?.assetId) {
+				const validateAssetId = await this.walletService.filterRafikiAssetById(
+					createRafikiWalletAddressDto?.assetId
+				);
+				if (!validateAssetId?.id) {
+					return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+						statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+						customCode: 'WGE0156',
+					});
+				}
+			}
+
 			const wallet = await this.walletService.createWalletAddress(
 				createRafikiWalletAddressDto,
 				token
 			);
-			return {
+			return res.status(HttpStatus.CREATED).send({
 				statusCode: HttpStatus.CREATED,
 				customCode: 'WGS0080',
-				customMessage: successCodes.WGS0080?.description,
-				customMessageEs: successCodes.WGS0080?.descriptionEs,
 				data: { wallet },
-			};
+			});
 		} catch (error) {
 			Sentry.captureException(error);
 			if (
@@ -109,8 +130,6 @@ export class RafikiWalletController {
 					{
 						statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
 						customCode: 'WGE0073',
-						customMessage: errorCodes.WGE0073?.description,
-						customMessageEs: errorCodes.WGE0073?.descriptionEs,
 					},
 					HttpStatus.INTERNAL_SERVER_ERROR
 				);
@@ -120,7 +139,6 @@ export class RafikiWalletController {
 	}
 
 	@Post('service-provider-address')
-	//@UsePipes(customValidationPipe('WGE0073', errorCodes.WGE0073))
 	@ApiOperation({ summary: 'Create a new wallet address' })
 	@ApiBody({
 		type: CreateRafikiWalletAddressDto,
@@ -141,7 +159,8 @@ export class RafikiWalletController {
 	async createServiceProviderWalletAddress(
 		@Body()
 		createServiceProviderWalletAddressDto: CreateServiceProviderWalletAddressDto,
-		@Headers() headers: MapOfStringToList
+		@Headers() headers: MapOfStringToList,
+		@Res() res
 	) {
 		let token;
 		try {
@@ -162,17 +181,37 @@ export class RafikiWalletController {
 		}
 		token = token || '';
 		try {
+			if (
+				createServiceProviderWalletAddressDto?.addressName &&
+				!isValidStringLength(createServiceProviderWalletAddressDto?.addressName)
+			) {
+				return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+					statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+					customCode: 'WGE0155',
+				});
+			}
+
+			if (createServiceProviderWalletAddressDto?.assetId) {
+				const validateAssetId = await this.walletService.filterRafikiAssetById(
+					createServiceProviderWalletAddressDto?.assetId
+				);
+				if (!validateAssetId?.id) {
+					return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+						statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+						customCode: 'WGE0156',
+					});
+				}
+			}
+
 			const wallet =
 				await this.walletService.createServiceProviderWalletAddress(
 					createServiceProviderWalletAddressDto
 				);
-			return {
+			return res.status(HttpStatus.CREATED).send({
 				statusCode: HttpStatus.CREATED,
 				customCode: 'WGS0080',
-				customMessage: successCodes.WGS0080?.description,
-				customMessageEs: successCodes.WGS0080?.descriptionEs,
 				data: { wallet },
-			};
+			});
 		} catch (error) {
 			Sentry.captureException(error);
 			if (
@@ -183,8 +222,6 @@ export class RafikiWalletController {
 					{
 						statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
 						customCode: 'WGE0073',
-						customMessage: errorCodes.WGE0073?.description,
-						customMessageEs: errorCodes.WGE0073?.descriptionEs,
 					},
 					HttpStatus.INTERNAL_SERVER_ERROR
 				);
