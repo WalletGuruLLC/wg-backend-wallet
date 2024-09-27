@@ -18,6 +18,7 @@ import {
 	ApiResponse,
 	ApiBearerAuth,
 	ApiBody,
+	ApiQuery,
 } from '@nestjs/swagger';
 
 import { WalletService } from '../service/wallet.service';
@@ -35,6 +36,7 @@ import {
 	GeneralReceiverInputDTO,
 	ReceiverInputDTO,
 } from '../dto/payments-rafiki.dto';
+import { isValidStringLength } from 'src/utils/helpers/isValidStringLength';
 
 @ApiTags('wallet-rafiki')
 @Controller('api/v1/wallets-rafiki')
@@ -46,7 +48,6 @@ export class RafikiWalletController {
 	) {}
 
 	@Post('address')
-	@UsePipes(customValidationPipe('WGE0073', errorCodes.WGE0073))
 	@ApiOperation({ summary: 'Create a new wallet address' })
 	@ApiBody({
 		type: CreateRafikiWalletAddressDto,
@@ -66,7 +67,8 @@ export class RafikiWalletController {
 	})
 	async createWalletAddress(
 		@Body() createRafikiWalletAddressDto: CreateRafikiWalletAddressDto,
-		@Headers() headers: MapOfStringToList
+		@Headers() headers: MapOfStringToList,
+		@Res() res
 	) {
 		let token;
 		try {
@@ -87,17 +89,37 @@ export class RafikiWalletController {
 		}
 		token = token || '';
 		try {
+			if (
+				createRafikiWalletAddressDto?.addressName &&
+				!isValidStringLength(createRafikiWalletAddressDto?.addressName)
+			) {
+				return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+					statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+					customCode: 'WGE0155',
+				});
+			}
+
+			if (createRafikiWalletAddressDto?.assetId) {
+				const validateAssetId = await this.walletService.filterRafikiAssetById(
+					createRafikiWalletAddressDto?.assetId
+				);
+				if (!validateAssetId?.id) {
+					return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+						statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+						customCode: 'WGE0156',
+					});
+				}
+			}
+
 			const wallet = await this.walletService.createWalletAddress(
 				createRafikiWalletAddressDto,
 				token
 			);
-			return {
+			return res.status(HttpStatus.CREATED).send({
 				statusCode: HttpStatus.CREATED,
 				customCode: 'WGS0080',
-				customMessage: successCodes.WGS0080?.description,
-				customMessageEs: successCodes.WGS0080?.descriptionEs,
 				data: { wallet },
-			};
+			});
 		} catch (error) {
 			Sentry.captureException(error);
 			if (
@@ -108,8 +130,6 @@ export class RafikiWalletController {
 					{
 						statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
 						customCode: 'WGE0073',
-						customMessage: errorCodes.WGE0073?.description,
-						customMessageEs: errorCodes.WGE0073?.descriptionEs,
 					},
 					HttpStatus.INTERNAL_SERVER_ERROR
 				);
@@ -119,7 +139,6 @@ export class RafikiWalletController {
 	}
 
 	@Post('service-provider-address')
-	//@UsePipes(customValidationPipe('WGE0073', errorCodes.WGE0073))
 	@ApiOperation({ summary: 'Create a new wallet address' })
 	@ApiBody({
 		type: CreateRafikiWalletAddressDto,
@@ -140,7 +159,8 @@ export class RafikiWalletController {
 	async createServiceProviderWalletAddress(
 		@Body()
 		createServiceProviderWalletAddressDto: CreateServiceProviderWalletAddressDto,
-		@Headers() headers: MapOfStringToList
+		@Headers() headers: MapOfStringToList,
+		@Res() res
 	) {
 		let token;
 		try {
@@ -161,17 +181,37 @@ export class RafikiWalletController {
 		}
 		token = token || '';
 		try {
+			if (
+				createServiceProviderWalletAddressDto?.addressName &&
+				!isValidStringLength(createServiceProviderWalletAddressDto?.addressName)
+			) {
+				return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+					statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+					customCode: 'WGE0155',
+				});
+			}
+
+			if (createServiceProviderWalletAddressDto?.assetId) {
+				const validateAssetId = await this.walletService.filterRafikiAssetById(
+					createServiceProviderWalletAddressDto?.assetId
+				);
+				if (!validateAssetId?.id) {
+					return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+						statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+						customCode: 'WGE0156',
+					});
+				}
+			}
+
 			const wallet =
 				await this.walletService.createServiceProviderWalletAddress(
 					createServiceProviderWalletAddressDto
 				);
-			return {
+			return res.status(HttpStatus.CREATED).send({
 				statusCode: HttpStatus.CREATED,
 				customCode: 'WGS0080',
-				customMessage: successCodes.WGS0080?.description,
-				customMessageEs: successCodes.WGS0080?.descriptionEs,
 				data: { wallet },
-			};
+			});
 		} catch (error) {
 			Sentry.captureException(error);
 			if (
@@ -182,8 +222,6 @@ export class RafikiWalletController {
 					{
 						statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
 						customCode: 'WGE0073',
-						customMessage: errorCodes.WGE0073?.description,
-						customMessageEs: errorCodes.WGE0073?.descriptionEs,
 					},
 					HttpStatus.INTERNAL_SERVER_ERROR
 				);
@@ -251,11 +289,12 @@ export class RafikiWalletController {
 	}
 
 	@Get('list-transactions')
+	@ApiQuery({ name: 'search', required: false, type: String })
 	@ApiOperation({ summary: 'List all user transactions' })
 	async listTransactions(
-		@Query('search') search: string,
 		@Headers() headers: MapOfStringToList,
-		@Res() res
+		@Res() res,
+		@Query('search') search?: string
 	) {
 		let token;
 		try {
@@ -334,6 +373,7 @@ export class RafikiWalletController {
 				customCode: 'WGE0150',
 			});
 		} catch (error) {
+			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
 				customCode: 'WGE0151',
@@ -355,12 +395,13 @@ export class RafikiWalletController {
 			const receiver = await this.walletService.createReceiver(input);
 			return res.status(200).send({
 				data: receiver,
+				customCode: 'WGE0152',
 			});
 		} catch (error) {
-			console.log('error', error?.message);
+			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-				customCode: 'WGE0137',
+				customCode: 'WGE0153',
 			});
 		}
 	}
@@ -377,11 +418,15 @@ export class RafikiWalletController {
 		try {
 			await addApiSignatureHeader(req, req.body);
 			const quote = await this.walletService.createQuote(input);
-			return res.status(200).send({ data: quote });
+			return res.status(200).send({
+				data: quote,
+				customCode: 'WGE0154',
+			});
 		} catch (error) {
+			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-				customCode: 'WGE0137',
+				customCode: 'WGE0155',
 			});
 		}
 	}
