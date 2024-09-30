@@ -474,7 +474,7 @@ export class RafikiWalletController {
 		} catch (error) {
 			Sentry.captureException(error);
 			return res.status(500).send({
-				customCode: 'WGE0162',
+				customCode: 'WGE0163',
 			});
 		}
 	}
