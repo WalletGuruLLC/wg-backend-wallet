@@ -6,7 +6,7 @@ export interface Rate {
 }
 
 export class Rates extends Document {
-	Id: string = '';
+	Id: string;
 	Base?: string;
 	Rates?: Rate[];
 	ExpTime?: string;

@@ -805,7 +805,7 @@ export class WalletService {
 			base = '';
 		}
 
-		let ratesRafiki = await axios.get(
+		const ratesRafiki = await axios.get(
 			`${this.EXCHANGE_RATES_URL}/rates?base=${base}`,
 			{}
 		);
