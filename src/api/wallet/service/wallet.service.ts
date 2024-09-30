@@ -16,26 +16,31 @@ import { CreateServiceProviderWalletAddressDto } from '../dto/create-rafiki-serv
 import { errorCodes } from 'src/utils/constants';
 import { generatePublicKeyRafiki } from 'src/utils/helpers/generatePublicKeyRafiki';
 import { generateJwk } from 'src/utils/helpers/jwk';
-import { tigerBeetleClient } from '../../../config/tigerBeetleClient';
-import { AccountFilterFlags } from 'tigerbeetle-node';
 import { convertToCamelCase } from '../../../utils/helpers/convertCamelCase';
+import { Rates } from '../entities/rates.entity';
+import { RatesSchema } from '../entities/rates.schema';
 
 @Injectable()
 export class WalletService {
 	private dbInstance: Model<Wallet>;
+	private dbRates: Model<Rates>;
 	private readonly AUTH_MICRO_URL: string;
 	private readonly DOMAIN_WALLET_URL: string;
+	private readonly EXCHANGE_RATES_URL: string;
 
 	constructor(
 		private configService: ConfigService,
 		private readonly graphqlService: GraphqlService
 	) {
 		this.dbInstance = dynamoose.model<Wallet>('Wallets', WalletSchema);
+		this.dbRates = dynamoose.model<Rates>('Rates', RatesSchema);
 		this.AUTH_MICRO_URL = this.configService.get<string>('AUTH_URL');
 		this.DOMAIN_WALLET_URL = this.configService.get<string>(
 			'DOMAIN_WALLET_URL',
 			'https://cloud-nine-wallet-backend/accounts'
 		);
+		this.EXCHANGE_RATES_URL =
+			this.configService.get<string>('EXCHANGE_RATES_URL');
 	}
 
 	//SERVICE TO CREATE A WALLET
@@ -794,4 +799,73 @@ export class WalletService {
 			throw new Error(`Error fetching outgoing payment: ${error.message}`);
 		}
 	}
+
+	async getExchangeRates(base: string) {
+		if (!base) {
+			base = '';
+		}
+
+		let ratesRafiki = await axios.get(
+			`${this.EXCHANGE_RATES_URL}/rates?base=${base}`,
+			{}
+		);
+
+		const ratesArray = Object.entries(ratesRafiki.data.rates).map(
+			([currency, rate]) => ({
+				currency,
+				rate,
+			})
+		);
+
+		const dbRatesConverted = {
+			Base: ratesRafiki.data.base,
+			Rates: ratesArray,
+			ExpTime: '',
+		};
+
+		const existingRate = await this.dbRates
+			.scan('Base')
+			.eq(dbRatesConverted.Base)
+			.exec();
+
+		if (existingRate.length > 0) {
+			const comparisonResults = this.compareAndGatherUpdates(
+				existingRate[0].Rates,
+				ratesArray
+			);
+			if (comparisonResults.length > 0) {
+				const id = existingRate[0].Id;
+
+				for (const update of comparisonResults) {
+					const updatedRate = await this.dbInstance.update(id, {
+						[`Rates.${update.currency}`]: update.newRate,
+					});
+
+					return convertToCamelCase(updatedRate);
+				}
+			} else {
+				return convertToCamelCase([existingRate[0]]);
+			}
+		} else {
+			return await convertToCamelCase(this.dbRates.create(dbRatesConverted));
+		}
+	}
+
+	compareAndGatherUpdates = (rates, ratesArray) => {
+		const updates = [];
+
+		for (const objRate of rates) {
+			const matchingRate = ratesArray.find(
+				(rate: { currency: any }) => rate.currency === objRate.currency
+			);
+
+			if (matchingRate) {
+				if (matchingRate.rate !== objRate.rate) {
+					updates.push({ currency: objRate.currency, newRate: objRate.rate });
+				}
+			}
+		}
+
+		return updates;
+	};
 }

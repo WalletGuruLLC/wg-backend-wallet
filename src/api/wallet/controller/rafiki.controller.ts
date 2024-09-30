@@ -430,4 +430,52 @@ export class RafikiWalletController {
 			});
 		}
 	}
+
+	@Get('exchange-rates')
+	@ApiOperation({ summary: 'List all exchange rates' })
+	@ApiResponse({
+		status: 200,
+		description: successCodes.WGS0081?.description,
+	})
+	@ApiResponse({
+		status: 500,
+		description: errorCodes.WGE0083?.description,
+	})
+	@ApiQuery({ name: 'search', required: false, type: String })
+	async getExchangeRates(
+		@Headers() headers: MapOfStringToList,
+		@Res() res,
+		@Query('base') base?: string
+	) {
+		let token: any;
+		try {
+			token = headers.authorization ?? '';
+			const instanceVerifier = await this.verifyService.getVerifiedFactory();
+			await instanceVerifier.verify(token.toString().split(' ')[1]);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new HttpException(
+				{
+					statusCode: HttpStatus.UNAUTHORIZED,
+					customCode: 'WGE0021',
+					customMessage: errorCodes.WGE0021?.description,
+					customMessageEs: errorCodes.WGE0021?.descriptionEs,
+				},
+				HttpStatus.UNAUTHORIZED
+			);
+		}
+
+		try {
+			const exchangeRates = await this.walletService.getExchangeRates(base);
+			return res.status(200).send({
+				customCode: 'WGE0161',
+				data: { exchangeRates: exchangeRates },
+			});
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(500).send({
+				customCode: 'WGE0162',
+			});
+		}
+	}
 }
