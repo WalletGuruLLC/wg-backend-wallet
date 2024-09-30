@@ -77,7 +77,7 @@ export class WalletController {
 			const wallet = await this.walletService.getWalletAddressExist(address);
 			return res.status(HttpStatus.OK).send({
 				statusCode: HttpStatus.OK,
-				customCode: 'WGE0077',
+				customCode: wallet == 'don’t found' ? 'WGE0074' : 'WGE0077',
 				data: wallet,
 			});
 		} catch (error) {
