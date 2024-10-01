@@ -20,17 +20,18 @@ import { CreateServiceProviderWalletAddressDto } from '../dto/create-rafiki-serv
 import { errorCodes } from 'src/utils/constants';
 import { generatePublicKeyRafiki } from 'src/utils/helpers/generatePublicKeyRafiki';
 import { generateJwk } from 'src/utils/helpers/jwk';
-import { tigerBeetleClient } from '../../../config/tigerBeetleClient';
-import { AccountFilterFlags } from 'tigerbeetle-node';
 import { convertToCamelCase } from '../../../utils/helpers/convertCamelCase';
 import { canonicalize } from 'json-canonicalize';
 import { SocketKey } from '../entities/socket.entity';
 import { SocketKeySchema } from '../entities/socket.schema';
+import { Rates } from '../entities/rates.entity';
+import { RatesSchema } from '../entities/rates.schema';
 
 @Injectable()
 export class WalletService {
 	private dbInstance: Model<Wallet>;
 	private dbInstanceSocket: Model<SocketKey>;
+	private dbRates: Model<Rates>;
 	private readonly AUTH_MICRO_URL: string;
 	private readonly DOMAIN_WALLET_URL: string;
 
@@ -43,6 +44,7 @@ export class WalletService {
 			'SocketKeys',
 			SocketKeySchema
 		);
+		this.dbRates = dynamoose.model<Rates>('Rates', RatesSchema);
 		this.AUTH_MICRO_URL = this.configService.get<string>('AUTH_URL');
 		this.DOMAIN_WALLET_URL = this.configService.get<string>(
 			'DOMAIN_WALLET_URL',
@@ -850,5 +852,13 @@ export class WalletService {
 			ServiceProviderId: createSocketKeyDto.serviceProviderId,
 		};
 		return this.dbInstanceSocket.create(socketKey);
+	}
+
+	async getExchangeRates(base: string) {
+		if (!base) {
+			base = 'USD';
+		}
+		const existingRate = await this.dbRates.scan('Base').eq(base).exec();
+		return convertToCamelCase(existingRate[0]);
 	}
 }
