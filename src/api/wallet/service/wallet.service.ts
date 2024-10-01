@@ -449,7 +449,7 @@ export class WalletService {
 			walletType: 'Native',
 			walletAddress: createRafikiWalletAddressInput.walletAddress,
 			rafikiId:
-			createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
+				createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
 			userId,
 		};
 		if (userInfo?.data?.first) {
@@ -468,8 +468,20 @@ export class WalletService {
 			wallet.rafikiId,
 			wallet.userId
 		);
+		const walletInfo = await this.graphqlService.listWalletInfo(
+			wallet.rafikiId
+		);
+		if (walletCreated.rafikiId) {
+			delete walletCreated.rafikiId;
+		}
 		await this.updateKeys(walletCreated?.id, pairs, keyId);
-		return walletCreated;
+
+		return {
+			walletDb: walletCreated,
+			walletAsset: walletInfo.data.walletAddress.asset,
+			balance: 0,
+			reserved: 0,
+		};
 	}
 
 	async createServiceProviderWalletAddress(
@@ -559,7 +571,7 @@ export class WalletService {
 			walletType: 'Native',
 			walletAddress: createRafikiWalletAddressInput.walletAddress,
 			rafikiId:
-			createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
+				createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
 			providerId: createServiceProviderWalletAddressDto.providerId,
 		};
 		const walletCreated = await this.create(
