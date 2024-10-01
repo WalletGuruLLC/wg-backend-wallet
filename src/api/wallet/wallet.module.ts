@@ -9,6 +9,7 @@ import { AccessControlMiddleware } from '../../verify/access-level-control';
 import { ApolloClientService } from 'src/graphql/apollo-client.service';
 import { GraphqlService } from 'src/graphql/graphql.service';
 import { RafikiWalletController } from './controller/rafiki.controller';
+import { AuthGateway } from './service/websocket';
 
 @Module({
 	imports: [ConfigModule, VerifyModule],
@@ -18,6 +19,7 @@ import { RafikiWalletController } from './controller/rafiki.controller';
 		VerifyService,
 		ApolloClientService,
 		GraphqlService,
+		AuthGateway,
 	],
 })
 export class WalletModule implements NestModule {
