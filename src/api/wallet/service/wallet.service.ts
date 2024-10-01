@@ -5,11 +5,15 @@ import { v4 as uuidv4 } from 'uuid';
 import { Model } from 'dynamoose/dist/Model';
 import { WalletSchema } from '../entities/wallet.schema';
 import { Wallet } from '../entities/wallet.entity';
-import { CreateWalletDto, UpdateWalletDto } from '../dto/wallet.dto';
+import {
+	CreateSocketDto,
+	CreateWalletDto,
+	UpdateWalletDto,
+} from '../dto/wallet.dto';
 import * as Sentry from '@sentry/nestjs';
 import { ApolloError } from '@apollo/client/errors';
 import axios from 'axios';
-import { createHmac, createSign, createVerify } from 'crypto';
+import { createHmac } from 'crypto';
 import { GraphqlService } from '../../../graphql/graphql.service';
 import { CreateRafikiWalletAddressDto } from '../dto/create-rafiki-wallet-address.dto';
 import { CreateServiceProviderWalletAddressDto } from '../dto/create-rafiki-service-provider-wallet-address.dto';
@@ -20,10 +24,13 @@ import { tigerBeetleClient } from '../../../config/tigerBeetleClient';
 import { AccountFilterFlags } from 'tigerbeetle-node';
 import { convertToCamelCase } from '../../../utils/helpers/convertCamelCase';
 import { canonicalize } from 'json-canonicalize';
+import { SocketKey } from '../entities/socket.entity';
+import { SocketKeySchema } from '../entities/socket.schema';
 
 @Injectable()
 export class WalletService {
 	private dbInstance: Model<Wallet>;
+	private dbInstanceSocket: Model<SocketKey>;
 	private readonly AUTH_MICRO_URL: string;
 	private readonly DOMAIN_WALLET_URL: string;
 
@@ -32,6 +39,10 @@ export class WalletService {
 		private readonly graphqlService: GraphqlService
 	) {
 		this.dbInstance = dynamoose.model<Wallet>('Wallets', WalletSchema);
+		this.dbInstanceSocket = dynamoose.model<SocketKey>(
+			'SocketKeys',
+			SocketKeySchema
+		);
 		this.AUTH_MICRO_URL = this.configService.get<string>('AUTH_URL');
 		this.DOMAIN_WALLET_URL = this.configService.get<string>(
 			'DOMAIN_WALLET_URL',
@@ -449,7 +460,7 @@ export class WalletService {
 			walletType: 'Native',
 			walletAddress: createRafikiWalletAddressInput.walletAddress,
 			rafikiId:
-			createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
+				createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
 			userId,
 		};
 		if (userInfo?.data?.first) {
@@ -559,7 +570,7 @@ export class WalletService {
 			walletType: 'Native',
 			walletAddress: createRafikiWalletAddressInput.walletAddress,
 			rafikiId:
-			createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
+				createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
 			providerId: createServiceProviderWalletAddressDto.providerId,
 		};
 		const walletCreated = await this.create(
@@ -796,7 +807,19 @@ export class WalletService {
 		}
 	}
 
-	generateToken(body: any, timestamp: string, secret: string): string {
+	async generateToken(
+		body: any,
+		timestamp: string,
+		publicKey: string
+	): Promise<string> {
+		const socket = await this.dbInstanceSocket
+			.scan('PublicKey')
+			.eq(publicKey)
+			.exec();
+		const secret = socket?.[0]?.SecretKey;
+		if (!secret) {
+			return '';
+		}
 		const payload = `${timestamp}^${canonicalize(body)}`;
 		const hmac = createHmac('sha256', secret);
 		hmac.update(payload);
@@ -816,5 +839,16 @@ export class WalletService {
 		const expectedDigest = hmac.digest('hex');
 
 		return expectedDigest === digest;
+	}
+
+	async createSocketKey(
+		createSocketKeyDto: CreateSocketDto
+	): Promise<SocketKey> {
+		const socketKey = {
+			PublicKey: createSocketKeyDto.publicKey,
+			SecretKey: createSocketKeyDto.secretKey,
+			ServiceProviderId: createSocketKeyDto.serviceProviderId,
+		};
+		return this.dbInstanceSocket.create(socketKey);
 	}
 }

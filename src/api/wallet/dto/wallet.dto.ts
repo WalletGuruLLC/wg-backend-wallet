@@ -65,3 +65,17 @@ export class GetWalletDto {
 	@IsString()
 	page?: number;
 }
+
+export class CreateSocketDto {
+	@IsOptional()
+	@IsString()
+	publicKey?: string;
+
+	@IsOptional()
+	@IsString()
+	secretKey?: string;
+
+	@IsOptional()
+	@IsString()
+	serviceProviderId?: string;
+}
