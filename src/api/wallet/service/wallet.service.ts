@@ -9,7 +9,7 @@ import { CreateWalletDto, UpdateWalletDto } from '../dto/wallet.dto';
 import * as Sentry from '@sentry/nestjs';
 import { ApolloError } from '@apollo/client/errors';
 import axios from 'axios';
-
+import { createHmac, createSign, createVerify } from 'crypto';
 import { GraphqlService } from '../../../graphql/graphql.service';
 import { CreateRafikiWalletAddressDto } from '../dto/create-rafiki-wallet-address.dto';
 import { CreateServiceProviderWalletAddressDto } from '../dto/create-rafiki-service-provider-wallet-address.dto';
@@ -17,6 +17,7 @@ import { errorCodes } from 'src/utils/constants';
 import { generatePublicKeyRafiki } from 'src/utils/helpers/generatePublicKeyRafiki';
 import { generateJwk } from 'src/utils/helpers/jwk';
 import { convertToCamelCase } from '../../../utils/helpers/convertCamelCase';
+import { canonicalize } from 'json-canonicalize';
 import { Rates } from '../entities/rates.entity';
 import { RatesSchema } from '../entities/rates.schema';
 
@@ -26,7 +27,6 @@ export class WalletService {
 	private dbRates: Model<Rates>;
 	private readonly AUTH_MICRO_URL: string;
 	private readonly DOMAIN_WALLET_URL: string;
-	private readonly EXCHANGE_RATES_URL: string;
 
 	constructor(
 		private configService: ConfigService,
@@ -39,8 +39,6 @@ export class WalletService {
 			'DOMAIN_WALLET_URL',
 			'https://cloud-nine-wallet-backend/accounts'
 		);
-		this.EXCHANGE_RATES_URL =
-			this.configService.get<string>('EXCHANGE_RATES_URL');
 	}
 
 	//SERVICE TO CREATE A WALLET
@@ -453,7 +451,7 @@ export class WalletService {
 			walletType: 'Native',
 			walletAddress: createRafikiWalletAddressInput.walletAddress,
 			rafikiId:
-				createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
+			createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
 			userId,
 		};
 		if (userInfo?.data?.first) {
@@ -563,7 +561,7 @@ export class WalletService {
 			walletType: 'Native',
 			walletAddress: createRafikiWalletAddressInput.walletAddress,
 			rafikiId:
-				createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
+			createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
 			providerId: createServiceProviderWalletAddressDto.providerId,
 		};
 		const walletCreated = await this.create(
@@ -868,4 +866,26 @@ export class WalletService {
 
 		return updates;
 	};
+
+	generateToken(body: any, timestamp: string, secret: string): string {
+		const payload = `${timestamp}^${canonicalize(body)}`;
+		const hmac = createHmac('sha256', secret);
+		hmac.update(payload);
+		const digest = hmac.digest('hex');
+		return `${digest}`;
+	}
+
+	verifyToken(token: string, body: any, secret: string): boolean {
+		const [timePart, digestPart] = token.split(', ');
+		const timestamp = timePart.split('=')[1];
+		const digest = digestPart.split('=')[1];
+
+		const payload = `${timestamp}.${canonicalize(body)}`;
+
+		const hmac = createHmac('sha256', secret);
+		hmac.update(payload);
+		const expectedDigest = hmac.digest('hex');
+
+		return expectedDigest === digest;
+	}
 }
