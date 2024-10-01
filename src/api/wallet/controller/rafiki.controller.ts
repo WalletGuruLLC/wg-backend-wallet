@@ -447,24 +447,6 @@ export class RafikiWalletController {
 		@Res() res,
 		@Query('base') base?: string
 	) {
-		let token: any;
-		try {
-			token = headers.authorization ?? '';
-			const instanceVerifier = await this.verifyService.getVerifiedFactory();
-			await instanceVerifier.verify(token.toString().split(' ')[1]);
-		} catch (error) {
-			Sentry.captureException(error);
-			throw new HttpException(
-				{
-					statusCode: HttpStatus.UNAUTHORIZED,
-					customCode: 'WGE0021',
-					customMessage: errorCodes.WGE0021?.description,
-					customMessageEs: errorCodes.WGE0021?.descriptionEs,
-				},
-				HttpStatus.UNAUTHORIZED
-			);
-		}
-
 		try {
 			const exchangeRates = await this.walletService.getExchangeRates(base);
 			return res.status(200).send({
@@ -472,6 +454,7 @@ export class RafikiWalletController {
 				data: { exchangeRates: exchangeRates },
 			});
 		} catch (error) {
+			console.log('error', error);
 			Sentry.captureException(error);
 			return res.status(500).send({
 				customCode: 'WGE0163',

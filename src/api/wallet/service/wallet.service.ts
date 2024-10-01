@@ -26,6 +26,7 @@ import { SocketKey } from '../entities/socket.entity';
 import { SocketKeySchema } from '../entities/socket.schema';
 import { Rates } from '../entities/rates.entity';
 import { RatesSchema } from '../entities/rates.schema';
+import { DocumentClient } from 'aws-sdk/clients/dynamodb';
 
 @Injectable()
 export class WalletService {
@@ -870,7 +871,20 @@ export class WalletService {
 		if (!base) {
 			base = 'USD';
 		}
-		const existingRate = await this.dbRates.scan('Base').eq(base).exec();
-		return convertToCamelCase(existingRate[0]);
+		const docClient = new DocumentClient();
+		const params: DocumentClient.ScanInput = {
+			TableName: 'Rates',
+			FilterExpression: '#base = :base',
+			ExpressionAttributeNames: {
+				'#base': 'Base',
+			},
+			ExpressionAttributeValues: {
+				':base': base,
+			},
+		};
+		const result = await docClient.scan(params).promise();
+		const resultCamelCase = convertToCamelCase(result.Items[0]);
+		resultCamelCase.rates = result.Items[0].Rates;
+		return resultCamelCase;
 	}
 }
