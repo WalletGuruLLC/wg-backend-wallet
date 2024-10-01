@@ -9,7 +9,7 @@ import { CreateWalletDto, UpdateWalletDto } from '../dto/wallet.dto';
 import * as Sentry from '@sentry/nestjs';
 import { ApolloError } from '@apollo/client/errors';
 import axios from 'axios';
-import { createSign, createVerify } from 'crypto';
+import { createHmac, createSign, createVerify } from 'crypto';
 import { GraphqlService } from '../../../graphql/graphql.service';
 import { CreateRafikiWalletAddressDto } from '../dto/create-rafiki-wallet-address.dto';
 import { CreateServiceProviderWalletAddressDto } from '../dto/create-rafiki-service-provider-wallet-address.dto';
@@ -19,6 +19,7 @@ import { generateJwk } from 'src/utils/helpers/jwk';
 import { tigerBeetleClient } from '../../../config/tigerBeetleClient';
 import { AccountFilterFlags } from 'tigerbeetle-node';
 import { convertToCamelCase } from '../../../utils/helpers/convertCamelCase';
+import { canonicalize } from 'json-canonicalize';
 
 @Injectable()
 export class WalletService {
