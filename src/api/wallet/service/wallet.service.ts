@@ -16,14 +16,15 @@ import { CreateServiceProviderWalletAddressDto } from '../dto/create-rafiki-serv
 import { errorCodes } from 'src/utils/constants';
 import { generatePublicKeyRafiki } from 'src/utils/helpers/generatePublicKeyRafiki';
 import { generateJwk } from 'src/utils/helpers/jwk';
-import { tigerBeetleClient } from '../../../config/tigerBeetleClient';
-import { AccountFilterFlags } from 'tigerbeetle-node';
 import { convertToCamelCase } from '../../../utils/helpers/convertCamelCase';
 import { canonicalize } from 'json-canonicalize';
+import { Rates } from '../entities/rates.entity';
+import { RatesSchema } from '../entities/rates.schema';
 
 @Injectable()
 export class WalletService {
 	private dbInstance: Model<Wallet>;
+	private dbRates: Model<Rates>;
 	private readonly AUTH_MICRO_URL: string;
 	private readonly DOMAIN_WALLET_URL: string;
 
@@ -32,6 +33,7 @@ export class WalletService {
 		private readonly graphqlService: GraphqlService
 	) {
 		this.dbInstance = dynamoose.model<Wallet>('Wallets', WalletSchema);
+		this.dbRates = dynamoose.model<Rates>('Rates', RatesSchema);
 		this.AUTH_MICRO_URL = this.configService.get<string>('AUTH_URL');
 		this.DOMAIN_WALLET_URL = this.configService.get<string>(
 			'DOMAIN_WALLET_URL',
@@ -449,7 +451,7 @@ export class WalletService {
 			walletType: 'Native',
 			walletAddress: createRafikiWalletAddressInput.walletAddress,
 			rafikiId:
-			createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
+				createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
 			userId,
 		};
 		if (userInfo?.data?.first) {
@@ -559,7 +561,7 @@ export class WalletService {
 			walletType: 'Native',
 			walletAddress: createRafikiWalletAddressInput.walletAddress,
 			rafikiId:
-			createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
+				createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
 			providerId: createServiceProviderWalletAddressDto.providerId,
 		};
 		const walletCreated = await this.create(
@@ -794,6 +796,14 @@ export class WalletService {
 		} catch (error) {
 			throw new Error(`Error fetching outgoing payment: ${error.message}`);
 		}
+	}
+
+	async getExchangeRates(base: string) {
+		if (!base) {
+			base = 'USD';
+		}
+		const existingRate = await this.dbRates.scan('Base').eq(base).exec();
+		return convertToCamelCase(existingRate[0]);
 	}
 
 	generateToken(body: any, timestamp: string, secret: string): string {
