@@ -451,7 +451,7 @@ export class WalletService {
 			walletType: 'Native',
 			walletAddress: createRafikiWalletAddressInput.walletAddress,
 			rafikiId:
-			createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
+				createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
 			userId,
 		};
 		if (userInfo?.data?.first) {
@@ -561,7 +561,7 @@ export class WalletService {
 			walletType: 'Native',
 			walletAddress: createRafikiWalletAddressInput.walletAddress,
 			rafikiId:
-			createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
+				createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
 			providerId: createServiceProviderWalletAddressDto.providerId,
 		};
 		const walletCreated = await this.create(
@@ -800,72 +800,11 @@ export class WalletService {
 
 	async getExchangeRates(base: string) {
 		if (!base) {
-			base = '';
+			base = 'USD';
 		}
-
-		const ratesRafiki = await axios.get(
-			`${this.EXCHANGE_RATES_URL}/rates?base=${base}`,
-			{}
-		);
-
-		const ratesArray = Object.entries(ratesRafiki.data.rates).map(
-			([currency, rate]) => ({
-				currency,
-				rate,
-			})
-		);
-
-		const dbRatesConverted = {
-			Base: ratesRafiki.data.base,
-			Rates: ratesArray,
-			ExpTime: '',
-		};
-
-		const existingRate = await this.dbRates
-			.scan('Base')
-			.eq(dbRatesConverted.Base)
-			.exec();
-
-		if (existingRate.length > 0) {
-			const comparisonResults = this.compareAndGatherUpdates(
-				existingRate[0].Rates,
-				ratesArray
-			);
-			if (comparisonResults.length > 0) {
-				const id = existingRate[0].Id;
-
-				for (const update of comparisonResults) {
-					const updatedRate = await this.dbInstance.update(id, {
-						[`Rates.${update.currency}`]: update.newRate,
-					});
-
-					return convertToCamelCase(updatedRate);
-				}
-			} else {
-				return convertToCamelCase([existingRate[0]]);
-			}
-		} else {
-			return await convertToCamelCase(this.dbRates.create(dbRatesConverted));
-		}
+		const existingRate = await this.dbRates.scan('Base').eq(base).exec();
+		return convertToCamelCase(existingRate[0]);
 	}
-
-	compareAndGatherUpdates = (rates, ratesArray) => {
-		const updates = [];
-
-		for (const objRate of rates) {
-			const matchingRate = ratesArray.find(
-				(rate: { currency: any }) => rate.currency === objRate.currency
-			);
-
-			if (matchingRate) {
-				if (matchingRate.rate !== objRate.rate) {
-					updates.push({ currency: objRate.currency, newRate: objRate.rate });
-				}
-			}
-		}
-
-		return updates;
-	};
 
 	generateToken(body: any, timestamp: string, secret: string): string {
 		const payload = `${timestamp}^${canonicalize(body)}`;
