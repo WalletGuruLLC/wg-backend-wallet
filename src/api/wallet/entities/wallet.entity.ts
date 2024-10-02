@@ -15,4 +15,7 @@ export class Wallet extends Document {
 	CreateDate?: string;
 	UpdateDate?: string;
 	PostedCredits?: number;
+	PostedDebits?: number;
+	PendingCredits?: number;
+	PendingDebits?: number;
 }
