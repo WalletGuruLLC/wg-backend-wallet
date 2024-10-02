@@ -10,7 +10,7 @@ interface WebHookData {
 	state: string;
 	receiver: string;
 	debitAmount: Amount;
-	receiveAmount: Amount;
+	receivedAmount: Amount;
 	sentAmount: Amount;
 	stateAttempts: number;
 	createdAt: string;

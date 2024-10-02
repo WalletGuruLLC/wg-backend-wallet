@@ -9,7 +9,7 @@ export class IncomingPaymentCompletedEvent implements EventWebHook {
 	async trigger(eventWebHookDTO: EventWebHookDTO, wallet): Promise<void> {
 		const docClient = new DocumentClient();
 		const credits =
-			wallet.postedCredits + parseInt(eventWebHookDTO.data.debitAmount.value);
+			wallet.postedCredits + parseInt(eventWebHookDTO.data.receivedAmount.value);
 		const params = {
 			Key: {
 				Id: wallet.id,
