@@ -14,4 +14,5 @@ export class Wallet extends Document {
 	KeyId?: string;
 	CreateDate?: string;
 	UpdateDate?: string;
+	PostedCredits?: number;
 }

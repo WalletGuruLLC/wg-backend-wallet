@@ -33,6 +33,7 @@ import { customValidationPipe } from '../../validation.pipe';
 import { addApiSignatureHeader } from 'src/utils/helpers/signatureHelper';
 import {
 	CreateQuoteInputDTO,
+	DepositDTO,
 	DepositOutgoingPaymentInputDTO,
 	GeneralReceiverInputDTO,
 	ReceiverInputDTO,
@@ -493,6 +494,47 @@ export class RafikiWalletController {
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
 				customCode: 'WGE0162',
+			});
+		}
+	}
+
+	@Post('create-deposit')
+	@ApiOperation({ summary: 'Create a quote' })
+	@ApiResponse({ status: 201, description: 'Quote created successfully.' })
+	@ApiResponse({ status: 400, description: 'Bad Request' })
+	async createDeposit(@Body() input: DepositDTO, @Req() req, @Res() res) {
+		let token;
+		try {
+			token = req.headers.authorization ?? '';
+			const instanceVerifier = await this.verifyService.getVerifiedFactory();
+			await instanceVerifier.verify(token.toString().split(' ')[1]);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new HttpException(
+				{
+					statusCode: HttpStatus.UNAUTHORIZED,
+					customCode: 'WGE0021',
+					customMessage: errorCodes.WGE0021?.description,
+					customMessageEs: errorCodes.WGE0021?.descriptionEs,
+				},
+				HttpStatus.UNAUTHORIZED
+			);
+		}
+
+		try {
+			await addApiSignatureHeader(req, req.body);
+			const deposit = await this.walletService.createDeposit(input);
+
+			return res.status(HttpStatus.OK).send({
+				statusCode: HttpStatus.OK,
+				customCode: 'WGE0172',
+				data: { wallet: deposit },
+			});
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0173',
 			});
 		}
 	}
