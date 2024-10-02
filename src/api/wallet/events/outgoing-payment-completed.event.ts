@@ -10,14 +10,19 @@ export class OutGoingPaymentCompletedEvent implements EventWebHook {
 		const docClient = new DocumentClient();
 		const debits =
 			wallet.postedDebits + parseInt(eventWebHookDTO.data.debitAmount.value);
+
+		const pendingDebits =
+			wallet.postedDebits - parseInt(eventWebHookDTO.data.debitAmount.value);
 		const params = {
 			Key: {
 				Id: wallet.id,
 			},
 			TableName: 'Wallets',
-			UpdateExpression: 'SET PostedDebits = :postedDebits',
+			UpdateExpression:
+				'SET PostedDebits = :postedDebits AND PendingDebits = :pendingDebits',
 			ExpressionAttributeValues: {
 				':postedDebits': debits,
+				':pendingDebits': pendingDebits,
 			},
 			ReturnValues: 'ALL_NEW',
 		};

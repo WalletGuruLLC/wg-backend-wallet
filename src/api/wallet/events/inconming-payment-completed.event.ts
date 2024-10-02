@@ -9,15 +9,21 @@ export class IncomingPaymentCompletedEvent implements EventWebHook {
 	async trigger(eventWebHookDTO: EventWebHookDTO, wallet): Promise<void> {
 		const docClient = new DocumentClient();
 		const credits =
-			wallet.postedCredits + parseInt(eventWebHookDTO.data.receivedAmount.value);
+			wallet.postedCredits +
+			parseInt(eventWebHookDTO.data.receivedAmount.value);
+		const pendingCredits =
+			wallet.pendingCredits -
+			parseInt(eventWebHookDTO.data.receivedAmount.value);
 		const params = {
 			Key: {
 				Id: wallet.id,
 			},
 			TableName: 'Wallets',
-			UpdateExpression: 'SET PostedCredits = :postedCredits',
+			UpdateExpression:
+				'SET PostedCredits = :postedCredits AND PendingDebits = :pendingDebits',
 			ExpressionAttributeValues: {
 				':postedCredits': credits,
+				':pendingDebits': pendingCredits,
 			},
 			ReturnValues: 'ALL_NEW',
 		};

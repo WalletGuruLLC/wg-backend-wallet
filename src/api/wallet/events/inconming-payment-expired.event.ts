@@ -9,7 +9,8 @@ export class IncomingPaymentExpiredEvent implements EventWebHook {
 	async trigger(eventWebHookDTO: EventWebHookDTO, wallet): Promise<void> {
 		const docClient = new DocumentClient();
 		const credits =
-			wallet.pendingDebits - parseInt(eventWebHookDTO.data.receivedAmount.value);
+			wallet.pendingDebits -
+			parseInt(eventWebHookDTO.data.incomingAmount.value);
 		const params = {
 			Key: {
 				Id: wallet.id,
