@@ -11,20 +11,18 @@ export const RatesSchema = new dynamoose.Schema(
 		},
 		Base: {
 			type: String,
+			index: {
+				global: true,
+				name: 'BaseIndex',
+			},
 		},
 		Rates: {
-			type: Array, // Use Array to define that Rates should be an array
-			schema: [
-				{
-					type: Object,
-					schema: {
-						currency: String, // Currency code
-						rate: Number, // Corresponding rate
-					},
-				},
-			],
-			default: [],
+			type: Object,
+			default: {},
 		},
+		ExpirationTime: {
+			type: Date
+		}
 	},
 	{
 		timestamps: {
