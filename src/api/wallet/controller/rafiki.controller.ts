@@ -430,4 +430,35 @@ export class RafikiWalletController {
 			});
 		}
 	}
+
+	@Get('exchange-rates')
+	@ApiOperation({ summary: 'List all exchange rates' })
+	@ApiResponse({
+		status: 200,
+		description: successCodes.WGS0081?.description,
+	})
+	@ApiResponse({
+		status: 500,
+		description: errorCodes.WGE0083?.description,
+	})
+	@ApiQuery({ name: 'search', required: false, type: String })
+	async getExchangeRates(
+		@Headers() headers: MapOfStringToList,
+		@Res() res,
+		@Query('base') base?: string
+	) {
+		try {
+			const exchangeRates = await this.walletService.getExchangeRates(base);
+			return res.status(200).send({
+				customCode: 'WGE0161',
+				data: { exchangeRates: exchangeRates },
+			});
+		} catch (error) {
+			console.log('error', error);
+			Sentry.captureException(error);
+			return res.status(500).send({
+				customCode: 'WGE0163',
+			});
+		}
+	}
 }
