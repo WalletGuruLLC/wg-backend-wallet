@@ -449,9 +449,10 @@ export class RafikiWalletController {
 	) {
 		try {
 			const exchangeRates = await this.walletService.getExchangeRates(base);
-			return res.status(200).send({
+			return res.status(HttpStatus.OK).send({
+				statusCode: HttpStatus.OK,
 				customCode: 'WGE0161',
-				data: { exchangeRates: exchangeRates },
+				exchangeRates,
 			});
 		} catch (error) {
 			console.log('error', error);
