@@ -21,8 +21,8 @@ export const RatesSchema = new dynamoose.Schema(
 			default: {},
 		},
 		ExpirationTime: {
-			type: Date
-		}
+			type: Date,
+		},
 	},
 	{
 		timestamps: {
