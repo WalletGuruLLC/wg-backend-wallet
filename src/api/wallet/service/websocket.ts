@@ -70,7 +70,7 @@ export class AuthGateway
 	}
 
 	@SubscribeMessage('link')
-	handleLogin(client: Socket, data: any): WsResponse<string> {
+	async handleLogin(client: Socket, data: any): Promise<WsResponse<string>> {
 		const nonceData = JSON.parse(data).nonce?.toString();
 		const sessionIdData = JSON.parse(data).sessionId?.toString();
 		const headers = client.handshake.headers;
@@ -106,10 +106,9 @@ export class AuthGateway
 			this.logger.error(`Client ${client.id} failed to authenticate.`);
 		}
 		const timestamp = Math.floor(new Date().getTime() / 1000);
-		// const timestamp = `${client.handshake.headers.timestamp}`;
 		const data_aux = JSON.parse(data);
 		delete data_aux.nonce;
-		const token = this.authService.generateToken(
+		const token = await this.authService.generateToken(
 			data_aux,
 			`${timestamp}`,
 			publicKeyData
