@@ -8,8 +8,8 @@ export interface Rate {
 export class Rates extends Document {
 	Id: string;
 	Base?: string;
-	Rates?: Rate[];
-	ExpTime?: string;
+	Rates?: object;
+	ExpirationTime?: string;
 	CreateDate?: string;
 	UpdateDate?: string;
 }
