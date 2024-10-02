@@ -888,7 +888,7 @@ export class WalletService {
 		return resultCamelCase;
 	}
 
-	async createDepositOutgoingMutation(input: any) {
+	async createDepositOutgoingMutationService(input: any) {
 		try {
 			return await this.graphqlService.createDepositOutgoingMutation(input);
 		} catch (error) {

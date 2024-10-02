@@ -481,7 +481,9 @@ export class RafikiWalletController {
 				idempotencyKey: uuidv4(),
 			};
 			const depositMutation =
-				await this.walletService.createDepositOutgoingMutation(inputDeposit);
+				await this.walletService.createDepositOutgoingMutationService(
+					inputDeposit
+				);
 			return res.status(200).send({
 				data: depositMutation,
 				customCode: 'WGE0161',
