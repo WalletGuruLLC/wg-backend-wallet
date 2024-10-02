@@ -33,10 +33,12 @@ import { customValidationPipe } from '../../validation.pipe';
 import { addApiSignatureHeader } from 'src/utils/helpers/signatureHelper';
 import {
 	CreateQuoteInputDTO,
+	DepositOutgoingPaymentInputDTO,
 	GeneralReceiverInputDTO,
 	ReceiverInputDTO,
 } from '../dto/payments-rafiki.dto';
 import { isValidStringLength } from 'src/utils/helpers/isValidStringLength';
+import { v4 as uuidv4 } from 'uuid';
 
 @ApiTags('wallet-rafiki')
 @Controller('api/v1/wallets-rafiki')
@@ -459,6 +461,36 @@ export class RafikiWalletController {
 			Sentry.captureException(error);
 			return res.status(500).send({
 				customCode: 'WGE0163',
+			});
+		}
+	}
+
+	@Post('deposit')
+	@ApiOperation({ summary: 'Create a deposit' })
+	@ApiResponse({ status: 201, description: 'Deposit created successfully.' })
+	@ApiResponse({ status: 400, description: 'Bad Request' })
+	async createDepositOutgoingMutation(
+		@Body() input: DepositOutgoingPaymentInputDTO,
+		@Req() req,
+		@Res() res
+	) {
+		try {
+			await addApiSignatureHeader(req, req.body);
+			const inputDeposit = {
+				outgoingPaymentId: input?.outgoingPaymentId,
+				idempotencyKey: uuidv4(),
+			};
+			const depositMutation =
+				await this.walletService.createDepositOutgoingMutation(inputDeposit);
+			return res.status(200).send({
+				data: depositMutation,
+				customCode: 'WGE0161',
+			});
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0162',
 			});
 		}
 	}
