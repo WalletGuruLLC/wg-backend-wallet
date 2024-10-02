@@ -24,7 +24,7 @@ export class OutGoingPaymentCompletedEvent implements EventWebHook {
 
 		try {
 			const result = await docClient.update(params).promise();
-            return convertToCamelCase(result);
+			return convertToCamelCase(result);
 		} catch (error) {
 			Sentry.captureException(error);
 			throw new Error(
