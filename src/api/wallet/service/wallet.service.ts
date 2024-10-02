@@ -897,4 +897,31 @@ export class WalletService {
 			);
 		}
 	}
+
+	async createDeposit(input: any) {
+		const walletAddress = input.walletAddressId;
+		const amount = input.amount;
+		const walletInfo = await this.graphqlService.listWalletInfo(walletAddress);
+		const scale = walletInfo.data.walletAddress.asset.scale;
+		const amountUpdated = amount * Math.pow(10, scale);
+		const walletDynamo = await this.dbInstance
+			.scan('RafikiId')
+			.eq(walletAddress)
+			.exec();
+		const dynamoAmount = walletDynamo[0].PostedCredits + amountUpdated;
+		const db = await this.dbInstance.update({
+			Id: walletDynamo[0].Id,
+			PostedCredits: dynamoAmount,
+		});
+		if (db.PublicKey) {
+			delete db.PublicKey;
+		}
+		if (db.PrivateKey) {
+			delete db.PrivateKey;
+		}
+		if (db.RafikiId) {
+			delete db.RafikiId;
+		}
+		return await convertToCamelCase(db);
+	}
 }
