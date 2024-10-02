@@ -452,7 +452,7 @@ export class RafikiWalletController {
 			return res.status(HttpStatus.OK).send({
 				statusCode: HttpStatus.OK,
 				customCode: 'WGE0161',
-				exchangeRates,
+				...exchangeRates,
 			});
 		} catch (error) {
 			console.log('error', error);
