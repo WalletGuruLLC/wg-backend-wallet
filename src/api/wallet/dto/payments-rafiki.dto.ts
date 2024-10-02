@@ -83,3 +83,9 @@ export class GetOutgoingPaymentInputDTO {
 	@IsNotEmpty()
 	id: string;
 }
+
+export class DepositOutgoingPaymentInputDTO {
+	@IsString()
+	@IsNotEmpty()
+	outgoingPaymentId: string;
+}

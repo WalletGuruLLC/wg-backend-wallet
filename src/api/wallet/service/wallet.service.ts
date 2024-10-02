@@ -887,4 +887,14 @@ export class WalletService {
 		resultCamelCase.rates = result.Items[0].Rates;
 		return resultCamelCase;
 	}
+
+	async createDepositOutgoingMutationService(input: any) {
+		try {
+			return await this.graphqlService.createDepositOutgoingMutation(input);
+		} catch (error) {
+			throw new Error(
+				`Error creating deposit outoing mutation: ${error.message}`
+			);
+		}
+	}
 }
