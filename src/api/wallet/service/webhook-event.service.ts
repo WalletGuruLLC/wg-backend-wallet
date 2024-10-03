@@ -12,7 +12,7 @@ export class WebHookEventService {
 
 	async executeEvent(eventWebHookDTO: EventWebHookDTO) {
 		try {
-			const event = hookEventMap[eventWebHookDTO.type](eventWebHookDTO.type);
+			const event = hookEventMap[eventWebHookDTO.type](this.walletService);
 
 			if (event) {
 				const wallet = await this.walletService.getWalletByRafikyId(
