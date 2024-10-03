@@ -40,14 +40,16 @@ export class AuthGateway
 			this.logger.error(`Client ${client.id} failed to provide public key.`);
 			return;
 		}
+		const tokenPromises = [];
+		for (let i = -5; i <= 5; i++) {
+			tokenPromises.push(
+				this.authService.generateToken(data, `${timestamp + i}`, publicKeyData)
+			);
+		}
 
-		const token = await this.authService.generateToken(
-			data,
-			`${timestamp}`,
-			publicKeyData
-		);
+		const validTokenRange = await Promise.all(tokenPromises);
 
-		if (headers.nonce === token) {
+		if (validTokenRange.includes(headers.nonce)) {
 			client.emit('hc', {
 				message: 'You are authenticated!',
 				statusCode: 'WGS0050',
@@ -108,13 +110,20 @@ export class AuthGateway
 		const timestamp = Math.floor(new Date().getTime() / 1000);
 		const data_aux = JSON.parse(data);
 		delete data_aux.nonce;
-		const token = await this.authService.generateToken(
-			data_aux,
-			`${timestamp}`,
-			publicKeyData
-		);
-		// this.logger.log(`Client from login ${client.id} data: ${data} timestamp: ${timestamp} nonce: ${nonceData} token: ${token}`);
-		if (nonceData === token) {
+		const tokenPromises = [];
+		for (let i = -5; i <= 5; i++) {
+			tokenPromises.push(
+				this.authService.generateToken(
+					data_aux,
+					`${timestamp + i}`,
+					publicKeyData
+				)
+			);
+		}
+
+		const validTokenRange = await Promise.all(tokenPromises);
+
+		if (validTokenRange.includes(nonceData)) {
 			this.logger.log(`Client ${client.id} authenticated successfully.`);
 			setTimeout(() => {
 				client.emit('hc', {
