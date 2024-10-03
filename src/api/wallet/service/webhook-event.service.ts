@@ -5,49 +5,25 @@ import { convertToCamelCase } from 'src/utils/helpers/convertCamelCase';
 import { hookEventMap } from 'src/utils/hookEventMap';
 import { EventWebHook } from '../dto/event-webhook';
 import { EventWebHookDTO } from '../dto/event-hook.dto';
+import { WalletService } from './wallet.service';
 @Injectable()
 export class WebHookEventService {
-	async getWalletByRafikyId(rafikiId: string) {
-		const docClient = new DocumentClient();
-		const params = {
-			TableName: 'Wallets',
-			IndexName: 'RafikyIdIndex',
-			KeyConditionExpression: `RafikyId = :rafikyId`,
-			ExpressionAttributeValues: {
-				':rafikyId': rafikiId,
-			},
-		};
-
-		try {
-			const result = await docClient.query(params).promise();
-			return convertToCamelCase(result.Items?.[0]);
-		} catch (error) {
-			Sentry.captureException(error);
-			throw new Error(`Error fetching wallet: ${error.message}`);
-		}
-	}
+	constructor(private readonly walletService: WalletService) {}
 
 	async executeEvent(eventWebHookDTO: EventWebHookDTO) {
 		try {
-			const event: EventWebHook = hookEventMap[eventWebHookDTO.type];
+			const event = hookEventMap[eventWebHookDTO.type](this.walletService);
 
-			const wallet = await this.getWalletByRafikyId(
-				eventWebHookDTO.data.walletAddressId
-			);
-
-			if (!event) {
-				throw new HttpException(
-					{
-						statusCode: HttpStatus.BAD_REQUEST,
-						customCode: 'WGE0183',
-					},
-					HttpStatus.BAD_REQUEST
+			if (event) {
+				const wallet = await this.walletService.getWalletByRafikyId(
+					eventWebHookDTO.data.walletAddressId
 				);
+
+				await event.trigger(eventWebHookDTO, wallet);
 			}
-			await event.trigger(eventWebHookDTO, wallet);
 		} catch (error) {
 			Sentry.captureException(error);
-			throw new Error(`Error fetching wallet: ${error.message}`);
+			throw new Error(`Error triggering event: ${error.message}`);
 		}
 	}
 }

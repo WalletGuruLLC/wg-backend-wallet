@@ -377,4 +377,29 @@ export class GraphqlService {
 		const result = await client.mutate({ mutation, variables });
 		return result.data;
 	}
+
+	async getInconmingPayment(id: string) {
+		const query = gql`
+			query IncomingPayment($incomingPaymentId: String!) {
+				incomingPayment(id: $incomingPaymentId) {
+					id
+					walletAddressId
+					incomingAmount {
+						assetScale
+						assetCode
+						value
+					}
+					createdAt
+					liquidity
+					state
+					client
+				}
+			}
+		`;
+
+		const variables = { id };
+		const client = this.apolloClientService.getClient();
+		const result = await client.query({ query, variables });
+		return result.data;
+	}
 }
