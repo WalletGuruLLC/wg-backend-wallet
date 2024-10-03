@@ -908,7 +908,7 @@ export class WalletService {
 			.scan('RafikiId')
 			.eq(walletAddress)
 			.exec();
-		const dynamoAmount = walletDynamo[0].PostedCredits + amountUpdated;
+		const dynamoAmount = (walletDynamo[0].PostedCredits || 0) + amountUpdated;
 		const db = await this.dbInstance.update({
 			Id: walletDynamo[0].Id,
 			PostedCredits: dynamoAmount,
