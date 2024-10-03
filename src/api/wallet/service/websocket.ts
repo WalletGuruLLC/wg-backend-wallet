@@ -47,6 +47,15 @@ export class AuthGateway
 			publicKeyData
 		);
 
+		console.log(
+			'token',
+			token,
+			'timestamp',
+			timestamp,
+			'publicKeyData',
+			publicKeyData
+		);
+
 		if (headers.nonce === token) {
 			client.emit('hc', {
 				message: 'You are authenticated!',
