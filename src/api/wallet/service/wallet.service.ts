@@ -5,25 +5,34 @@ import { v4 as uuidv4 } from 'uuid';
 import { Model } from 'dynamoose/dist/Model';
 import { WalletSchema } from '../entities/wallet.schema';
 import { Wallet } from '../entities/wallet.entity';
-import { CreateWalletDto, UpdateWalletDto } from '../dto/wallet.dto';
+import {
+	CreateSocketDto,
+	CreateWalletDto,
+	UpdateWalletDto,
+} from '../dto/wallet.dto';
 import * as Sentry from '@sentry/nestjs';
 import { ApolloError } from '@apollo/client/errors';
 import axios from 'axios';
-import { createHmac, createSign, createVerify } from 'crypto';
+import { createHmac } from 'crypto';
 import { GraphqlService } from '../../../graphql/graphql.service';
 import { CreateRafikiWalletAddressDto } from '../dto/create-rafiki-wallet-address.dto';
 import { CreateServiceProviderWalletAddressDto } from '../dto/create-rafiki-service-provider-wallet-address.dto';
 import { errorCodes } from 'src/utils/constants';
 import { generatePublicKeyRafiki } from 'src/utils/helpers/generatePublicKeyRafiki';
 import { generateJwk } from 'src/utils/helpers/jwk';
-import { tigerBeetleClient } from '../../../config/tigerBeetleClient';
-import { AccountFilterFlags } from 'tigerbeetle-node';
 import { convertToCamelCase } from '../../../utils/helpers/convertCamelCase';
 import { canonicalize } from 'json-canonicalize';
+import { SocketKey } from '../entities/socket.entity';
+import { SocketKeySchema } from '../entities/socket.schema';
+import { Rates } from '../entities/rates.entity';
+import { RatesSchema } from '../entities/rates.schema';
+import { DocumentClient } from 'aws-sdk/clients/dynamodb';
 
 @Injectable()
 export class WalletService {
 	private dbInstance: Model<Wallet>;
+	private dbInstanceSocket: Model<SocketKey>;
+	private dbRates: Model<Rates>;
 	private readonly AUTH_MICRO_URL: string;
 	private readonly DOMAIN_WALLET_URL: string;
 
@@ -32,6 +41,11 @@ export class WalletService {
 		private readonly graphqlService: GraphqlService
 	) {
 		this.dbInstance = dynamoose.model<Wallet>('Wallets', WalletSchema);
+		this.dbInstanceSocket = dynamoose.model<SocketKey>(
+			'SocketKeys',
+			SocketKeySchema
+		);
+		this.dbRates = dynamoose.model<Rates>('Rates', RatesSchema);
 		this.AUTH_MICRO_URL = this.configService.get<string>('AUTH_URL');
 		this.DOMAIN_WALLET_URL = this.configService.get<string>(
 			'DOMAIN_WALLET_URL',
@@ -449,7 +463,7 @@ export class WalletService {
 			walletType: 'Native',
 			walletAddress: createRafikiWalletAddressInput.walletAddress,
 			rafikiId:
-			createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
+				createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
 			userId,
 		};
 		if (userInfo?.data?.first) {
@@ -468,8 +482,20 @@ export class WalletService {
 			wallet.rafikiId,
 			wallet.userId
 		);
+		const walletInfo = await this.graphqlService.listWalletInfo(
+			wallet.rafikiId
+		);
+		if (walletCreated.rafikiId) {
+			delete walletCreated.rafikiId;
+		}
 		await this.updateKeys(walletCreated?.id, pairs, keyId);
-		return walletCreated;
+
+		return {
+			walletDb: walletCreated,
+			walletAsset: walletInfo.data.walletAddress.asset,
+			balance: 0,
+			reserved: 0,
+		};
 	}
 
 	async createServiceProviderWalletAddress(
@@ -559,7 +585,7 @@ export class WalletService {
 			walletType: 'Native',
 			walletAddress: createRafikiWalletAddressInput.walletAddress,
 			rafikiId:
-			createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
+				createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
 			providerId: createServiceProviderWalletAddressDto.providerId,
 		};
 		const walletCreated = await this.create(
@@ -796,7 +822,19 @@ export class WalletService {
 		}
 	}
 
-	generateToken(body: any, timestamp: string, secret: string): string {
+	async generateToken(
+		body: any,
+		timestamp: string,
+		publicKey: string
+	): Promise<string> {
+		const socket = await this.dbInstanceSocket
+			.scan('PublicKey')
+			.eq(publicKey)
+			.exec();
+		const secret = socket?.[0]?.SecretKey;
+		if (!secret) {
+			return '';
+		}
 		const payload = `${timestamp}^${canonicalize(body)}`;
 		const hmac = createHmac('sha256', secret);
 		hmac.update(payload);
@@ -816,5 +854,74 @@ export class WalletService {
 		const expectedDigest = hmac.digest('hex');
 
 		return expectedDigest === digest;
+	}
+
+	async createSocketKey(
+		createSocketKeyDto: CreateSocketDto
+	): Promise<SocketKey> {
+		const socketKey = {
+			PublicKey: createSocketKeyDto.publicKey,
+			SecretKey: createSocketKeyDto.secretKey,
+			ServiceProviderId: createSocketKeyDto.serviceProviderId,
+		};
+		return this.dbInstanceSocket.create(socketKey);
+	}
+
+	async getExchangeRates(base: string) {
+		if (!base) {
+			base = 'USD';
+		}
+		const docClient = new DocumentClient();
+		const params: DocumentClient.ScanInput = {
+			TableName: 'Rates',
+			FilterExpression: '#base = :base',
+			ExpressionAttributeNames: {
+				'#base': 'Base',
+			},
+			ExpressionAttributeValues: {
+				':base': base,
+			},
+		};
+		const result = await docClient.scan(params).promise();
+		const resultCamelCase = convertToCamelCase(result.Items[0]);
+		resultCamelCase.rates = result.Items[0].Rates;
+		return resultCamelCase;
+	}
+
+	async createDepositOutgoingMutationService(input: any) {
+		try {
+			return await this.graphqlService.createDepositOutgoingMutation(input);
+		} catch (error) {
+			throw new Error(
+				`Error creating deposit outoing mutation: ${error.message}`
+			);
+		}
+	}
+
+	async createDeposit(input: any) {
+		const walletAddress = input.walletAddressId;
+		const amount = input.amount;
+		const walletInfo = await this.graphqlService.listWalletInfo(walletAddress);
+		const scale = walletInfo.data.walletAddress.asset.scale;
+		const amountUpdated = amount * Math.pow(10, scale);
+		const walletDynamo = await this.dbInstance
+			.scan('RafikiId')
+			.eq(walletAddress)
+			.exec();
+		const dynamoAmount = (walletDynamo[0].PostedCredits || 0) + amountUpdated;
+		const db = await this.dbInstance.update({
+			Id: walletDynamo[0].Id,
+			PostedCredits: dynamoAmount,
+		});
+		if (db.PublicKey) {
+			delete db.PublicKey;
+		}
+		if (db.PrivateKey) {
+			delete db.PrivateKey;
+		}
+		if (db.RafikiId) {
+			delete db.RafikiId;
+		}
+		return await convertToCamelCase(db);
 	}
 }

@@ -360,4 +360,21 @@ export class GraphqlService {
 		const result = await client.query({ query, variables });
 		return result.data;
 	}
+
+	async createDepositOutgoingMutation(input: any) {
+		const mutation = gql`
+			mutation DepositOutgoingPaymentLiquidity(
+				$input: DepositOutgoingPaymentLiquidityInput!
+			) {
+				depositOutgoingPaymentLiquidity(input: $input) {
+					success
+				}
+			}
+		`;
+
+		const variables = { input };
+		const client = this.apolloClientService.getClient();
+		const result = await client.mutate({ mutation, variables });
+		return result.data;
+	}
 }
