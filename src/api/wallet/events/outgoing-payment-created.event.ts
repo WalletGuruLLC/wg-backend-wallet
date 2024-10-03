@@ -4,12 +4,21 @@ import { EventWebHook } from '../dto/event-webhook';
 import { DocumentClient } from 'aws-sdk/clients/dynamodb';
 import * as Sentry from '@sentry/nestjs';
 import { convertToCamelCase } from 'src/utils/helpers/convertCamelCase';
+import { WalletService } from '../service/wallet.service';
+import { v4 as uuidv4 } from 'uuid';
 
 export class OutGoingPaymentCreatedEvent implements EventWebHook {
+	constructor(private readonly walletService: WalletService) {}
 	async trigger(eventWebHookDTO: EventWebHookDTO, wallet): Promise<void> {
 		const docClient = new DocumentClient();
+		const depositOutgoingPaymentInput = {
+			outgoingPaymentId: eventWebHookDTO?.data?.id,
+			idempotencyKey: uuidv4(),
+		};
+
 		const debits =
-			wallet.pendingDebits + parseInt(eventWebHookDTO.data.sentAmount.value);
+			wallet?.pendingDebits ||
+			0 + parseInt(eventWebHookDTO.data.sentAmount.value);
 		const params = {
 			Key: {
 				Id: wallet.id,
@@ -24,6 +33,10 @@ export class OutGoingPaymentCreatedEvent implements EventWebHook {
 
 		try {
 			const result = await docClient.update(params).promise();
+
+			await this.walletService.createDepositOutgoingMutationService(
+				depositOutgoingPaymentInput
+			);
 			return convertToCamelCase(result);
 		} catch (error) {
 			Sentry.captureException(error);
