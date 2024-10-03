@@ -900,7 +900,7 @@ export class WalletService {
 
 	async createDeposit(input: any) {
 		const walletAddress = input.walletAddressId;
-		const amount = input.amount ;
+		const amount = input.amount;
 		const walletInfo = await this.graphqlService.listWalletInfo(walletAddress);
 		const scale = walletInfo.data.walletAddress.asset.scale;
 		const amountUpdated = amount * Math.pow(10, scale);
