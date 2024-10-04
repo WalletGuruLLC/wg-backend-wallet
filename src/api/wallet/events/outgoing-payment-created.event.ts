@@ -35,7 +35,7 @@ export class OutGoingPaymentCreatedEvent implements EventWebHook {
 		try {
 			const result = await docClient.update(params).promise();
 
-			await delay(5000);
+			await delay(500);
 
 			await this.walletService.createDepositOutgoingMutationService(
 				depositOutgoingPaymentInput
