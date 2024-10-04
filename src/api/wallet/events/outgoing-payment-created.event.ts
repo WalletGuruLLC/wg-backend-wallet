@@ -18,7 +18,8 @@ export class OutGoingPaymentCreatedEvent implements EventWebHook {
 
 		const debits =
 			wallet?.pendingDebits ||
-			0 + parseInt(eventWebHookDTO.data.sentAmount.value);
+			0 + parseInt(eventWebHookDTO.data.receiveAmount.value);
+
 		const params = {
 			Key: {
 				Id: wallet.id,
@@ -38,7 +39,7 @@ export class OutGoingPaymentCreatedEvent implements EventWebHook {
 				await this.walletService.createDepositOutgoingMutationService(
 					depositOutgoingPaymentInput
 				);
-			}, 5000);
+			}, 500);
 
 			return convertToCamelCase(result);
 		} catch (error) {
