@@ -3,7 +3,6 @@ import { EventWebHookDTO } from '../dto/event-hook.dto';
 import { EventWebHook } from '../dto/event-webhook';
 import { DocumentClient } from 'aws-sdk/clients/dynamodb';
 import * as Sentry from '@sentry/nestjs';
-import { convertToCamelCase } from 'src/utils/helpers/convertCamelCase';
 import { WalletService } from '../service/wallet.service';
 
 export class OutGoingPaymentCompletedEvent implements EventWebHook {
@@ -13,16 +12,16 @@ export class OutGoingPaymentCompletedEvent implements EventWebHook {
 		const recieverWallet = eventWebHookDTO?.data?.receiver.split('/');
 		const incomingPaymentId = recieverWallet?.[4];
 		const debits =
-			wallet?.postedDebits ||
-			0 + parseInt(eventWebHookDTO.data.receiveAmount.value);
+			(wallet?.postedDebits || 0) +
+			parseInt(eventWebHookDTO.data.receiveAmount.value);
 
 		const pendingDebits =
-			wallet?.postedDebits ||
-			0 - parseInt(eventWebHookDTO.data.receiveAmount.value);
+			(wallet?.pendingDebits || 0) -
+			parseInt(eventWebHookDTO.data.receiveAmount.value);
 
 		const walletPostedCredits =
-			wallet?.postedCredits ||
-			0 - parseInt(eventWebHookDTO.data.receiveAmount.value);
+			(wallet?.postedCredits || 0) -
+			parseInt(eventWebHookDTO.data.receiveAmount.value);
 		const params = {
 			Key: {
 				Id: wallet.id,
@@ -47,12 +46,12 @@ export class OutGoingPaymentCompletedEvent implements EventWebHook {
 			);
 
 			const recieverPostedCredits =
-				recieverWallet?.postedDebits ||
-				0 + parseInt(eventWebHookDTO.data.receiveAmount.value);
+				(recieverWallet?.postedDebits || 0) +
+				parseInt(eventWebHookDTO.data.receiveAmount.value);
 
 			const recieverPendingCredits =
-				recieverWallet?.pendingCredits ||
-				0 - parseInt(eventWebHookDTO.data.receiveAmount.value);
+				(recieverWallet?.pendingCredits || 0) -
+				parseInt(eventWebHookDTO.data.receiveAmount.value);
 
 			const recieverParams = {
 				Key: {
@@ -68,9 +67,8 @@ export class OutGoingPaymentCompletedEvent implements EventWebHook {
 				ReturnValues: 'ALL_NEW',
 			};
 
-			const result = await docClient.update(params).promise();
+			await docClient.update(params).promise();
 			await docClient.update(recieverParams).promise();
-			return convertToCamelCase(result);
 		} catch (error) {
 			Sentry.captureException(error);
 			throw new Error(
