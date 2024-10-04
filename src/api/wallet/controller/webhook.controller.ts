@@ -31,6 +31,7 @@ export class WebHookController {
 	})
 	async recieveEvent(@Body() input: EventWebHookDTO, @Req() req, @Res() res) {
 		try {
+			console.log(`Recieving Event from hook ${JSON.stringify(input)}`);
 			const eventResult = await this.webHookEventService.executeEvent(input);
 			return res.status(200).send({
 				data: eventResult,
