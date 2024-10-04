@@ -14,15 +14,15 @@ export class OutGoingPaymentCompletedEvent implements EventWebHook {
 		const incomingPaymentId = recieverWallet?.[4];
 		const debits =
 			wallet?.postedDebits ||
-			0 + parseInt(eventWebHookDTO.data.receivedAmount.value);
+			0 + parseInt(eventWebHookDTO.data.receiveAmount.value);
 
 		const pendingDebits =
 			wallet?.postedDebits ||
-			0 - parseInt(eventWebHookDTO.data.receivedAmount.value);
+			0 - parseInt(eventWebHookDTO.data.receiveAmount.value);
 
 		const walletPostedCredits =
 			wallet?.postedCredits ||
-			0 - parseInt(eventWebHookDTO.data.receivedAmount.value);
+			0 - parseInt(eventWebHookDTO.data.receiveAmount.value);
 		const params = {
 			Key: {
 				Id: wallet.id,
@@ -48,11 +48,11 @@ export class OutGoingPaymentCompletedEvent implements EventWebHook {
 
 			const recieverPostedCredits =
 				recieverWallet?.postedDebits ||
-				0 + parseInt(eventWebHookDTO.data.receivedAmount.value);
+				0 + parseInt(eventWebHookDTO.data.receiveAmount.value);
 
 			const recieverPendingCredits =
 				recieverWallet?.pendingCredits ||
-				0 - parseInt(eventWebHookDTO.data.receivedAmount.value);
+				0 - parseInt(eventWebHookDTO.data.receiveAmount.value);
 
 			const recieverParams = {
 				Key: {
