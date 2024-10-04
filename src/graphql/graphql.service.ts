@@ -380,8 +380,8 @@ export class GraphqlService {
 
 	async getInconmingPayment(id: string) {
 		const query = gql`
-			query IncomingPayment($incomingPaymentId: String!) {
-				incomingPayment(id: $incomingPaymentId) {
+			query IncomingPayment($id: String!) {
+				incomingPayment(id: $id) {
 					id
 					walletAddressId
 					incomingAmount {
@@ -400,6 +400,6 @@ export class GraphqlService {
 		const variables = { id };
 		const client = this.apolloClientService.getClient();
 		const result = await client.query({ query, variables });
-		return result.data;
+		return result.data?.incomingPayment;
 	}
 }
