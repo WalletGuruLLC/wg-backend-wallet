@@ -680,21 +680,14 @@ export class WalletService {
 	async getWalletByToken(token: string): Promise<{
 		walletDb: Wallet;
 		walletAsset: any;
-		balance: number;
-		reserved: number;
 	}> {
 		const walletDb = await this.getUserByToken(token);
 		const walletInfo = await this.graphqlService.listWalletInfo(
 			walletDb.RafikiId
 		);
-		if (walletDb.RafikiId) {
-			delete walletDb.RafikiId;
-		}
 		return {
 			walletDb: walletDb,
 			walletAsset: walletInfo.data.walletAddress.asset,
-			balance: 0,
-			reserved: 0,
 		};
 	}
 
@@ -736,11 +729,7 @@ export class WalletService {
 	async getUserByToken(token: string) {
 		let userInfo = await axios.get(
 			this.AUTH_MICRO_URL + '/api/v1/users/current-user',
-			{
-				headers: {
-					Authorization: token,
-				},
-			}
+			{ headers: { Authorization: token } }
 		);
 		userInfo = userInfo.data;
 		const walletByUserId = await this.dbInstance
@@ -755,9 +744,12 @@ export class WalletService {
 				'Active',
 				'Name',
 				'RafikiId',
-			]) // Apenas traga estas colunas
+				'PostedCredits',
+				'PostedDebits',
+				'PendingCredits',
+				'PendingDebits',
+			])
 			.exec();
-
 		return walletByUserId[0];
 	}
 
