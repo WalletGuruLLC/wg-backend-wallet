@@ -29,7 +29,7 @@ export class OutGoingPaymentCompletedEvent implements EventWebHook {
 			},
 			TableName: 'Wallets',
 			UpdateExpression:
-				'SET PostedDebits = :postedDebits AND PendingDebits = :pendingDebits',
+				'SET PostedDebits = :postedDebits, PendingDebits = :pendingDebits, PostedCredits = :postedCredits',
 			ExpressionAttributeValues: {
 				':postedDebits': debits,
 				':pendingDebits': pendingDebits,
@@ -60,7 +60,7 @@ export class OutGoingPaymentCompletedEvent implements EventWebHook {
 				},
 				TableName: 'Wallets',
 				UpdateExpression:
-					'SET PostedCredits = :postedCredits AND PendingCredits = :pendingCredits',
+					'SET PostedCredits = :postedCredits, PendingCredits = :pendingCredits',
 				ExpressionAttributeValues: {
 					':postedCredits': recieverPostedCredits,
 					':pendingCredits': recieverPendingCredits,
