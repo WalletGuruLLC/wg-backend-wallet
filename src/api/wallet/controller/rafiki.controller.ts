@@ -363,18 +363,20 @@ export class RafikiWalletController {
 				receiver: receiver?.createReceiver?.receiver?.id,
 			};
 
-			const quote = await this.walletService.createQuote(quoteInput);
-			const inputOutgoing = {
-				walletAddressId: input?.walletAddressId,
-				quoteId: quote?.createQuote?.quote?.id,
-			};
-			const outgoingPayment = await this.walletService.createOutgoingPayment(
-				inputOutgoing
-			);
-			return res.status(200).send({
-				data: outgoingPayment,
-				customCode: 'WGE0150',
-			});
+			setTimeout(async () => {
+				const quote = await this.walletService.createQuote(quoteInput);
+				const inputOutgoing = {
+					walletAddressId: input?.walletAddressId,
+					quoteId: quote?.createQuote?.quote?.id,
+				};
+				const outgoingPayment = await this.walletService.createOutgoingPayment(
+					inputOutgoing
+				);
+				return res.status(200).send({
+					data: outgoingPayment,
+					customCode: 'WGE0150',
+				});
+			}, 500);
 		} catch (error) {
 			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
