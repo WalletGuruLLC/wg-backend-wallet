@@ -12,14 +12,17 @@ export class WebHookEventService {
 
 	async executeEvent(eventWebHookDTO: EventWebHookDTO) {
 		try {
-			const event = hookEventMap[eventWebHookDTO.type](this.walletService);
+			const event = hookEventMap[eventWebHookDTO.type];
 
 			if (event) {
 				const wallet = await this.walletService.getWalletByRafikyId(
 					eventWebHookDTO.data.walletAddressId
 				);
+				const eventAction = hookEventMap[eventWebHookDTO.type](
+					this.walletService
+				);
 
-				await event.trigger(eventWebHookDTO, wallet);
+				await eventAction.trigger(eventWebHookDTO, wallet);
 			}
 		} catch (error) {
 			Sentry.captureException(error);
