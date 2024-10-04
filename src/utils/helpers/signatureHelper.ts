@@ -159,3 +159,24 @@ export async function addHostHeader(
 		}
 	}
 }
+
+export async function addHostHeader(
+	req: Request,
+	hostVarName?: string
+): Promise<void> {
+	const requestUrl = url.parse(req.url);
+
+	if (hostVarName) {
+		const hostVarValue = `${requestUrl.protocol}//${requestUrl.host}`;
+		process.env[hostVarName] = hostVarValue;
+	}
+
+	if (requestUrl.hostname === 'localhost') {
+		const hostHeader =
+			requestUrl.port === '3000' ? process.env.HOST3000 : process.env.HOST4000;
+
+		if (hostHeader) {
+			req.headers.host = hostHeader;
+		}
+	}
+}
