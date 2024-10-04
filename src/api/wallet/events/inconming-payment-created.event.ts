@@ -4,12 +4,14 @@ import { EventWebHook } from '../dto/event-webhook';
 import { DocumentClient } from 'aws-sdk/clients/dynamodb';
 import * as Sentry from '@sentry/nestjs';
 import { convertToCamelCase } from 'src/utils/helpers/convertCamelCase';
+import { WalletService } from '../service/wallet.service';
 
 export class IncomingPaymentCreatedEvent implements EventWebHook {
+	constructor(private readonly walletService: WalletService) {}
 	async trigger(eventWebHookDTO: EventWebHookDTO, wallet): Promise<void> {
 		const docClient = new DocumentClient();
 		const credits =
-			wallet.pendingCredits +
+			(wallet.pendingCredits || 0) +
 			parseInt(eventWebHookDTO.data.incomingAmount.value);
 		const params = {
 			Key: {

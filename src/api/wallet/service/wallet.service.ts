@@ -822,6 +822,14 @@ export class WalletService {
 		}
 	}
 
+	async getIncomingPayment(id: string) {
+		try {
+			return await this.graphqlService.getInconmingPayment(id);
+		} catch (error) {
+			throw new Error(`Error fetching incoming payment: ${error.message}`);
+		}
+	}
+
 	async generateToken(
 		body: any,
 		timestamp: string,
@@ -923,5 +931,24 @@ export class WalletService {
 			delete db.RafikiId;
 		}
 		return await convertToCamelCase(db);
+	}
+	async getWalletByRafikyId(rafikiId: string) {
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'Wallets',
+			IndexName: 'RafikiIdIndex',
+			KeyConditionExpression: `RafikiId = :rafikiId`,
+			ExpressionAttributeValues: {
+				':rafikiId': rafikiId,
+			},
+		};
+
+		try {
+			const result = await docClient.query(params).promise();
+			return convertToCamelCase(result.Items?.[0]);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new Error(`Error fetching wallet: ${error.message}`);
+		}
 	}
 }
