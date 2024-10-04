@@ -1,6 +1,7 @@
 import { createHmac } from 'crypto';
 import { canonicalize } from 'json-canonicalize';
 import fetch from 'node-fetch';
+import url from 'url';
 
 interface Request {
 	url: string;
@@ -135,4 +136,25 @@ export async function addApiSignatureHeader(
 	}
 	const signature = generateBackendApiSignature(formattedBody);
 	req.headers['signature'] = signature;
+}
+
+export async function addHostHeader(
+	req: Request,
+	hostVarName?: string
+): Promise<void> {
+	const requestUrl = url.parse(req.url);
+
+	if (hostVarName) {
+		const hostVarValue = `${requestUrl.protocol}//${requestUrl.host}`;
+		process.env[hostVarName] = hostVarValue;
+	}
+
+	if (requestUrl.hostname === 'localhost') {
+		const hostHeader =
+			requestUrl.port === '3000' ? process.env.HOST3000 : process.env.HOST4000;
+
+		if (hostHeader) {
+			req.headers.host = hostHeader;
+		}
+	}
 }

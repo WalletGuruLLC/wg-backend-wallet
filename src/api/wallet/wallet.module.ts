@@ -15,6 +15,7 @@ import { WebHookEventService } from './service/webhook-event.service';
 import { SqsService } from './sqs/sqs.service';
 import { UserWsGateway } from './service/websocket-users';
 import { ClearPaymentController } from './controller/clear-payment.controller';
+import { PaymentService } from './service/payments.service';
 
 @Module({
 	imports: [ConfigModule, VerifyModule],
@@ -27,6 +28,7 @@ import { ClearPaymentController } from './controller/clear-payment.controller';
 	providers: [
 		WalletService,
 		VerifyService,
+		PaymentService,
 		ApolloClientService,
 		GraphqlService,
 		AuthGateway,

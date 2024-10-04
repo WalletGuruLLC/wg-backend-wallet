@@ -32,7 +32,10 @@ import { MapOfStringToList } from 'aws-sdk/clients/apigateway';
 import { CreateRafikiWalletAddressDto } from '../dto/create-rafiki-wallet-address.dto';
 import { CreateServiceProviderWalletAddressDto } from '../dto/create-rafiki-service-provider-wallet-address.dto';
 import { customValidationPipe } from '../../validation.pipe';
-import { addApiSignatureHeader } from 'src/utils/helpers/signatureHelper';
+import {
+	addApiSignatureHeader,
+	addHostHeader,
+} from 'src/utils/helpers/signatureHelper';
 import {
 	ActionOugoingPaymentDto,
 	CreateQuoteInputDTO,
@@ -45,6 +48,13 @@ import {
 } from '../dto/payments-rafiki.dto';
 import { isValidStringLength } from 'src/utils/helpers/isValidStringLength';
 import { v4 as uuidv4 } from 'uuid';
+import { PaymentService } from '../service/payments.service';
+import {
+	AuthOpenPaymentGrantInputDTO,
+	IncomingOpenPaymentDTO,
+	OutgoingOpenPaymentDTO,
+	OutgoingPaymentAuthInputDTO,
+} from '../dto/payments-open-payment.dt';
 import { convertToCamelCase } from 'src/utils/helpers/convertCamelCase';
 import { CreatePaymentDTO } from '../dto/create-payment-rafiki.dto';
 import { AuthGateway } from '../service/websocket';
@@ -68,6 +78,7 @@ export class RafikiWalletController {
 		private readonly verifyService: VerifyService,
 		private readonly authGateway: AuthGateway,
 		private readonly userWsGateway: UserWsGateway,
+        private readonly paymentService: PaymentService
 		private configService: ConfigService
 	) {
 		this.AUTH_MICRO_URL = process.env.AUTH_URL;
@@ -1716,5 +1727,152 @@ export class RafikiWalletController {
 			statusCode: HttpStatus.OK,
 			customCode: 'WGE0150',
 		});
+	}
+
+	@Post('auth-payment')
+	@ApiBody({
+		type: AuthOpenPaymentGrantInputDTO,
+		description: 'Auth open payment',
+	})
+	@ApiOperation({ summary: 'Open payment - auth payment' })
+	async authPayment(
+		@Body('clientWalletAddress') clientWalletAddress: string,
+		@Req() req,
+		@Res() res
+	) {
+		try {
+			await addApiSignatureHeader(req, req.body);
+			return this.paymentService.postAuthPayment(clientWalletAddress);
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0155',
+			});
+		}
+	}
+
+	@Post('incoming-payment')
+	@ApiBody({
+		type: IncomingOpenPaymentDTO,
+		description: 'Incoming open payment',
+	})
+	@ApiOperation({ summary: 'Open payment - incoming payment' })
+	async incomingPayment(
+		@Body('receiverWalletAddress') receiverWalletAddress: string,
+		@Req() req,
+		@Res() res
+	) {
+		try {
+			await addApiSignatureHeader(req, req.body);
+			await addHostHeader(req, process.env.URL_BASE_OPEN_PAYMENTS);
+			return this.paymentService.createIncomingPayment(receiverWalletAddress);
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0155',
+			});
+		}
+	}
+
+	@Post('outgoing-payment-auth')
+	@ApiBody({
+		type: OutgoingPaymentAuthInputDTO,
+		description: 'Incoming open payment',
+	})
+	@ApiOperation({ summary: 'Open payment - outgoing payment' })
+	async outgoingPaymentAuth(
+		@Body('senderWalletAddress') senderWalletAddress: string,
+		@Body('clientWalletAddress') clientWalletAddress: string,
+		@Body('debitAmount') debitAmount: number,
+		@Body('receiveAmount') receiveAmount: number,
+		@Req() req,
+		@Res() res
+	) {
+		try {
+			await addApiSignatureHeader(req, req.body);
+			return this.paymentService.postOutgoingPaymentAuth(
+				senderWalletAddress,
+				clientWalletAddress,
+				debitAmount,
+				receiveAmount
+			);
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0155',
+			});
+		}
+	}
+
+	@Post('continue/:continueId')
+	@ApiOperation({ summary: 'Open paymeny - continue' })
+	async continueInteraction(
+		@Param('continueId') continueId: string,
+		@Param('interact_ref') interactRef: string,
+		@Req() req,
+		@Res() res
+	) {
+		try {
+			await addApiSignatureHeader(req, req.body);
+			return this.paymentService.continueInteraction(continueId, interactRef);
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0155',
+			});
+		}
+	}
+
+	@Post('outgoing-payment')
+	@ApiBody({
+		type: OutgoingOpenPaymentDTO,
+		description: 'Incoming open payment',
+	})
+	@ApiOperation({ summary: 'Open payment - create outgoing payment' })
+	async outgoingPayment(
+		@Body('senderWalletAddress') senderWalletAddress: string,
+		@Body('incomingPaymentUrl') incomingPaymentUrl: string,
+		@Body('debitAmount') debitAmount: number,
+		@Req() req,
+		@Res() res
+	) {
+		try {
+			await addApiSignatureHeader(req, req.body);
+			return this.paymentService.createOutgoingPayment(
+				senderWalletAddress,
+				incomingPaymentUrl,
+				debitAmount
+			);
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0155',
+			});
+		}
+	}
+
+	@Get('outgoing-payment/:outgoingPaymentId')
+	@ApiOperation({ summary: 'Open payment - get outgoing payment' })
+	async getOutgoingPayment(
+		@Param('outgoingPaymentId') outgoingPaymentId: string,
+		@Req() req,
+		@Res() res
+	) {
+		try {
+			await addHostHeader(req, process.env.URL_BASE_OPEN_PAYMENTS);
+			await addApiSignatureHeader(req, req.body);
+			return this.paymentService.getOutgoingPayment(outgoingPaymentId);
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0155',
+			});
+		}
 	}
 }
