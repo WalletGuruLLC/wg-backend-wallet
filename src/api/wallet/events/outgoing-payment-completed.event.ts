@@ -42,7 +42,7 @@ export class OutGoingPaymentCompletedEvent implements EventWebHook {
 			);
 
 			const recieverPostedCredits =
-				(recieverWallet?.postedDebits || 0) +
+				(recieverWallet?.postedCredits || 0) +
 				parseInt(eventWebHookDTO.data.receiveAmount.value);
 
 			const recieverPendingCredits =
