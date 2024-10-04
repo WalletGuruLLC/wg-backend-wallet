@@ -10,6 +10,7 @@ import { v4 as uuidv4 } from 'uuid';
 export class OutGoingPaymentCreatedEvent implements EventWebHook {
 	constructor(private readonly walletService: WalletService) {}
 	async trigger(eventWebHookDTO: EventWebHookDTO, wallet): Promise<void> {
+		const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 		const docClient = new DocumentClient();
 		const depositOutgoingPaymentInput = {
 			outgoingPaymentId: eventWebHookDTO?.data?.id,
@@ -33,6 +34,8 @@ export class OutGoingPaymentCreatedEvent implements EventWebHook {
 
 		try {
 			const result = await docClient.update(params).promise();
+
+			await delay(5000);
 
 			await this.walletService.createDepositOutgoingMutationService(
 				depositOutgoingPaymentInput
