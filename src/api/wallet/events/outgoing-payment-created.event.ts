@@ -40,9 +40,6 @@ export class OutGoingPaymentCreatedEvent implements EventWebHook {
 				);
 			}, 5000);
 
-			await this.walletService.createDepositOutgoingMutationService(
-				depositOutgoingPaymentInput
-			);
 			return convertToCamelCase(result);
 		} catch (error) {
 			Sentry.captureException(error);
