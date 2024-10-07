@@ -707,8 +707,8 @@ export class WalletService {
 
 		for (
 			let index = 0;
-			index < 3;
-			// index < transactions.data.walletAddress.outgoingPayments.edges.length;
+			index < 10 &&
+			index < transactions.data.walletAddress.outgoingPayments.edges.length;
 			index++
 		) {
 			let object =
@@ -785,7 +785,7 @@ export class WalletService {
 				'PostedDebits',
 				'PendingCredits',
 				'PendingDebits',
-				'WalletAddress'
+				'WalletAddress',
 			])
 			.exec();
 		return walletByUserId[0];
