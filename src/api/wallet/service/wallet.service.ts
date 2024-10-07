@@ -701,28 +701,65 @@ export class WalletService {
 		const transactions = await this.graphqlService.listTransactions(
 			walletDb.RafikiId
 		);
-		const completedIncomingPayments = this.extractAndSortCompletedPayments(
-			transactions.data.walletAddress.incomingPayments.edges,
-			walletDb.Id
-		);
-		const completedOutgoingPayments = this.extractAndSortCompletedPayments(
-			transactions.data.walletAddress.outgoingPayments.edges,
-			walletDb.Id
+
+		let outgoingArray = [];
+		let incomingArray = [];
+
+		for (
+			let index = 0;
+			index < 10 &&
+			index < transactions.data.walletAddress.outgoingPayments.edges.length;
+			index++
+		) {
+			let object =
+				transactions.data.walletAddress.outgoingPayments.edges[index];
+			let objectConverted = {
+				type: object.node.__typename,
+				outgoingPaymentId: object.node.id,
+				walletAddressId: object.node.walletAddressId,
+				state: object.node.state,
+				metadata: object.node.metadata,
+				receiver: object.node.receiver,
+				receiveAmount: object.node.receiveAmount,
+				createdAt: object.node.createdAt,
+			};
+			outgoingArray.push(objectConverted);
+			let incomingPaymentId = object.node.receiver.split('/')[4];
+			const incomingPayment = await this.getIncomingPayment(incomingPaymentId);
+
+			if (incomingPayment.state !== 'EXPIRED') {
+				let incomingConverted = {
+					type: incomingPayment.__typename,
+					incomingPaymentId: incomingPayment.id,
+					walletAddressId: incomingPayment.walletAddressId,
+					state: incomingPayment.state,
+					incomingAmount: incomingPayment.incomingAmount,
+					createdAt: incomingPayment.createdAt,
+				};
+				incomingArray.push(incomingConverted);
+			}
+		}
+		let combinedArray = incomingArray.concat(outgoingArray);
+
+		let incomingSorted = incomingArray.sort(
+			(a: any, b: any) =>
+				new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
 		);
 
+		let outGoingSorted = outgoingArray.sort(
+			(a: any, b: any) =>
+				new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+		);
+		let combinedSorted = combinedArray.sort(
+			(a: any, b: any) =>
+				new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+		);
 		if (search === 'credit') {
-			return convertToCamelCase({
-				completedIncomingPayments,
-			});
+			return convertToCamelCase(incomingSorted);
 		} else if (search === 'debit') {
-			return convertToCamelCase({
-				completedOutgoingPayments,
-			});
+			return convertToCamelCase(outGoingSorted);
 		} else {
-			return convertToCamelCase({
-				completedIncomingPayments,
-				completedOutgoingPayments,
-			});
+			return convertToCamelCase(combinedSorted);
 		}
 	}
 
@@ -748,38 +785,10 @@ export class WalletService {
 				'PostedDebits',
 				'PendingCredits',
 				'PendingDebits',
+				'WalletAddress',
 			])
 			.exec();
 		return walletByUserId[0];
-	}
-
-	extractAndSortCompletedPayments(edges: any[], walletAddressId: string) {
-		return edges
-			.filter(edge => edge.node.state === 'COMPLETED')
-			.map(edge => {
-				const node = edge.node;
-				let creditAccountId: string | undefined;
-				let debitAccountId: string | undefined;
-				if (edge.__typename === 'IncomingPaymentEdge') {
-					creditAccountId = walletAddressId;
-					debitAccountId = 'EMPTY';
-				} else if (edge.__typename === 'OutgoingPaymentEdge') {
-					debitAccountId = walletAddressId;
-					creditAccountId = 'EMPTY';
-				}
-				return {
-					id: node.id,
-					state: node.state,
-					description: node.metadata?.description || '',
-					value: node.receivedAmount?.value || node.debitAmount?.value || 0,
-					assetCode:
-						node.receivedAmount?.assetCode || node.debitAmount?.assetCode || '',
-					createdAt: new Date(node.createdAt).getTime(),
-					debitAccountId,
-					creditAccountId,
-				};
-			})
-			.sort((a, b) => b.createdAt - a.createdAt);
 	}
 
 	async createReceiver(input: any) {
