@@ -16,7 +16,7 @@ export class OutGoingPaymentCompletedEvent implements EventWebHook {
 			parseInt(eventWebHookDTO.data.receiveAmount.value);
 
 		const pendingDebits =
-			(wallet?.pendingDebits || 0) -
+			(wallet?.pendingDebits || 0) 
 			parseInt(eventWebHookDTO.data.receiveAmount.value);
 
 		const params = {
