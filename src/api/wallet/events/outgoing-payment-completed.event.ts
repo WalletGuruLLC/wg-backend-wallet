@@ -19,20 +19,16 @@ export class OutGoingPaymentCompletedEvent implements EventWebHook {
 			(wallet?.pendingDebits || 0) -
 			parseInt(eventWebHookDTO.data.receiveAmount.value);
 
-		const walletPostedCredits =
-			(wallet?.postedCredits || 0) -
-			parseInt(eventWebHookDTO.data.receiveAmount.value);
 		const params = {
 			Key: {
 				Id: wallet.id,
 			},
 			TableName: 'Wallets',
 			UpdateExpression:
-				'SET PostedDebits = :postedDebits, PendingDebits = :pendingDebits, PostedCredits = :postedCredits',
+				'SET PostedDebits = :postedDebits, PendingDebits = :pendingDebits',
 			ExpressionAttributeValues: {
 				':postedDebits': debits,
 				':pendingDebits': pendingDebits,
-				':postedCredits': walletPostedCredits,
 			},
 			ReturnValues: 'ALL_NEW',
 		};
@@ -46,7 +42,7 @@ export class OutGoingPaymentCompletedEvent implements EventWebHook {
 			);
 
 			const recieverPostedCredits =
-				(recieverWallet?.postedDebits || 0) +
+				(recieverWallet?.postedCredits || 0) +
 				parseInt(eventWebHookDTO.data.receiveAmount.value);
 
 			const recieverPendingCredits =
