@@ -39,7 +39,7 @@ export class OutGoingPaymentCreatedEvent implements EventWebHook {
 				await this.walletService.createDepositOutgoingMutationService(
 					depositOutgoingPaymentInput
 				);
-			}, 2000);
+			}, 500);
 
 			return convertToCamelCase(result);
 		} catch (error) {
