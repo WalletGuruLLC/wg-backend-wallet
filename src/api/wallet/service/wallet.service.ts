@@ -680,21 +680,14 @@ export class WalletService {
 	async getWalletByToken(token: string): Promise<{
 		walletDb: Wallet;
 		walletAsset: any;
-		balance: number;
-		reserved: number;
 	}> {
 		const walletDb = await this.getUserByToken(token);
 		const walletInfo = await this.graphqlService.listWalletInfo(
 			walletDb.RafikiId
 		);
-		if (walletDb.RafikiId) {
-			delete walletDb.RafikiId;
-		}
 		return {
 			walletDb: walletDb,
 			walletAsset: walletInfo.data.walletAddress.asset,
-			balance: 0,
-			reserved: 0,
 		};
 	}
 
@@ -736,11 +729,7 @@ export class WalletService {
 	async getUserByToken(token: string) {
 		let userInfo = await axios.get(
 			this.AUTH_MICRO_URL + '/api/v1/users/current-user',
-			{
-				headers: {
-					Authorization: token,
-				},
-			}
+			{ headers: { Authorization: token } }
 		);
 		userInfo = userInfo.data;
 		const walletByUserId = await this.dbInstance
@@ -755,9 +744,12 @@ export class WalletService {
 				'Active',
 				'Name',
 				'RafikiId',
-			]) // Apenas traga estas colunas
+				'PostedCredits',
+				'PostedDebits',
+				'PendingCredits',
+				'PendingDebits',
+			])
 			.exec();
-
 		return walletByUserId[0];
 	}
 
@@ -819,6 +811,14 @@ export class WalletService {
 			return await this.graphqlService.getOutgoingPayment(id);
 		} catch (error) {
 			throw new Error(`Error fetching outgoing payment: ${error.message}`);
+		}
+	}
+
+	async getIncomingPayment(id: string) {
+		try {
+			return await this.graphqlService.getInconmingPayment(id);
+		} catch (error) {
+			throw new Error(`Error fetching incoming payment: ${error.message}`);
 		}
 	}
 
@@ -923,5 +923,24 @@ export class WalletService {
 			delete db.RafikiId;
 		}
 		return await convertToCamelCase(db);
+	}
+	async getWalletByRafikyId(rafikiId: string) {
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'Wallets',
+			IndexName: 'RafikiIdIndex',
+			KeyConditionExpression: `RafikiId = :rafikiId`,
+			ExpressionAttributeValues: {
+				':rafikiId': rafikiId,
+			},
+		};
+
+		try {
+			const result = await docClient.query(params).promise();
+			return convertToCamelCase(result.Items?.[0]);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new Error(`Error fetching wallet: ${error.message}`);
+		}
 	}
 }
