@@ -713,8 +713,6 @@ export class WalletService {
 		) {
 			let object =
 				transactions.data.walletAddress.outgoingPayments.edges[index];
-
-			console.log('object', object);
 			let objectConverted = {
 				type: object.node.__typename,
 				outgoingPaymentId: object.node.id,
