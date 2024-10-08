@@ -27,6 +27,7 @@ import { SocketKeySchema } from '../entities/socket.schema';
 import { Rates } from '../entities/rates.entity';
 import { RatesSchema } from '../entities/rates.schema';
 import { DocumentClient } from 'aws-sdk/clients/dynamodb';
+import { SqsService } from '../sqs/sqs.service';
 
 @Injectable()
 export class WalletService {
@@ -38,7 +39,8 @@ export class WalletService {
 
 	constructor(
 		private configService: ConfigService,
-		private readonly graphqlService: GraphqlService
+		private readonly graphqlService: GraphqlService,
+		private readonly sqsService: SqsService
 	) {
 		this.dbInstance = dynamoose.model<Wallet>('Wallets', WalletSchema);
 		this.dbInstanceSocket = dynamoose.model<SocketKey>(
@@ -950,6 +952,53 @@ export class WalletService {
 		} catch (error) {
 			Sentry.captureException(error);
 			throw new Error(`Error fetching wallet: ${error.message}`);
+		}
+	}
+
+	async sendMail(input: any, outGoingPayment: any) {
+		try {
+			const walletInfo = await this.getWalletByRafikyId(input.walletAddressId);
+			const docClient = new DocumentClient();
+			const params = {
+				TableName: 'Users',
+				Key: { Id: walletInfo.userId },
+			};
+			const result = await docClient.get(params).promise();
+
+			const date = new Date(
+				outGoingPayment.createOutgoingPayment.payment.createdAt
+			);
+
+			const day = String(date.getDate()).padStart(2, '0');
+			const month = String(date.getMonth() + 1).padStart(2, '0');
+			const year = date.getFullYear();
+			const hours = String(date.getHours()).padStart(2, '0');
+			const minutes = String(date.getMinutes()).padStart(2, '0');
+
+			const formattedDate = `${day}/${month}/${year} - ${hours}:${minutes}`;
+
+			const value = {
+				value:
+					outGoingPayment.createOutgoingPayment.payment.receiveAmount.value,
+				asset:
+					outGoingPayment.createOutgoingPayment.payment.receiveAmount.assetCode,
+				walletAddress: walletInfo.walletAddress,
+				date: formattedDate,
+			};
+
+			const sqsMessage = {
+				event: 'SEND_MONEY_CONFIRMATION',
+				email: result.Item.Email,
+				username:
+					result.Item.FirstName +
+					(result.Item.Lastname ? ' ' + result.Item.Lastname : ''),
+				value: value,
+			};
+			await this.sqsService.sendMessage(process.env.SQS_QUEUE_URL, sqsMessage);
+
+			return;
+		} catch (error) {
+			throw new Error(`Error creating outgoing payment: ${error.message}`);
 		}
 	}
 }

@@ -12,6 +12,7 @@ import { RafikiWalletController } from './controller/rafiki.controller';
 import { AuthGateway } from './service/websocket';
 import { WebHookController } from './controller/webhook.controller';
 import { WebHookEventService } from './service/webhook-event.service';
+import { SqsService } from './sqs/sqs.service';
 
 @Module({
 	imports: [ConfigModule, VerifyModule],
@@ -23,6 +24,7 @@ import { WebHookEventService } from './service/webhook-event.service';
 		GraphqlService,
 		AuthGateway,
 		WebHookEventService,
+		SqsService,
 	],
 })
 export class WalletModule implements NestModule {
