@@ -10,6 +10,7 @@ import {
 	Res,
 	Query,
 	Req,
+	Param,
 } from '@nestjs/common';
 
 import {
@@ -517,6 +518,51 @@ export class RafikiWalletController {
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
 				customCode: 'WGE0173',
+			});
+		}
+	}
+
+	@Get(':id/asset')
+	@ApiOperation({ summary: 'Get wallet address by rafikyId' })
+	@ApiResponse({
+		status: 200,
+	})
+	@ApiResponse({
+		status: 500,
+	})
+	async getAssetByRafikyId(
+		@Param('id') id: string,
+		@Headers() headers: MapOfStringToList,
+		@Res() res
+	) {
+		let token;
+		try {
+			token = headers.authorization ?? '';
+			const instanceVerifier = await this.verifyService.getVerifiedFactory();
+			await instanceVerifier.verify(token.toString().split(' ')[1]);
+		} catch (error) {
+			Sentry.captureException(error);
+
+			return res.status(HttpStatus.UNAUTHORIZED).send({
+				statusCode: HttpStatus.UNAUTHORIZED,
+				customCode: 'WGE0021',
+			});
+		}
+
+		try {
+			const asset = await this.walletService.getAssetByRafikyId(id);
+
+			return res.status(HttpStatus.OK).send({
+				statusCode: HttpStatus.OK,
+				customCode: 'WGS0081',
+				data: { asset },
+			});
+		} catch (error) {
+			Sentry.captureException(error);
+
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0083',
 			});
 		}
 	}
