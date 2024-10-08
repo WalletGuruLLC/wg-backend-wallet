@@ -526,11 +526,9 @@ export class RafikiWalletController {
 	@ApiOperation({ summary: 'Get wallet address by rafikyId' })
 	@ApiResponse({
 		status: 200,
-		description: successCodes.WGS0081?.description,
 	})
 	@ApiResponse({
 		status: 500,
-		description: errorCodes.WGE0083?.description,
 	})
 	async getAssetByRafikyId(
 		@Param('id') id: string,
@@ -569,7 +567,6 @@ export class RafikiWalletController {
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
 				customCode: 'WGE0083',
-				message: error.message,
 			});
 		}
 	}
