@@ -666,6 +666,20 @@ export class WalletService {
 		}));
 	}
 
+	async getAssetByRafikyId(rafikyId: string) {
+		try {
+			const walletAddress = await this.graphqlService.getWalletAddressAsset(
+				rafikyId
+			);
+			return walletAddress;
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new Error(
+				'Failed to get wallet address asset by rafikyId. Please try again later.'
+			);
+		}
+	}
+
 	async filterRafikiAssetById(assetId: string) {
 		const assets = await this.getRafikiAssets();
 		const filteredAsset = assets.find(asset => asset?.id === assetId);
@@ -702,8 +716,8 @@ export class WalletService {
 			walletDb.RafikiId
 		);
 
-		let outgoingArray = [];
-		let incomingArray = [];
+		const outgoingArray = [];
+		const incomingArray = [];
 
 		for (
 			let index = 0;
@@ -711,9 +725,9 @@ export class WalletService {
 			index < transactions.data.walletAddress.outgoingPayments.edges.length;
 			index++
 		) {
-			let object =
+			const object =
 				transactions.data.walletAddress.outgoingPayments.edges[index];
-			let objectConverted = {
+			const objectConverted = {
 				type: object.node.__typename,
 				outgoingPaymentId: object.node.id,
 				walletAddressId: object.node.walletAddressId,
@@ -724,11 +738,11 @@ export class WalletService {
 				createdAt: object.node.createdAt,
 			};
 			outgoingArray.push(objectConverted);
-			let incomingPaymentId = object.node.receiver.split('/')[4];
+			const incomingPaymentId = object.node.receiver.split('/')[4];
 			const incomingPayment = await this.getIncomingPayment(incomingPaymentId);
 
 			if (incomingPayment.state !== 'EXPIRED') {
-				let incomingConverted = {
+				const incomingConverted = {
 					type: incomingPayment.__typename,
 					incomingPaymentId: incomingPayment.id,
 					walletAddressId: incomingPayment.walletAddressId,
@@ -739,18 +753,18 @@ export class WalletService {
 				incomingArray.push(incomingConverted);
 			}
 		}
-		let combinedArray = incomingArray.concat(outgoingArray);
+		const combinedArray = incomingArray.concat(outgoingArray);
 
-		let incomingSorted = incomingArray.sort(
+		const incomingSorted = incomingArray.sort(
 			(a: any, b: any) =>
 				new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
 		);
 
-		let outGoingSorted = outgoingArray.sort(
+		const outGoingSorted = outgoingArray.sort(
 			(a: any, b: any) =>
 				new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
 		);
-		let combinedSorted = combinedArray.sort(
+		const combinedSorted = combinedArray.sort(
 			(a: any, b: any) =>
 				new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
 		);
