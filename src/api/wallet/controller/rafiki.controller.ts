@@ -542,15 +542,11 @@ export class RafikiWalletController {
 			await instanceVerifier.verify(token.toString().split(' ')[1]);
 		} catch (error) {
 			Sentry.captureException(error);
-			throw new HttpException(
-				{
-					statusCode: HttpStatus.UNAUTHORIZED,
-					customCode: 'WGE0021',
-					customMessage: errorCodes.WGE0021?.description,
-					customMessageEs: errorCodes.WGE0021?.descriptionEs,
-				},
-				HttpStatus.UNAUTHORIZED
-			);
+
+			return res.status(HttpStatus.UNAUTHORIZED).send({
+				statusCode: HttpStatus.UNAUTHORIZED,
+				customCode: 'WGE0021',
+			});
 		}
 
 		try {
@@ -558,7 +554,7 @@ export class RafikiWalletController {
 
 			return res.status(HttpStatus.OK).send({
 				statusCode: HttpStatus.OK,
-				customCode: 'WGE0021',
+				customCode: 'WGS0081',
 				data: { asset },
 			});
 		} catch (error) {
