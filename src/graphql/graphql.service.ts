@@ -147,43 +147,12 @@ export class GraphqlService {
 		const query = gql`
 			query WalletAddress($id: String!) {
 				walletAddress(id: $id) {
-					incomingPayments {
-						edges {
-							node {
-								id
-								state
-								expiresAt
-								incomingAmount {
-									value
-								}
-								receivedAmount {
-									value
-									assetCode
-									assetScale
-								}
-								metadata
-								createdAt
-							}
-							cursor
-						}
-						pageInfo {
-							endCursor
-							hasNextPage
-							hasPreviousPage
-							startCursor
-						}
-					}
 					outgoingPayments {
 						edges {
 							node {
 								id
+								walletAddressId
 								state
-								error
-								debitAmount {
-									value
-									assetCode
-									assetScale
-								}
 								receiveAmount {
 									value
 									assetCode
@@ -390,9 +359,7 @@ export class GraphqlService {
 						value
 					}
 					createdAt
-					liquidity
 					state
-					client
 				}
 			}
 		`;
