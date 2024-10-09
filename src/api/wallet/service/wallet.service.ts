@@ -666,6 +666,20 @@ export class WalletService {
 		}));
 	}
 
+	async getAssetByRafikyId(rafikyId: string) {
+		try {
+			const walletAddress = await this.graphqlService.getWalletAddressAsset(
+				rafikyId
+			);
+			return walletAddress;
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new Error(
+				'Failed to get wallet address asset by rafikyId. Please try again later.'
+			);
+		}
+	}
+
 	async filterRafikiAssetById(assetId: string) {
 		const assets = await this.getRafikiAssets();
 		const filteredAsset = assets.find(asset => asset?.id === assetId);
