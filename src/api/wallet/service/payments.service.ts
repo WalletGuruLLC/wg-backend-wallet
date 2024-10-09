@@ -53,8 +53,7 @@ export class PaymentService {
 			console.log('First request completed:', response.data);
 			return response.data;
 		} catch (error) {
-			console.error('Error in postAuthPayment:', error.message);
-			throw error;
+			console.log('Error in postAuthPayment:', error.message);
 		}
 	}
 

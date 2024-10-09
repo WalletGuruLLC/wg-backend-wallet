@@ -139,10 +139,12 @@ export async function addApiSignatureHeader(
 }
 
 export async function addHostHeader(
-	req: Request,
+	req: any,
 	hostVarName?: string
 ): Promise<void> {
-	const requestUrl = url.parse(req.url);
+	const fullUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+	const requestUrl = new URL(fullUrl);
+	//const requestUrl = url.parse(fullUrl);
 
 	if (hostVarName) {
 		const hostVarValue = `${requestUrl.protocol}//${requestUrl.host}`;
@@ -151,7 +153,7 @@ export async function addHostHeader(
 
 	if (requestUrl.hostname === 'localhost') {
 		const hostHeader =
-			requestUrl.port === '3000' ? process.env.HOST3000 : process.env.HOST4000;
+			requestUrl.port === '3000' ? 'localhost:3000' : 'localhost:4000';
 
 		if (hostHeader) {
 			req.headers.host = hostHeader;

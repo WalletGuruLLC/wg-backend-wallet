@@ -1731,20 +1731,27 @@ export class RafikiWalletController {
 
 	@Post('auth-payment')
 	@ApiBody({
-		type: AuthOpenPaymentGrantInputDTO,
-		description: 'Auth open payment',
+		schema: {
+			type: 'object',
+			properties: {
+				clientWalletAddress: { type: 'string', example: '0x123456789abcdef' },
+			},
+		},
+		description: 'auth open payment',
 	})
 	@ApiOperation({ summary: 'Open payment - auth payment' })
-	async authPayment(
+	async postAuthPayment(
 		@Body('clientWalletAddress') clientWalletAddress: string,
 		@Req() req,
 		@Res() res
 	) {
 		try {
+			console.log('entro');
 			await addApiSignatureHeader(req, req.body);
+			console.log('paso signature');
 			return this.paymentService.postAuthPayment(clientWalletAddress);
 		} catch (error) {
-			Sentry.captureException(error);
+			console.log('error', error?.message);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
 				customCode: 'WGE0155',
@@ -1754,7 +1761,12 @@ export class RafikiWalletController {
 
 	@Post('incoming-payment')
 	@ApiBody({
-		type: IncomingOpenPaymentDTO,
+		schema: {
+			type: 'object',
+			properties: {
+				receiverWalletAddress: { type: 'string', example: '0x123456789abcdef' },
+			},
+		},
 		description: 'Incoming open payment',
 	})
 	@ApiOperation({ summary: 'Open payment - incoming payment' })
@@ -1778,8 +1790,16 @@ export class RafikiWalletController {
 
 	@Post('outgoing-payment-auth')
 	@ApiBody({
-		type: OutgoingPaymentAuthInputDTO,
-		description: 'Incoming open payment',
+		schema: {
+			type: 'object',
+			properties: {
+				senderWalletAddress: { type: 'string', example: '0x987654321fedcba' },
+				clientWalletAddress: { type: 'string', example: '0xa1b2c3d4e5f67890' },
+				debitAmount: { type: 'number', example: 100 },
+				receiveAmount: { type: 'number', example: 95 },
+			},
+		},
+		description: 'Outgoing payment authentication',
 	})
 	@ApiOperation({ summary: 'Open payment - outgoing payment' })
 	async outgoingPaymentAuth(
@@ -1808,10 +1828,19 @@ export class RafikiWalletController {
 	}
 
 	@Post('continue/:continueId')
-	@ApiOperation({ summary: 'Open paymeny - continue' })
+	@ApiBody({
+		schema: {
+			type: 'object',
+			properties: {
+				interact_ref: { type: 'string', example: 'ref12345' },
+			},
+		},
+		description: 'Continue open payment interaction',
+	})
+	@ApiOperation({ summary: 'Open payment - continue' })
 	async continueInteraction(
 		@Param('continueId') continueId: string,
-		@Param('interact_ref') interactRef: string,
+		@Body('interact_ref') interactRef: string,
 		@Req() req,
 		@Res() res
 	) {
@@ -1829,8 +1858,18 @@ export class RafikiWalletController {
 
 	@Post('outgoing-payment')
 	@ApiBody({
-		type: OutgoingOpenPaymentDTO,
-		description: 'Incoming open payment',
+		schema: {
+			type: 'object',
+			properties: {
+				senderWalletAddress: { type: 'string', example: '0x123456789abcdef' },
+				incomingPaymentUrl: {
+					type: 'string',
+					example: 'https://payment-url.com',
+				},
+				debitAmount: { type: 'number', example: 150 },
+			},
+		},
+		description: 'Create outgoing open payment',
 	})
 	@ApiOperation({ summary: 'Open payment - create outgoing payment' })
 	async outgoingPayment(
