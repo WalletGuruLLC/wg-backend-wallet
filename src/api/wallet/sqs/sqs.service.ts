@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SQS } from 'aws-sdk';
-import { sendMailDto } from './dto/login-message.dto';
+import { sendMailDto } from './dto/send-mail.dto';
 import * as Sentry from '@sentry/nestjs';
 
 @Injectable()

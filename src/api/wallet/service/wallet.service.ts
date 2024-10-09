@@ -969,7 +969,7 @@ export class WalletService {
 		}
 	}
 
-	async sendMail(input: any, outGoingPayment: any) {
+	async sendMoneyMailConfirmation(input: any, outGoingPayment: any) {
 		try {
 			const walletInfo = await this.getWalletByRafikyId(input.walletAddressId);
 			const docClient = new DocumentClient();
@@ -996,7 +996,7 @@ export class WalletService {
 					outGoingPayment.createOutgoingPayment.payment.receiveAmount.value,
 				asset:
 					outGoingPayment.createOutgoingPayment.payment.receiveAmount.assetCode,
-				walletAddress: walletInfo.walletAddress,
+				walletAddress: walletInfo.walletAddress.split('/')[4],
 				date: formattedDate,
 			};
 
@@ -1008,8 +1008,54 @@ export class WalletService {
 					(result.Item.Lastname ? ' ' + result.Item.Lastname : ''),
 				value: value,
 			};
-			await this.sqsService.sendMessage(process.env.SQS_QUEUE_URL, sqsMessage);
 
+			const incomingPaymentId =
+				outGoingPayment.createOutgoingPayment.payment.receiver.split('/')[4];
+			const incomingPayment = await this.getIncomingPayment(incomingPaymentId);
+
+			const receiverInfo = await this.getWalletByRafikyId(
+				incomingPayment.walletAddressId
+			);
+
+			const receiverParam = {
+				TableName: 'Users',
+				Key: { Id: receiverInfo.userId },
+			};
+			const receiver = await docClient.get(receiverParam).promise();
+
+			const receiverDate = new Date(incomingPayment.createdAt);
+			const receiverDay = String(receiverDate.getDate()).padStart(2, '0');
+			const receiverMonth = String(receiverDate.getMonth() + 1).padStart(
+				2,
+				'0'
+			);
+			const receiverYear = receiverDate.getFullYear();
+			const receiverHours = String(receiverDate.getHours()).padStart(2, '0');
+			const receiverMinutes = String(receiverDate.getMinutes()).padStart(
+				2,
+				'0'
+			);
+
+			const receiverDateFormatted = `${receiverDay}/${receiverMonth}/${receiverYear} - ${receiverHours}:${receiverMinutes}`;
+
+			const receiverValue = {
+				value: incomingPayment.incomingAmount.value,
+				asset: incomingPayment.incomingAmount.assetCode,
+				walletAddress: receiverInfo.walletAddress.split('/')[4],
+				date: receiverDateFormatted,
+			};
+
+			const sqsMsg = {
+				event: 'RECEIVE_MONEY_CONFIRMATION',
+				email: receiver.Item.Email,
+				username:
+					receiver.Item.FirstName +
+					(receiver.Item.Lastname ? ' ' + receiver.Item.Lastname : ''),
+				value: receiverValue,
+			};
+
+			await this.sqsService.sendMessage(process.env.SQS_QUEUE_URL, sqsMessage);
+			await this.sqsService.sendMessage(process.env.SQS_QUEUE_URL, sqsMsg);
 			return;
 		} catch (error) {
 			throw new Error(`Error creating outgoing payment: ${error.message}`);

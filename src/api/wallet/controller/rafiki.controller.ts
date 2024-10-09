@@ -374,7 +374,10 @@ export class RafikiWalletController {
 					inputOutgoing
 				);
 
-				await this.walletService.sendMail(inputOutgoing, outgoingPayment);
+				await this.walletService.sendMoneyMailConfirmation(
+					inputOutgoing,
+					outgoingPayment
+				);
 
 				return res.status(200).send({
 					data: outgoingPayment,
