@@ -373,6 +373,12 @@ export class RafikiWalletController {
 				const outgoingPayment = await this.walletService.createOutgoingPayment(
 					inputOutgoing
 				);
+
+				await this.walletService.sendMoneyMailConfirmation(
+					inputOutgoing,
+					outgoingPayment
+				);
+
 				return res.status(200).send({
 					data: outgoingPayment,
 					customCode: 'WGE0150',
