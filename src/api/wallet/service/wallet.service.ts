@@ -833,7 +833,7 @@ export class WalletService {
 		try {
 			const updateInput = {
 				metadata: {
-					description: input.metadata.description,
+					description: '',
 					type: 'provider',
 					wgUser: userWallet.walletDb?.userId,
 				},
