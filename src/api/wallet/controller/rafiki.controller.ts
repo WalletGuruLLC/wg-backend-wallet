@@ -688,6 +688,8 @@ export class RafikiWalletController {
 		}
 
 		try {
+			await addApiSignatureHeader(req, req.body);
+
 			const incomingPayment = await this.walletService.completePayment(
 				input?.outgoingPaymentId,
 				input?.action
