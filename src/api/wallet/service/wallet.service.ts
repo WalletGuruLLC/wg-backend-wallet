@@ -28,12 +28,16 @@ import { Rates } from '../entities/rates.entity';
 import { RatesSchema } from '../entities/rates.schema';
 import { DocumentClient } from 'aws-sdk/clients/dynamodb';
 import { SqsService } from '../sqs/sqs.service';
+import { UserIncomingPayment } from '../entities/user-incoming.entity';
+import { UserIncomingSchema } from '../entities/user-incoming.schema';
+import { ReceiverInputDTO } from '../dto/payments-rafiki.dto';
 
 @Injectable()
 export class WalletService {
 	private dbInstance: Model<Wallet>;
 	private dbInstanceSocket: Model<SocketKey>;
 	private dbRates: Model<Rates>;
+	private dbUserIncoming: Model<UserIncomingPayment>;
 	private readonly AUTH_MICRO_URL: string;
 	private readonly DOMAIN_WALLET_URL: string;
 
@@ -46,6 +50,11 @@ export class WalletService {
 		this.dbInstanceSocket = dynamoose.model<SocketKey>(
 			'SocketKeys',
 			SocketKeySchema
+		);
+
+		this.dbUserIncoming = dynamoose.model<UserIncomingPayment>(
+			'UserIncoming',
+			UserIncomingSchema
 		);
 		this.dbRates = dynamoose.model<Rates>('Rates', RatesSchema);
 		this.AUTH_MICRO_URL = this.configService.get<string>('AUTH_URL');
@@ -815,6 +824,56 @@ export class WalletService {
 		}
 	}
 
+	async createIncomingPayment(
+		input: ReceiverInputDTO,
+		providerWallet,
+		userWallet
+	) {
+		try {
+			const updateInput = {
+				metadata: {
+					description: input.metadata.description,
+					type: 'provider',
+					wgUser: userWallet.userId,
+				},
+				incomingAmount: input.incomingAmount,
+				walletAddressUrl: input.walletAddressUrl,
+			};
+
+			const balance =
+				userWallet.postedCredits -
+				(userWallet.pendingDebits + userWallet.postedDebits);
+
+			if (updateInput.incomingAmount.value > balance) {
+				throw new HttpException(
+					{
+						statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+						customCode: 'WGE0137',
+					},
+					HttpStatus.INTERNAL_SERVER_ERROR
+				);
+			}
+
+			const incomingPayment = await this.graphqlService.createReceiver(
+				updateInput
+			);
+
+			const providerWalletId =
+				incomingPayment?.createReceiver?.receiver?.id.split('/');
+			const incomingPaymentId = providerWalletId?.[4];
+
+			const userIncomingPayment = {
+				ServiceProviderId: providerWallet?.providerId,
+				UserId: userWallet.userId,
+				IncomingPaymentId: incomingPaymentId,
+			};
+
+			return await this.dbUserIncoming.create(userIncomingPayment);
+		} catch (error) {
+			throw new Error(`Error creating incoming payment: ${error.message}`);
+		}
+	}
+
 	async createQuote(input: any) {
 		try {
 			return await this.graphqlService.createQuote(input);
@@ -966,6 +1025,26 @@ export class WalletService {
 		} catch (error) {
 			Sentry.captureException(error);
 			throw new Error(`Error fetching wallet: ${error.message}`);
+		}
+	}
+
+	async getWalletByAddress(walletAddress: string) {
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'Wallets',
+			IndexName: 'WalletAddressIndex',
+			KeyConditionExpression: `WalletAddress  = :walletAddress`,
+			ExpressionAttributeValues: {
+				':walletAddress': walletAddress,
+			},
+		};
+
+		try {
+			const result = await docClient.query(params).promise();
+			return convertToCamelCase(result.Items?.[0]);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new Error(`Error fetching wallet by address: ${error.message}`);
 		}
 	}
 
