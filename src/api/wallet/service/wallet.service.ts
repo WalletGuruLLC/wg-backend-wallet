@@ -27,11 +27,16 @@ import { SocketKeySchema } from '../entities/socket.schema';
 import { Rates } from '../entities/rates.entity';
 import { RatesSchema } from '../entities/rates.schema';
 import { DocumentClient } from 'aws-sdk/clients/dynamodb';
+import { CreateIncomingUserDto } from '../dto/incoming-user.dto';
+import { UserIncomingPayment } from '../entities/incoming.entity';
+import { UserIncomingSchema } from '../entities/incoming.schema';
+import { isGreaterValue } from 'src/utils/helpers/isGreaterValueToSend';
 
 @Injectable()
 export class WalletService {
 	private dbInstance: Model<Wallet>;
 	private dbInstanceSocket: Model<SocketKey>;
+	private dbIncomingUser: Model<UserIncomingPayment>;
 	private dbRates: Model<Rates>;
 	private readonly AUTH_MICRO_URL: string;
 	private readonly DOMAIN_WALLET_URL: string;
@@ -40,6 +45,10 @@ export class WalletService {
 		private configService: ConfigService,
 		private readonly graphqlService: GraphqlService
 	) {
+		this.dbIncomingUser = dynamoose.model<UserIncomingPayment>(
+			'UserIncoming',
+			UserIncomingSchema
+		);
 		this.dbInstance = dynamoose.model<Wallet>('Wallets', WalletSchema);
 		this.dbInstanceSocket = dynamoose.model<SocketKey>(
 			'SocketKeys',
@@ -51,6 +60,15 @@ export class WalletService {
 			'DOMAIN_WALLET_URL',
 			'https://cloud-nine-wallet-backend/accounts'
 		);
+	}
+
+	async createIncoming(createIncomingUserDto: CreateIncomingUserDto) {
+		const createIncomingDtoConverted = {
+			IncomingPaymentId: createIncomingUserDto.incomingPaymentId,
+			ServiceProviderId: createIncomingUserDto.serviceProviderId,
+			UserId: createIncomingUserDto.userId,
+		};
+		return this.dbIncomingUser.create(createIncomingDtoConverted);
 	}
 
 	//SERVICE TO CREATE A WALLET
@@ -965,5 +983,175 @@ export class WalletService {
 			Sentry.captureException(error);
 			throw new Error(`Error fetching wallet: ${error.message}`);
 		}
+	}
+
+	async getIncomingPaymentById(incomingPaymentId: string) {
+		try {
+			const incomingPayment = await this.graphqlService.getIncomingPayment(
+				incomingPaymentId
+			);
+			return incomingPayment;
+		} catch (error) {
+			throw new Error('Failed to get incoming payment.');
+		}
+	}
+
+	async createOutgoing(input: any) {
+		try {
+			return await this.graphqlService.createReceiver(input);
+		} catch (error) {
+			throw new Error(`Error creating receiver: ${error.message}`);
+		}
+	}
+
+	async cancelOutgoingPayment(input: any) {
+		try {
+			return await this.graphqlService.cancelOutgoingPayment(input);
+		} catch (error) {
+			throw new Error(`Error cancel outgoing payment: ${error.message}`);
+		}
+	}
+
+	async filterParameterById(parameters: Array<any>, parameterId: string) {
+		const filteredAsset = parameters?.find(
+			parameter => parameter?.id == parameterId
+		);
+
+		if (!filteredAsset) {
+			return {};
+		}
+
+		return filteredAsset;
+	}
+
+	async validatePaymentParameterId(
+		paymentId: string,
+		token: string,
+		serviceProviderId: string
+	) {
+		const response = await axios.get(
+			this.AUTH_MICRO_URL +
+				`/api/v1/providers/list/payment-parameters?items=10&serviceProviderId=${serviceProviderId}`,
+			{
+				headers: {
+					Authorization: token,
+				},
+			}
+		);
+
+		const parameters = response?.data?.data?.paymentParameters;
+
+		const assetValue = await this.filterParameterById(parameters, paymentId);
+
+		return assetValue?.id ? assetValue : {};
+	}
+
+	async processParameterFlow(
+		paymentId,
+		token,
+		calculatedValue,
+		walletAddressId,
+		serviceProviderId
+	) {
+		const parameterExists = await this.validatePaymentParameterId(
+			paymentId,
+			token,
+			serviceProviderId
+		);
+
+		if (!parameterExists?.id) {
+			console.log('Type parameter does not exist');
+			return false;
+		}
+
+		const shouldSendNotification = isGreaterValue(
+			calculatedValue,
+			parameterExists?.cost
+		);
+
+		if (!shouldSendNotification) {
+			console.log('Invalid value');
+			return false;
+		}
+
+		const incomingPayment = await this.dbIncomingUser
+			.query('ServiceProviderId')
+			.eq(serviceProviderId)
+			.exec();
+
+		const quoteInput = {
+			walletAddressId: walletAddressId,
+			receiver: incomingPayment?.[0]?.IncomingPaymentId,
+		};
+
+		const quote = await this.createQuote(quoteInput);
+
+		const incomingState = await this.getIncomingPaymentById(
+			incomingPayment?.[0]?.IncomingPaymentId
+		);
+
+		if (incomingState?.state !== 'COMPLETED') {
+			console.log('Missing funds');
+			return false;
+		}
+
+		const inputOutgoing = {
+			walletAddressId: walletAddressId,
+			quoteId: quote?.createQuote?.quote?.id,
+		};
+		const outgoing = await this.createOutgoingPayment(inputOutgoing);
+
+		return outgoing;
+	}
+
+	async completePayment(outgoingPaymentId, action) {
+		let response;
+		const activityId = uuidv4();
+
+		switch (action) {
+			case 'accept':
+				await this.createDepositOutgoingMutationService({
+					outgoingPaymentId: outgoingPaymentId,
+					idempotencyKey: activityId,
+				});
+				response = {
+					action: 'hc',
+					message: 'Payment accepted successfully',
+					statusCode: 200,
+					activityId: activityId,
+				};
+				break;
+
+			case 'reject':
+				await this.cancelOutgoingPayment({
+					id: outgoingPaymentId,
+					reason: 'Reject payment',
+				});
+				response = {
+					action: 'error',
+					message: 'Payment rejected',
+					statusCode: 200,
+					activityId: activityId,
+				};
+				break;
+
+			case 'timeout':
+				await this.cancelOutgoingPayment({
+					id: outgoingPaymentId,
+					reason: 'Timeout',
+				});
+				response = {
+					action: 'error',
+					message: 'Payment timed out and was cancelled',
+					statusCode: 408,
+					activityId: activityId,
+				};
+				break;
+
+			default:
+				throw new Error('Invalid action');
+		}
+
+		return response;
 	}
 }
