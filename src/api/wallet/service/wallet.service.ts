@@ -1199,8 +1199,10 @@ export class WalletService {
 
 			case 'reject':
 				data = await this.cancelOutgoingPayment({
-					id: outgoingPaymentId,
-					reason: 'Reject payment',
+					input: {
+						id: outgoingPaymentId,
+						reason: 'Reject payment',
+					},
 				});
 				response = {
 					action: 'error',
@@ -1212,8 +1214,10 @@ export class WalletService {
 
 			case 'timeout':
 				data = await this.cancelOutgoingPayment({
-					id: outgoingPaymentId,
-					reason: 'Timeout',
+					input: {
+						id: outgoingPaymentId,
+						reason: 'Timeout',
+					},
 				});
 				response = {
 					action: 'error',
