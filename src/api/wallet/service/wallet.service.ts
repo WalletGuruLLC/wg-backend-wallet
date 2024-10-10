@@ -31,6 +31,7 @@ import { SqsService } from '../sqs/sqs.service';
 import { UserIncomingPayment } from '../entities/user-incoming.entity';
 import { UserIncomingSchema } from '../entities/user-incoming.schema';
 import { ReceiverInputDTO } from '../dto/payments-rafiki.dto';
+import { CreatePaymentDTO } from '../dto/create-payment-rafiki.dto';
 
 @Injectable()
 export class WalletService {
@@ -825,7 +826,7 @@ export class WalletService {
 	}
 
 	async createIncomingPayment(
-		input: ReceiverInputDTO,
+		input: CreatePaymentDTO,
 		providerWallet,
 		userWallet
 	) {
@@ -834,17 +835,22 @@ export class WalletService {
 				metadata: {
 					description: input.metadata.description,
 					type: 'provider',
-					wgUser: userWallet.userId,
+					wgUser: userWallet.walletDb?.userId,
 				},
-				incomingAmount: input.incomingAmount,
+				incomingAmount: {
+					assetCode: userWallet?.walletAsset?.code,
+					assetScale: userWallet?.walletAsset?.scale,
+					value: input.incomingAmount,
+				},
 				walletAddressUrl: input.walletAddressUrl,
 			};
 
 			const balance =
-				userWallet.postedCredits -
-				(userWallet.pendingDebits + userWallet.postedDebits);
+				userWallet?.walletDb?.postedCredits -
+				(userWallet?.walletDb?.pendingDebits +
+					userWallet?.walletDb?.postedDebits);
 
-			if (updateInput.incomingAmount.value > balance) {
+			if (input.incomingAmount > balance) {
 				throw new HttpException(
 					{
 						statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
@@ -864,7 +870,7 @@ export class WalletService {
 
 			const userIncomingPayment = {
 				ServiceProviderId: providerWallet?.providerId,
-				UserId: userWallet.userId,
+				UserId: userWallet.walletDb?.userId,
 				IncomingPaymentId: incomingPaymentId,
 			};
 
