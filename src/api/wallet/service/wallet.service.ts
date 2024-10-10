@@ -841,6 +841,12 @@ export class WalletService {
 		}
 	}
 
+	async expireDate() {
+		const fechaActual = new Date();
+		fechaActual.setMonth(fechaActual.getMonth() + 12);
+		return fechaActual;
+	}
+
 	async createIncomingPayment(
 		input: CreatePaymentDTO,
 		providerWallet,
@@ -859,6 +865,7 @@ export class WalletService {
 					value: input.incomingAmount,
 				},
 				walletAddressUrl: input.walletAddressUrl,
+				expiresAt: this.expireDate(),
 			};
 
 			const balance =
