@@ -43,4 +43,5 @@ Create a .env file in the root of the project following the content of .env.exam
 - `AWS_SECRET_ACCESS_KEY_TERRAFORM`: Secret key of the AWS account for Terraform
 - `BACKEND_API_SIGNATURE_VERSION`: Version of rafiki transaction
 - `BACKEND_API_SIGNATURE_SECRET`: Secret of rafiki transactions
+- `SQS_QUEUE_URL`: Url of AWS SQS Service
 
