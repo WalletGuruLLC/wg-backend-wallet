@@ -849,7 +849,7 @@ export class WalletService {
 			const updateInput = {
 				metadata: {
 					description: input.metadata.description,
-					type: 'provider',
+					type: 'PROVIDER',
 					wgUser: userWallet.userId,
 				},
 				incomingAmount: input.incomingAmount,
@@ -1067,6 +1067,7 @@ export class WalletService {
 		try {
 			return await this.graphqlService.cancelOutgoingPayment(input);
 		} catch (error) {
+			console.log('error', error?.message);
 			throw new Error(`Error cancel outgoing payment: ${error.message}`);
 		}
 	}
@@ -1106,31 +1107,23 @@ export class WalletService {
 	}
 
 	async processParameterFlow(
-		paymentId,
+		parameterId,
 		token,
-		calculatedValue,
 		walletAddressId,
 		serviceProviderId
 	) {
 		const parameterExists = await this.validatePaymentParameterId(
-			paymentId,
+			parameterId,
 			token,
 			serviceProviderId
 		);
 
 		if (!parameterExists?.id) {
-			console.log('Type parameter does not exist');
-			return false;
-		}
-
-		const shouldSendNotification = isGreaterValue(
-			calculatedValue,
-			parameterExists?.cost
-		);
-
-		if (!shouldSendNotification) {
-			console.log('Invalid value');
-			return false;
+			return {
+				action: 'error',
+				message: 'Type parameter does not exist',
+				statusCode: 'WGE0203',
+			};
 		}
 
 		const incomingPayment = await this.dbIncomingUser
@@ -1150,8 +1143,11 @@ export class WalletService {
 		);
 
 		if (incomingState?.state !== 'COMPLETED') {
-			console.log('Missing funds');
-			return false;
+			return {
+				action: 'error',
+				message: 'Missing funds',
+				statusCode: 'WGE0205',
+			};
 		}
 
 		const inputOutgoing = {
@@ -1160,49 +1156,56 @@ export class WalletService {
 		};
 		const outgoing = await this.createOutgoingPayment(inputOutgoing);
 
-		return outgoing;
+		return {
+			action: 'hc',
+			message: 'Success create outgoing payment id',
+			statusCode: 'WGE0206',
+			data: outgoing?.payment?.id,
+		};
 	}
 
 	async completePayment(outgoingPaymentId, action) {
 		let response;
+		let data;
 		const activityId = uuidv4();
 
 		switch (action) {
 			case 'accept':
-				await this.createDepositOutgoingMutationService({
+				data = await this.createDepositOutgoingMutationService({
 					outgoingPaymentId: outgoingPaymentId,
 					idempotencyKey: activityId,
 				});
+				console.log('data', data);
 				response = {
 					action: 'hc',
 					message: 'Payment accepted successfully',
-					statusCode: 200,
+					statusCode: 'WGE0200',
 					activityId: activityId,
 				};
 				break;
 
 			case 'reject':
-				await this.cancelOutgoingPayment({
+				data = await this.cancelOutgoingPayment({
 					id: outgoingPaymentId,
 					reason: 'Reject payment',
 				});
 				response = {
 					action: 'error',
 					message: 'Payment rejected',
-					statusCode: 200,
+					statusCode: 'WGE0201',
 					activityId: activityId,
 				};
 				break;
 
 			case 'timeout':
-				await this.cancelOutgoingPayment({
+				data = await this.cancelOutgoingPayment({
 					id: outgoingPaymentId,
 					reason: 'Timeout',
 				});
 				response = {
 					action: 'error',
 					message: 'Payment timed out and was cancelled',
-					statusCode: 408,
+					statusCode: 'WGE0202',
 					activityId: activityId,
 				};
 				break;
@@ -1213,6 +1216,7 @@ export class WalletService {
 
 		return response;
 	}
+
 	async getWalletByAddress(walletAddress: string) {
 		const docClient = new DocumentClient();
 		const params = {

@@ -33,6 +33,7 @@ import { CreateServiceProviderWalletAddressDto } from '../dto/create-rafiki-serv
 import { customValidationPipe } from '../../validation.pipe';
 import { addApiSignatureHeader } from 'src/utils/helpers/signatureHelper';
 import {
+	ActionOugoingPaymentDto,
 	CreateQuoteInputDTO,
 	DepositDTO,
 	DepositOutgoingPaymentInputDTO,
@@ -652,6 +653,61 @@ export class RafikiWalletController {
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
 				customCode: 'WGE0151',
+				message: error.message,
+			});
+		}
+	}
+
+	@Post('action/outgoing-payment')
+	@ApiOperation({ summary: 'Action outgoing payment' })
+	@ApiResponse({
+		status: 201,
+		description: 'Action outgoing payment created successfully.',
+	})
+	@ApiResponse({ status: 400, description: 'Bad Request' })
+	async actionOutgoingPayment(
+		@Body() input: ActionOugoingPaymentDto,
+		@Req() req,
+		@Res() res,
+		@Headers() headers: MapOfStringToList
+	) {
+		let token;
+
+		try {
+			token = headers.authorization ?? '';
+			const instanceVerifier = await this.verifyService.getVerifiedFactory();
+			await instanceVerifier.verify(token.toString().split(' ')[1]);
+		} catch (error) {
+			Sentry.captureException(error);
+
+			return res.status(HttpStatus.UNAUTHORIZED).send({
+				statusCode: HttpStatus.UNAUTHORIZED,
+				customCode: 'WGE0021',
+			});
+		}
+
+		try {
+			const incomingPayment = await this.walletService.completePayment(
+				input?.outgoingPaymentId,
+				input?.action
+			);
+
+			if (incomingPayment?.action == 'hc') {
+				return res.status(HttpStatus.OK).send({
+					statusCode: HttpStatus.OK,
+					customCode: 'WGE0210',
+				});
+			} else {
+				return res.status(HttpStatus.BAD_REQUEST).send({
+					statusCode: HttpStatus.BAD_REQUEST,
+					customCode: incomingPayment?.statusCode,
+				});
+			}
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0211',
 				message: error.message,
 			});
 		}

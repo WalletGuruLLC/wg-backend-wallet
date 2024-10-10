@@ -358,6 +358,7 @@ export class GraphqlService {
 						assetCode
 						value
 					}
+					metadata
 					createdAt
 					state
 				}

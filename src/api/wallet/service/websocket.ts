@@ -150,4 +150,84 @@ export class AuthGateway
 		}
 		return { event: 'response', data: 'Authentication processed.' };
 	}
+
+	@SubscribeMessage('play')
+	async handlePlay(client: Socket, data: any): Promise<WsResponse<string>> {
+		const headers = client.handshake.headers;
+		const parsedData = JSON.parse(data);
+		const publicKeyData =
+			parsedData['x-public-key']?.toString() ||
+			headers['public-key']?.toString();
+		const nonceData =
+			parsedData['x-nonce']?.toString() || headers['nonce']?.toString();
+		const sessionIdData = parsedData.sessionId?.toString();
+
+		if (!publicKeyData) {
+			client.emit('error', {
+				message: 'Public key missing!',
+				statusCode: 'WGE0151',
+				sessionId: '',
+			});
+			client.disconnect();
+			this.logger.error(`Client ${client.id} failed to provide public key.`);
+			return;
+		}
+
+		if (!nonceData) {
+			client.emit('error', {
+				message: 'You need send auth',
+				statusCode: 'WGE0151',
+				sessionId: '',
+			});
+			client.disconnect();
+			this.logger.error(`Client ${client.id} failed to authenticate.`);
+		}
+		if (!sessionIdData) {
+			client.emit('error', {
+				message: 'You need send session id',
+				statusCode: 'WGE0152',
+				sessionId: '',
+			});
+			client.disconnect();
+			this.logger.error(`Client ${client.id} failed to authenticate.`);
+		}
+		const timestamp = Math.floor(new Date().getTime() / 1000);
+		const tokenPromises = [];
+
+		for (let i = -5; i <= 5; i++) {
+			tokenPromises.push(
+				this.authService.generateToken({}, `${timestamp + i}`, publicKeyData)
+			);
+		}
+
+		const validTokenRange = await Promise.all(tokenPromises);
+
+		if (validTokenRange.includes(nonceData)) {
+			const responsePlay = await this.authService.processParameterFlow(
+				parsedData['parameter-id']?.toString(),
+				parsedData['token']?.toString(),
+				parsedData['wallet-address-id']?.toString(),
+				parsedData['service-provider-id']?.toString()
+			);
+			if (responsePlay?.action == 'hc') {
+				setTimeout(() => {
+					client.emit('hc', {
+						message: responsePlay?.message,
+						statusCode: responsePlay?.statusCode,
+						outgoingPaymentId: responsePlay?.data,
+					});
+				}, 2800);
+			} else {
+				client.emit('error', {
+					message: responsePlay?.message,
+					statusCode: responsePlay?.statusCode,
+				});
+				client.disconnect();
+			}
+		} else {
+			client.disconnect();
+			this.logger.error(`Client ${client.id} failed to authenticate.`);
+		}
+		return { event: 'response', data: 'Stop processed.' };
+	}
 }
