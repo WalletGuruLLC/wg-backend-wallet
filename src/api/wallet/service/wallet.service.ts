@@ -840,6 +840,20 @@ export class WalletService {
 				walletAddressUrl: input.walletAddressUrl,
 			};
 
+			const balance =
+				userWallet.postedCredits -
+				(userWallet.pendingDebits + userWallet.postedDebits);
+
+			if (updateInput.incomingAmount.value > balance) {
+				throw new HttpException(
+					{
+						statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+						customCode: 'WGE0137',
+					},
+					HttpStatus.INTERNAL_SERVER_ERROR
+				);
+			}
+
 			const incomingPayment = await this.graphqlService.createReceiver(
 				updateInput
 			);

@@ -584,8 +584,24 @@ export class RafikiWalletController {
 	async createIncomingPayment(
 		@Body() input: ReceiverInputDTO,
 		@Req() req,
-		@Res() res
+		@Res() res,
+		@Headers() headers: MapOfStringToList
 	) {
+		let token;
+
+		try {
+			token = headers.authorization ?? '';
+			const instanceVerifier = await this.verifyService.getVerifiedFactory();
+			await instanceVerifier.verify(token.toString().split(' ')[1]);
+		} catch (error) {
+			Sentry.captureException(error);
+
+			return res.status(HttpStatus.UNAUTHORIZED).send({
+				statusCode: HttpStatus.UNAUTHORIZED,
+				customCode: 'WGE0021',
+			});
+		}
+
 		try {
 			const userWallet = await this.walletService.getWalletByRafikyId(
 				input.walletAddressId
@@ -597,6 +613,18 @@ export class RafikiWalletController {
 					customCode: 'WGE0074',
 				});
 			}
+
+			const userWalletByToken = convertToCamelCase(
+				await this.walletService.getWalletByToken(token)
+			);
+
+			if (userWalletByToken?.walletDb?.userId !== userWallet?.userId) {
+				return res.status(HttpStatus.UNAUTHORIZED).send({
+					statusCode: HttpStatus.UNAUTHORIZED,
+					customCode: 'WGE0021',
+				});
+			}
+
 			const providerWallet = await this.walletService.getWalletByAddress(
 				input.walletAddressUrl
 			);
