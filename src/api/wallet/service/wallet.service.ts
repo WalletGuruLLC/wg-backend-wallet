@@ -1173,7 +1173,7 @@ export class WalletService {
 			action: 'hc',
 			message: 'Success create outgoing payment id',
 			statusCode: 'WGE0206',
-			data: outgoing?.payment?.id,
+			data: outgoing?.createOutgoingPayment?.payment?.id,
 		};
 	}
 
