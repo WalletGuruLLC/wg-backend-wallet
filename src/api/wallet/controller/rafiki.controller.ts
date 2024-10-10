@@ -42,6 +42,7 @@ import {
 import { isValidStringLength } from 'src/utils/helpers/isValidStringLength';
 import { v4 as uuidv4 } from 'uuid';
 import { convertToCamelCase } from 'src/utils/helpers/convertCamelCase';
+import { CreatePaymentDTO } from '../dto/create-payment-rafiki.dto';
 
 @ApiTags('wallet-rafiki')
 @Controller('api/v1/wallets-rafiki')
@@ -582,7 +583,7 @@ export class RafikiWalletController {
 	})
 	@ApiResponse({ status: 400, description: 'Bad Request' })
 	async createIncomingPayment(
-		@Body() input: ReceiverInputDTO,
+		@Body() input: CreatePaymentDTO,
 		@Req() req,
 		@Res() res,
 		@Headers() headers: MapOfStringToList
@@ -639,7 +640,7 @@ export class RafikiWalletController {
 			const incomingPayment = await this.walletService.createIncomingPayment(
 				input,
 				providerWallet,
-				userWallet
+				userWalletByToken
 			);
 
 			return res.status(HttpStatus.OK).send({
