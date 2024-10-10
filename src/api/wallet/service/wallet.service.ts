@@ -27,6 +27,7 @@ import { SocketKeySchema } from '../entities/socket.schema';
 import { Rates } from '../entities/rates.entity';
 import { RatesSchema } from '../entities/rates.schema';
 import { DocumentClient } from 'aws-sdk/clients/dynamodb';
+import { SqsService } from '../sqs/sqs.service';
 
 @Injectable()
 export class WalletService {
@@ -38,7 +39,8 @@ export class WalletService {
 
 	constructor(
 		private configService: ConfigService,
-		private readonly graphqlService: GraphqlService
+		private readonly graphqlService: GraphqlService,
+		private readonly sqsService: SqsService
 	) {
 		this.dbInstance = dynamoose.model<Wallet>('Wallets', WalletSchema);
 		this.dbInstanceSocket = dynamoose.model<SocketKey>(
@@ -666,6 +668,20 @@ export class WalletService {
 		}));
 	}
 
+	async getAssetByRafikyId(rafikyId: string) {
+		try {
+			const walletAddress = await this.graphqlService.getWalletAddressAsset(
+				rafikyId
+			);
+			return walletAddress;
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new Error(
+				'Failed to get wallet address asset by rafikyId. Please try again later.'
+			);
+		}
+	}
+
 	async filterRafikiAssetById(assetId: string) {
 		const assets = await this.getRafikiAssets();
 		const filteredAsset = assets.find(asset => asset?.id === assetId);
@@ -702,8 +718,8 @@ export class WalletService {
 			walletDb.RafikiId
 		);
 
-		let outgoingArray = [];
-		let incomingArray = [];
+		const outgoingArray = [];
+		const incomingArray = [];
 
 		for (
 			let index = 0;
@@ -711,9 +727,9 @@ export class WalletService {
 			index < transactions.data.walletAddress.outgoingPayments.edges.length;
 			index++
 		) {
-			let object =
+			const object =
 				transactions.data.walletAddress.outgoingPayments.edges[index];
-			let objectConverted = {
+			const objectConverted = {
 				type: object.node.__typename,
 				outgoingPaymentId: object.node.id,
 				walletAddressId: object.node.walletAddressId,
@@ -724,11 +740,11 @@ export class WalletService {
 				createdAt: object.node.createdAt,
 			};
 			outgoingArray.push(objectConverted);
-			let incomingPaymentId = object.node.receiver.split('/')[4];
+			const incomingPaymentId = object.node.receiver.split('/')[4];
 			const incomingPayment = await this.getIncomingPayment(incomingPaymentId);
 
 			if (incomingPayment.state !== 'EXPIRED') {
-				let incomingConverted = {
+				const incomingConverted = {
 					type: incomingPayment.__typename,
 					incomingPaymentId: incomingPayment.id,
 					walletAddressId: incomingPayment.walletAddressId,
@@ -739,18 +755,18 @@ export class WalletService {
 				incomingArray.push(incomingConverted);
 			}
 		}
-		let combinedArray = incomingArray.concat(outgoingArray);
+		const combinedArray = incomingArray.concat(outgoingArray);
 
-		let incomingSorted = incomingArray.sort(
+		const incomingSorted = incomingArray.sort(
 			(a: any, b: any) =>
 				new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
 		);
 
-		let outGoingSorted = outgoingArray.sort(
+		const outGoingSorted = outgoingArray.sort(
 			(a: any, b: any) =>
 				new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
 		);
-		let combinedSorted = combinedArray.sort(
+		const combinedSorted = combinedArray.sort(
 			(a: any, b: any) =>
 				new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
 		);
@@ -950,6 +966,99 @@ export class WalletService {
 		} catch (error) {
 			Sentry.captureException(error);
 			throw new Error(`Error fetching wallet: ${error.message}`);
+		}
+	}
+
+	async sendMoneyMailConfirmation(input: any, outGoingPayment: any) {
+		try {
+			const walletInfo = await this.getWalletByRafikyId(input.walletAddressId);
+			const docClient = new DocumentClient();
+			const params = {
+				TableName: 'Users',
+				Key: { Id: walletInfo.userId },
+			};
+			const result = await docClient.get(params).promise();
+
+			const date = new Date(
+				outGoingPayment.createOutgoingPayment.payment.createdAt
+			);
+
+			const day = String(date.getDate()).padStart(2, '0');
+			const month = String(date.getMonth() + 1).padStart(2, '0');
+			const year = date.getFullYear();
+			const hours = String(date.getHours()).padStart(2, '0');
+			const minutes = String(date.getMinutes()).padStart(2, '0');
+
+			const formattedDate = `${day}/${month}/${year} - ${hours}:${minutes}`;
+
+			const value = {
+				value:
+					outGoingPayment.createOutgoingPayment.payment.receiveAmount.value,
+				asset:
+					outGoingPayment.createOutgoingPayment.payment.receiveAmount.assetCode,
+				walletAddress: walletInfo.walletAddress.split('/')[4],
+				date: formattedDate,
+			};
+
+			const sqsMessage = {
+				event: 'SEND_MONEY_CONFIRMATION',
+				email: result.Item.Email,
+				username:
+					result.Item.FirstName +
+					(result.Item.Lastname ? ' ' + result.Item.Lastname : ''),
+				value: value,
+			};
+
+			const incomingPaymentId =
+				outGoingPayment.createOutgoingPayment.payment.receiver.split('/')[4];
+			const incomingPayment = await this.getIncomingPayment(incomingPaymentId);
+
+			const receiverInfo = await this.getWalletByRafikyId(
+				incomingPayment.walletAddressId
+			);
+
+			const receiverParam = {
+				TableName: 'Users',
+				Key: { Id: receiverInfo.userId },
+			};
+			const receiver = await docClient.get(receiverParam).promise();
+
+			const receiverDate = new Date(incomingPayment.createdAt);
+			const receiverDay = String(receiverDate.getDate()).padStart(2, '0');
+			const receiverMonth = String(receiverDate.getMonth() + 1).padStart(
+				2,
+				'0'
+			);
+			const receiverYear = receiverDate.getFullYear();
+			const receiverHours = String(receiverDate.getHours()).padStart(2, '0');
+			const receiverMinutes = String(receiverDate.getMinutes()).padStart(
+				2,
+				'0'
+			);
+
+			const receiverDateFormatted = `${receiverDay}/${receiverMonth}/${receiverYear} - ${receiverHours}:${receiverMinutes}`;
+
+			const receiverValue = {
+				value: incomingPayment.incomingAmount.value,
+				asset: incomingPayment.incomingAmount.assetCode,
+				walletAddress: receiverInfo.walletAddress.split('/')[4],
+				date: receiverDateFormatted,
+			};
+
+			const sqsMsg = {
+				event: 'RECEIVE_MONEY_CONFIRMATION',
+				email: receiver.Item.Email,
+				username:
+					receiver.Item.FirstName +
+					(receiver.Item.Lastname ? ' ' + receiver.Item.Lastname : ''),
+				value: receiverValue,
+			};
+
+			await this.sqsService.sendMessage(process.env.SQS_QUEUE_URL, sqsMessage);
+			await this.sqsService.sendMessage(process.env.SQS_QUEUE_URL, sqsMsg);
+			return;
+		} catch (error) {
+			throw new Error(`Error creating outgoing payment: ${error.message}`);
 		}
 	}
 }
