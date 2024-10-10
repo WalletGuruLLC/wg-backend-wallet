@@ -100,3 +100,13 @@ export class DepositOutgoingPaymentInputDTO {
 	@IsNotEmpty()
 	outgoingPaymentId: string;
 }
+
+export class ActionOugoingPaymentDto {
+	@IsString()
+	@IsNotEmpty()
+	outgoingPaymentId: string;
+
+	@IsString()
+	@IsNotEmpty()
+	action: string;
+}
