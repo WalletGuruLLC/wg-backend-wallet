@@ -484,4 +484,29 @@ export class GraphqlService {
 		const result = await client.mutate({ mutation, variables });
 		return result.data;
 	}
+
+	async cancelIncomingPayment(input: any) {
+		const mutation = gql`
+			mutation CancelIncomingPayment($input: CancelIncomingPaymentInput!) {
+				cancelIncomingPayment(input: $input) {
+					payment {
+						id
+						state
+						expiresAt
+						walletAddressId
+						receivedAmount {
+							value
+							assetCode
+							assetScale
+						}
+					}
+				}
+			}
+		`;
+
+		const variables = { input };
+		const client = this.apolloClientService.getClient();
+		const result = await client.mutate({ mutation, variables });
+		return result.data;
+	}
 }

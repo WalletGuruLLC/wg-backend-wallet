@@ -1016,6 +1016,8 @@ export class WalletService {
 					ReturnValues: 'ALL_NEW',
 				};
 
+				await this.cancelIncomingPayment(incomingPaymentId);
+
 				await docClient.update(params).promise();
 				await docClient.update(userIncomingParams).promise();
 			}
@@ -1259,6 +1261,15 @@ export class WalletService {
 		} catch (error) {
 			console.log('error', error?.message);
 			throw new Error(`Error cancel outgoing payment: ${error.message}`);
+		}
+	}
+
+	async cancelIncomingPayment(id: string) {
+		try {
+			return await this.graphqlService.cancelIncomingPayment({ id: id });
+		} catch (error) {
+			console.log('error', error?.message);
+			throw new Error(`Error cancel incoming payment: ${error.message}`);
 		}
 	}
 
