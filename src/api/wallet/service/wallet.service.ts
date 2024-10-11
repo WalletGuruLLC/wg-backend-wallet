@@ -805,6 +805,46 @@ export class WalletService {
 		}
 	}
 
+	async listIncomingPayments(token: string) {
+		const userWallet = convertToCamelCase(await this.getUserByToken(token));
+
+		const userIncomingPayment = await this.getIncomingPaymentsByUser(
+			userWallet?.userId
+		);
+
+		const incomingPayments = [];
+
+		await Promise.all(
+			userIncomingPayment.map(async userIncomingPayment => {
+				const incomingPayment = await this.getIncomingPayment(
+					userIncomingPayment?.incomingPaymentId
+				);
+
+				if (
+					incomingPayment.state !== 'COMPLETED' ||
+					incomingPayment.state !== 'EXPIRED'
+				) {
+					const incomingConverted = {
+						type: incomingPayment.__typename,
+						incomingPaymentId: incomingPayment.id,
+						walletAddressId: incomingPayment.walletAddressId,
+						state: incomingPayment.state,
+						incomingAmount: incomingPayment.incomingAmount,
+						createdAt: incomingPayment.createdAt,
+					};
+					incomingPayments.push(incomingConverted);
+				}
+			})
+		);
+
+		const incomingSorted = incomingPayments.sort(
+			(a: any, b: any) =>
+				new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+		);
+
+		return convertToCamelCase(incomingSorted)
+	}
+
 	async getUserByToken(token: string) {
 		let userInfo = await axios.get(
 			this.AUTH_MICRO_URL + '/api/v1/users/current-user',
@@ -1055,6 +1095,26 @@ export class WalletService {
 		} catch (error) {
 			Sentry.captureException(error);
 			throw new Error(`Error fetching wallet: ${error.message}`);
+		}
+	}
+
+	async getIncomingPaymentsByUser(userId: string) {
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'UserIncoming',
+			IndexName: 'UserIdIndex',
+			KeyConditionExpression: `UserId = :userId`,
+			ExpressionAttributeValues: {
+				':userId': userId,
+			},
+		};
+
+		try {
+			const result = await docClient.query(params).promise();
+			return convertToCamelCase(result?.Items);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new Error(`Error fetching wallet by userId: ${error.message}`);
 		}
 	}
 
