@@ -647,13 +647,13 @@ export class RafikiWalletController {
 			return res.status(HttpStatus.OK).send({
 				data: convertToCamelCase(incomingPayment),
 				statusCode: HttpStatus.OK,
-				customCode: 'WGE0152',
+				customCode: 'WGE0164',
 			});
 		} catch (error) {
 			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-				customCode: 'WGE0151',
+				customCode: 'WGE0165',
 				message: error.message,
 			});
 		}
@@ -711,6 +711,49 @@ export class RafikiWalletController {
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
 				customCode: 'WGE0211',
+				message: error.message,
+			});
+		}
+	}
+
+	@Get('list-incoming-payments')
+	@ApiOperation({ summary: 'List all user incoming payments' })
+	async listIncomingPayments(
+		@Headers() headers: MapOfStringToList,
+		@Res() res
+	) {
+		let token;
+		try {
+			token = headers.authorization ?? '';
+			const instanceVerifier = await this.verifyService.getVerifiedFactory();
+			await instanceVerifier.verify(token.toString().split(' ')[1]);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new HttpException(
+				{
+					statusCode: HttpStatus.UNAUTHORIZED,
+					customCode: 'WGE0021',
+					customMessage: errorCodes.WGE0021?.description,
+					customMessageEs: errorCodes.WGE0021?.descriptionEs,
+				},
+				HttpStatus.UNAUTHORIZED
+			);
+		}
+
+		try {
+			const incomingPayments = await this.walletService.listIncomingPayments(
+				token
+			);
+			return res.status(HttpStatus.OK).send({
+				statusCode: HttpStatus.OK,
+				customCode: 'WGS0138',
+				data: { incomingPayments },
+			});
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0137',
 				message: error.message,
 			});
 		}
