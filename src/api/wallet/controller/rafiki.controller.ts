@@ -797,13 +797,13 @@ export class RafikiWalletController {
 			await this.walletService.cancelIncomingPaymentId(id, token);
 			return res.status(HttpStatus.OK).send({
 				statusCode: HttpStatus.OK,
-				customCode: 'WGE0076',
+				customCode: 'WGE0166',
 			});
 		} catch (error) {
 			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-				customCode: 'WGE0087',
+				customCode: 'WGE0167',
 			});
 		}
 	}
