@@ -806,10 +806,10 @@ export class WalletService {
 	}
 
 	async listIncomingPayments(token: string) {
-		const userWallet = convertToCamelCase(await this.getUserByToken(token));
+		const userWallet = await this.getUserByToken(token);
 
 		const userIncomingPayment = await this.getIncomingPaymentsByUser(
-			userWallet?.userId
+			userWallet?.UserId
 		);
 
 		const incomingPayments = [];
@@ -826,7 +826,7 @@ export class WalletService {
 				) {
 					const incomingConverted = {
 						type: incomingPayment.__typename,
-						incomingPaymentId: incomingPayment.id,
+						id: incomingPayment.id,
 						walletAddressId: incomingPayment.walletAddressId,
 						state: incomingPayment.state,
 						incomingAmount: incomingPayment.incomingAmount,
@@ -842,7 +842,7 @@ export class WalletService {
 				new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
 		);
 
-		return convertToCamelCase(incomingSorted)
+		return convertToCamelCase(incomingSorted);
 	}
 
 	async getUserByToken(token: string) {
@@ -851,6 +851,7 @@ export class WalletService {
 			{ headers: { Authorization: token } }
 		);
 		userInfo = userInfo.data;
+
 		const walletByUserId = await this.dbInstance
 			.scan('UserId')
 			.eq(userInfo.data.id)
