@@ -353,6 +353,7 @@ export class GraphqlService {
 				incomingPayment(id: $id) {
 					id
 					walletAddressId
+					expiresAt
 					incomingAmount {
 						assetScale
 						assetCode

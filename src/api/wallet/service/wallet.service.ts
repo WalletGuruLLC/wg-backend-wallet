@@ -831,6 +831,7 @@ export class WalletService {
 						state: incomingPayment.state,
 						incomingAmount: incomingPayment.incomingAmount,
 						createdAt: incomingPayment.createdAt,
+						expiresAt: incomingPayment?.expiresAt,
 					};
 					incomingPayments.push(incomingConverted);
 				}
