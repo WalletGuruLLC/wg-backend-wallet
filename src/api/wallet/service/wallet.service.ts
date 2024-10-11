@@ -1282,7 +1282,7 @@ export class WalletService {
 			};
 
 			const sqsMessage = {
-				event: 'SEND_MONEY_CONFIRMATION',
+				event: 'RECEIVE_MONEY_CONFIRMATION',
 				email: result.Item.Email,
 				username:
 					result.Item.FirstName +
@@ -1327,7 +1327,7 @@ export class WalletService {
 			};
 
 			const sqsMsg = {
-				event: 'RECEIVE_MONEY_CONFIRMATION',
+				event: 'SEND_MONEY_CONFIRMATION',
 				email: receiver.Item.Email,
 				username:
 					receiver.Item.FirstName +
