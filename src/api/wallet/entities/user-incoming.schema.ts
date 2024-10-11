@@ -28,6 +28,9 @@ export const UserIncomingSchema = new dynamoose.Schema(
 			type: String,
 			required: true,
 		},
+		ReceiverId: {
+			type: String,
+		},
 		Status: {
 			type: Boolean,
 			default: true,
