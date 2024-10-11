@@ -964,6 +964,7 @@ export class WalletService {
 
 	async cancelIncomingPaymentId(incomingPaymentId: string, token: string) {
 		try {
+			const docClient = new DocumentClient();
 			const userIncoming = await this.getUserIncomingPaymentById(
 				incomingPaymentId
 			);
@@ -982,7 +983,7 @@ export class WalletService {
 
 			if (userIncoming?.status && userWallet) {
 				const postedDebits: number =
-					(userWallet?.postedDebits || 0) + parseInt(incomingPayment);
+					(userWallet?.postedDebits || 0) + parseInt(incomingPayment.incomingAmount.value);
 
 				const pendingDebits: number =
 					(userWallet?.pendingDebits || 0) -
@@ -1001,6 +1002,8 @@ export class WalletService {
 					},
 					ReturnValues: 'ALL_NEW',
 				};
+
+				await docClient.update(params).promise();
 			}
 		} catch (error) {
 			throw new Error(`Error canceling incoming payment: ${error.message}`);
