@@ -1106,8 +1106,10 @@ export class WalletService {
 			TableName: 'UserIncoming',
 			IndexName: 'UserIdIndex',
 			KeyConditionExpression: `UserId = :userId`,
+			FilterExpression: 'Status = :status',
 			ExpressionAttributeValues: {
 				':userId': userId,
+				':status': true,
 			},
 		};
 
@@ -1126,10 +1128,8 @@ export class WalletService {
 			TableName: 'UserIncoming',
 			IndexName: 'IncomingPaymentIdIndex',
 			KeyConditionExpression: `IncomingPaymentId = :incomingPaymentId`,
-			FilterExpression: 'Status = :status',
 			ExpressionAttributeValues: {
 				':incomingPaymentId': incomingPaymentId,
-				':status': true,
 			},
 		};
 
