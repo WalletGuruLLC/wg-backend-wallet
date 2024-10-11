@@ -1313,6 +1313,26 @@ export class WalletService {
 		}
 	}
 
+	async getWalletByUser(userId: string) {
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'Wallets',
+			IndexName: 'UserIdIndex',
+			KeyConditionExpression: `UserId  = :userId`,
+			ExpressionAttributeValues: {
+				':userId': userId,
+			},
+		};
+
+		try {
+			const result = await docClient.query(params).promise();
+			return convertToCamelCase(result.Items?.[0]);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new Error(`Error fetching wallet by user: ${error.message}`);
+		}
+	}
+
 	async sendMoneyMailConfirmation(input: any, outGoingPayment: any) {
 		try {
 			const walletInfo = await this.getWalletByRafikyId(input.walletAddressId);
