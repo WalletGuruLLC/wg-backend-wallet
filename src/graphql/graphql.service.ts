@@ -353,11 +353,13 @@ export class GraphqlService {
 				incomingPayment(id: $id) {
 					id
 					walletAddressId
+					expiresAt
 					incomingAmount {
 						assetScale
 						assetCode
 						value
 					}
+					metadata
 					createdAt
 					state
 				}
@@ -391,5 +393,95 @@ export class GraphqlService {
 		const result = await client.query({ query, variables });
 
 		return result.data?.walletAddress?.asset;
+	}
+
+	async getIncomingPayment(id: string) {
+		const query = gql`
+			query GetIncomingPayment($id: String!) {
+				incomingPayment(id: $id) {
+					id
+					walletAddressId
+					client
+					state
+					expiresAt
+					incomingAmount {
+						value
+						assetCode
+						assetScale
+					}
+					receivedAmount {
+						value
+						assetCode
+						assetScale
+					}
+					metadata
+					createdAt
+				}
+			}
+		`;
+
+		const variables = { id };
+
+		const client = this.apolloClientService.getClient();
+		const result = await client.query({ query, variables });
+
+		return result.data?.incomingPayment;
+	}
+
+	async cancelOutgoingPayment(input: any) {
+		const mutation = gql`
+			mutation CancelOutgoingPayment($input: CancelOutgoingPaymentInput!) {
+				cancelOutgoingPayment(input: $input) {
+					payment {
+						createdAt
+						error
+						metadata
+						id
+						walletAddressId
+						quote {
+							createdAt
+							expiresAt
+							id
+							estimatedExchangeRate
+							walletAddressId
+							receiveAmount {
+								assetCode
+								assetScale
+								value
+							}
+							receiver
+							debitAmount {
+								assetCode
+								assetScale
+								value
+							}
+						}
+						receiveAmount {
+							assetCode
+							assetScale
+							value
+						}
+						receiver
+						debitAmount {
+							assetCode
+							assetScale
+							value
+						}
+						sentAmount {
+							assetCode
+							assetScale
+							value
+						}
+						state
+						stateAttempts
+					}
+				}
+			}
+		`;
+
+		const variables = { input };
+		const client = this.apolloClientService.getClient();
+		const result = await client.mutate({ mutation, variables });
+		return result.data;
 	}
 }
