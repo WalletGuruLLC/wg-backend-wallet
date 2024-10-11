@@ -27,23 +27,42 @@ import { SocketKeySchema } from '../entities/socket.schema';
 import { Rates } from '../entities/rates.entity';
 import { RatesSchema } from '../entities/rates.schema';
 import { DocumentClient } from 'aws-sdk/clients/dynamodb';
+import { CreateIncomingUserDto } from '../dto/incoming-user.dto';
+import { isGreaterValue } from 'src/utils/helpers/isGreaterValueToSend';
+import { SqsService } from '../sqs/sqs.service';
+import { UserIncomingPayment } from '../entities/user-incoming.entity';
+import { UserIncomingSchema } from '../entities/user-incoming.schema';
+import { ReceiverInputDTO } from '../dto/payments-rafiki.dto';
+import { CreatePaymentDTO } from '../dto/create-payment-rafiki.dto';
 
 @Injectable()
 export class WalletService {
 	private dbInstance: Model<Wallet>;
 	private dbInstanceSocket: Model<SocketKey>;
+	private dbIncomingUser: Model<UserIncomingPayment>;
 	private dbRates: Model<Rates>;
+	private dbUserIncoming: Model<UserIncomingPayment>;
 	private readonly AUTH_MICRO_URL: string;
 	private readonly DOMAIN_WALLET_URL: string;
 
 	constructor(
 		private configService: ConfigService,
-		private readonly graphqlService: GraphqlService
+		private readonly graphqlService: GraphqlService,
+		private readonly sqsService: SqsService
 	) {
+		this.dbIncomingUser = dynamoose.model<UserIncomingPayment>(
+			'UserIncoming',
+			UserIncomingSchema
+		);
 		this.dbInstance = dynamoose.model<Wallet>('Wallets', WalletSchema);
 		this.dbInstanceSocket = dynamoose.model<SocketKey>(
 			'SocketKeys',
 			SocketKeySchema
+		);
+
+		this.dbUserIncoming = dynamoose.model<UserIncomingPayment>(
+			'UserIncoming',
+			UserIncomingSchema
 		);
 		this.dbRates = dynamoose.model<Rates>('Rates', RatesSchema);
 		this.AUTH_MICRO_URL = this.configService.get<string>('AUTH_URL');
@@ -51,6 +70,15 @@ export class WalletService {
 			'DOMAIN_WALLET_URL',
 			'https://cloud-nine-wallet-backend/accounts'
 		);
+	}
+
+	async createIncoming(createIncomingUserDto: CreateIncomingUserDto) {
+		const createIncomingDtoConverted = {
+			IncomingPaymentId: createIncomingUserDto.incomingPaymentId,
+			ServiceProviderId: createIncomingUserDto.serviceProviderId,
+			UserId: createIncomingUserDto.userId,
+		};
+		return this.dbIncomingUser.create(createIncomingDtoConverted);
 	}
 
 	//SERVICE TO CREATE A WALLET
@@ -777,12 +805,54 @@ export class WalletService {
 		}
 	}
 
+	async listIncomingPayments(token: string) {
+		const userWallet = await this.getUserByToken(token);
+
+		const userIncomingPayment = await this.getIncomingPaymentsByUser(
+			userWallet?.UserId
+		);
+
+		const incomingPayments = [];
+
+		await Promise.all(
+			userIncomingPayment.map(async userIncomingPayment => {
+				const incomingPayment = await this.getIncomingPayment(
+					userIncomingPayment?.incomingPaymentId
+				);
+
+				if (
+					incomingPayment.state !== 'COMPLETED' ||
+					incomingPayment.state !== 'EXPIRED'
+				) {
+					const incomingConverted = {
+						type: incomingPayment.__typename,
+						id: incomingPayment.id,
+						walletAddressId: incomingPayment.walletAddressId,
+						state: incomingPayment.state,
+						incomingAmount: incomingPayment.incomingAmount,
+						createdAt: incomingPayment.createdAt,
+						expiresAt: incomingPayment?.expiresAt,
+					};
+					incomingPayments.push(incomingConverted);
+				}
+			})
+		);
+
+		const incomingSorted = incomingPayments.sort(
+			(a: any, b: any) =>
+				new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+		);
+
+		return convertToCamelCase(incomingSorted);
+	}
+
 	async getUserByToken(token: string) {
 		let userInfo = await axios.get(
 			this.AUTH_MICRO_URL + '/api/v1/users/current-user',
 			{ headers: { Authorization: token } }
 		);
 		userInfo = userInfo.data;
+
 		const walletByUserId = await this.dbInstance
 			.scan('UserId')
 			.eq(userInfo.data.id)
@@ -810,6 +880,69 @@ export class WalletService {
 			return await this.graphqlService.createReceiver(input);
 		} catch (error) {
 			throw new Error(`Error creating receiver: ${error.message}`);
+		}
+	}
+
+	async expireDate() {
+		const fechaActual = new Date();
+		fechaActual.setMonth(fechaActual.getMonth() + 1);
+		return fechaActual.toISOString();
+	}
+
+	async createIncomingPayment(
+		input: CreatePaymentDTO,
+		providerWallet,
+		userWallet
+	) {
+		try {
+			const expireDate = await this.expireDate();
+			const updateInput = {
+				metadata: {
+					description: '',
+					type: 'PROVIDER',
+					wgUser: userWallet.walletDb?.userId,
+				},
+				incomingAmount: {
+					assetCode: userWallet?.walletAsset?.code,
+					assetScale: userWallet?.walletAsset?.scale,
+					value: input.incomingAmount,
+				},
+				walletAddressUrl: input.walletAddressUrl,
+				expiresAt: expireDate,
+			};
+
+			const balance =
+				userWallet?.walletDb?.postedCredits -
+				(userWallet?.walletDb?.pendingDebits +
+					userWallet?.walletDb?.postedDebits);
+
+			if (input.incomingAmount > balance) {
+				throw new HttpException(
+					{
+						statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+						customCode: 'WGE0137',
+					},
+					HttpStatus.INTERNAL_SERVER_ERROR
+				);
+			}
+
+			const incomingPayment = await this.graphqlService.createReceiver(
+				updateInput
+			);
+
+			const providerWalletId =
+				incomingPayment?.createReceiver?.receiver?.id.split('/');
+			const incomingPaymentId = providerWalletId?.[4];
+
+			const userIncomingPayment = {
+				ServiceProviderId: providerWallet?.providerId,
+				UserId: userWallet.walletDb?.userId,
+				IncomingPaymentId: incomingPaymentId,
+			};
+
+			return await this.dbUserIncoming.create(userIncomingPayment);
+		} catch (error) {
+			throw new Error(`Error creating incoming payment: ${error.message}`);
 		}
 	}
 
@@ -964,6 +1097,356 @@ export class WalletService {
 		} catch (error) {
 			Sentry.captureException(error);
 			throw new Error(`Error fetching wallet: ${error.message}`);
+		}
+	}
+
+	async getIncomingPaymentsByUser(userId: string) {
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'UserIncoming',
+			IndexName: 'UserIdIndex',
+			KeyConditionExpression: `UserId = :userId`,
+			FilterExpression: 'Status = :status',
+			ExpressionAttributeValues: {
+				':userId': userId,
+				':status': true,
+			},
+		};
+
+		try {
+			const result = await docClient.query(params).promise();
+			return convertToCamelCase(result?.Items);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new Error(`Error fetching wallet by userId: ${error.message}`);
+		}
+	}
+
+	async getUserIncomingPaymentById(incomingPaymentId: string) {
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'UserIncoming',
+			IndexName: 'IncomingPaymentIdIndex',
+			KeyConditionExpression: `IncomingPaymentId = :incomingPaymentId`,
+			ExpressionAttributeValues: {
+				':incomingPaymentId': incomingPaymentId,
+			},
+		};
+
+		try {
+			const result = await docClient.query(params).promise();
+			return convertToCamelCase(result?.Items?.[0]);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new Error(
+				`Error fetching incoming payment by userId: ${error.message}`
+			);
+		}
+	}
+
+	async getIncomingPaymentById(incomingPaymentId: string) {
+		try {
+			const incomingPayment = await this.graphqlService.getIncomingPayment(
+				incomingPaymentId
+			);
+			return incomingPayment;
+		} catch (error) {
+			throw new Error('Failed to get incoming payment.');
+		}
+	}
+
+	async createOutgoing(input: any) {
+		try {
+			return await this.graphqlService.createReceiver(input);
+		} catch (error) {
+			throw new Error(`Error creating receiver: ${error.message}`);
+		}
+	}
+
+	async cancelOutgoingPayment(input: any) {
+		try {
+			return await this.graphqlService.cancelOutgoingPayment(input);
+		} catch (error) {
+			console.log('error', error?.message);
+			throw new Error(`Error cancel outgoing payment: ${error.message}`);
+		}
+	}
+
+	async filterParameterById(parameters: Array<any>, parameterId: string) {
+		const filteredAsset = parameters?.find(
+			parameter => parameter?.id == parameterId
+		);
+
+		if (!filteredAsset) {
+			return {};
+		}
+
+		return filteredAsset;
+	}
+
+	async validatePaymentParameterId(
+		paymentId: string,
+		token: string,
+		serviceProviderId: string
+	) {
+		const response = await axios.get(
+			this.AUTH_MICRO_URL +
+				`/api/v1/providers/list/payment-parameters?items=10&serviceProviderId=${serviceProviderId}`,
+			{
+				headers: {
+					Authorization: token,
+				},
+			}
+		);
+
+		const parameters = response?.data?.data?.paymentParameters;
+
+		const assetValue = await this.filterParameterById(parameters, paymentId);
+
+		return assetValue?.id ? assetValue : {};
+	}
+
+	async processParameterFlow(
+		parameterId,
+		token,
+		walletAddressId,
+		serviceProviderId
+	) {
+		const parameterExists = await this.validatePaymentParameterId(
+			parameterId,
+			token,
+			serviceProviderId
+		);
+
+		if (!parameterExists?.id) {
+			return {
+				action: 'error',
+				message: 'Type parameter does not exist',
+				statusCode: 'WGE0203',
+			};
+		}
+
+		const incomingPayment = await this.dbIncomingUser
+			.query('ServiceProviderId')
+			.eq(serviceProviderId)
+			.exec();
+
+		const quoteInput = {
+			walletAddressId: walletAddressId,
+			receiver: incomingPayment?.[0]?.IncomingPaymentId,
+		};
+
+		const quote = await this.createQuote(quoteInput);
+
+		const incomingState = await this.getIncomingPaymentById(
+			incomingPayment?.[0]?.IncomingPaymentId
+		);
+
+		if (incomingState?.state !== 'COMPLETED') {
+			return {
+				action: 'error',
+				message: 'Missing funds',
+				statusCode: 'WGE0205',
+			};
+		}
+
+		const inputOutgoing = {
+			walletAddressId: walletAddressId,
+			quoteId: quote?.createQuote?.quote?.id,
+		};
+		const outgoing = await this.createOutgoingPayment(inputOutgoing);
+
+		return {
+			action: 'hc',
+			message: 'Success create outgoing payment id',
+			statusCode: 'WGE0206',
+			data: outgoing?.createOutgoingPayment?.payment?.id,
+		};
+	}
+
+	async completePayment(outgoingPaymentId, action) {
+		let response;
+		let data;
+		const activityId = uuidv4();
+
+		switch (action) {
+			case 'accept':
+				data = await this.createDepositOutgoingMutationService({
+					outgoingPaymentId: outgoingPaymentId,
+					idempotencyKey: activityId,
+				});
+				console.log('data', data);
+				response = {
+					action: 'hc',
+					message: 'Payment accepted successfully',
+					statusCode: 'WGE0200',
+					activityId: activityId,
+				};
+				break;
+
+			case 'reject':
+				data = await this.cancelOutgoingPayment({
+					id: outgoingPaymentId,
+					reason: 'Reject payment',
+				});
+				response = {
+					action: 'error',
+					message: 'Payment rejected',
+					statusCode: 'WGE0201',
+					activityId: activityId,
+				};
+				break;
+
+			case 'timeout':
+				data = await this.cancelOutgoingPayment({
+					id: outgoingPaymentId,
+					reason: 'Timeout',
+				});
+				response = {
+					action: 'error',
+					message: 'Payment timed out and was cancelled',
+					statusCode: 'WGE0202',
+					activityId: activityId,
+				};
+				break;
+
+			default:
+				throw new Error('Invalid action');
+		}
+
+		return response;
+	}
+
+	async getWalletByAddress(walletAddress: string) {
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'Wallets',
+			IndexName: 'WalletAddressIndex',
+			KeyConditionExpression: `WalletAddress  = :walletAddress`,
+			ExpressionAttributeValues: {
+				':walletAddress': walletAddress,
+			},
+		};
+
+		try {
+			const result = await docClient.query(params).promise();
+			return convertToCamelCase(result.Items?.[0]);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new Error(`Error fetching wallet by address: ${error.message}`);
+		}
+	}
+
+	async getWalletByUser(userId: string) {
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'Wallets',
+			IndexName: 'UserIdIndex',
+			KeyConditionExpression: `UserId  = :userId`,
+			ExpressionAttributeValues: {
+				':userId': userId,
+			},
+		};
+
+		try {
+			const result = await docClient.query(params).promise();
+			return convertToCamelCase(result.Items?.[0]);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new Error(`Error fetching wallet by user: ${error.message}`);
+		}
+	}
+
+	async sendMoneyMailConfirmation(input: any, outGoingPayment: any) {
+		try {
+			const walletInfo = await this.getWalletByRafikyId(input.walletAddressId);
+			const docClient = new DocumentClient();
+			const params = {
+				TableName: 'Users',
+				Key: { Id: walletInfo.userId },
+			};
+			const result = await docClient.get(params).promise();
+
+			const date = new Date(
+				outGoingPayment.createOutgoingPayment.payment.createdAt
+			);
+
+			const day = String(date.getDate()).padStart(2, '0');
+			const month = String(date.getMonth() + 1).padStart(2, '0');
+			const year = date.getFullYear();
+			const hours = String(date.getHours()).padStart(2, '0');
+			const minutes = String(date.getMinutes()).padStart(2, '0');
+
+			const formattedDate = `${day}/${month}/${year} - ${hours}:${minutes}`;
+
+			const value = {
+				value:
+					outGoingPayment.createOutgoingPayment.payment.receiveAmount.value,
+				asset:
+					outGoingPayment.createOutgoingPayment.payment.receiveAmount.assetCode,
+				walletAddress: walletInfo.walletAddress.split('/')[4],
+				date: formattedDate,
+			};
+
+			const sqsMessage = {
+				event: 'RECEIVE_MONEY_CONFIRMATION',
+				email: result.Item.Email,
+				username:
+					result.Item.FirstName +
+					(result.Item.Lastname ? ' ' + result.Item.Lastname : ''),
+				value: value,
+			};
+
+			const incomingPaymentId =
+				outGoingPayment.createOutgoingPayment.payment.receiver.split('/')[4];
+			const incomingPayment = await this.getIncomingPayment(incomingPaymentId);
+
+			const receiverInfo = await this.getWalletByRafikyId(
+				incomingPayment.walletAddressId
+			);
+
+			const receiverParam = {
+				TableName: 'Users',
+				Key: { Id: receiverInfo.userId },
+			};
+			const receiver = await docClient.get(receiverParam).promise();
+
+			const receiverDate = new Date(incomingPayment.createdAt);
+			const receiverDay = String(receiverDate.getDate()).padStart(2, '0');
+			const receiverMonth = String(receiverDate.getMonth() + 1).padStart(
+				2,
+				'0'
+			);
+			const receiverYear = receiverDate.getFullYear();
+			const receiverHours = String(receiverDate.getHours()).padStart(2, '0');
+			const receiverMinutes = String(receiverDate.getMinutes()).padStart(
+				2,
+				'0'
+			);
+
+			const receiverDateFormatted = `${receiverDay}/${receiverMonth}/${receiverYear} - ${receiverHours}:${receiverMinutes}`;
+
+			const receiverValue = {
+				value: incomingPayment.incomingAmount.value,
+				asset: incomingPayment.incomingAmount.assetCode,
+				walletAddress: receiverInfo.walletAddress.split('/')[4],
+				date: receiverDateFormatted,
+			};
+
+			const sqsMsg = {
+				event: 'SEND_MONEY_CONFIRMATION',
+				email: receiver.Item.Email,
+				username:
+					receiver.Item.FirstName +
+					(receiver.Item.Lastname ? ' ' + receiver.Item.Lastname : ''),
+				value: receiverValue,
+			};
+
+			await this.sqsService.sendMessage(process.env.SQS_QUEUE_URL, sqsMessage);
+			await this.sqsService.sendMessage(process.env.SQS_QUEUE_URL, sqsMsg);
+			return;
+		} catch (error) {
+			throw new Error(`Error creating outgoing payment: ${error.message}`);
 		}
 	}
 }

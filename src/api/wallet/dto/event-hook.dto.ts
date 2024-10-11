@@ -4,6 +4,12 @@ interface Amount {
 	assetScale: number;
 }
 
+export class MetadataWebHookDTO {
+	description: string;
+	type: string;
+	wgUser: string;
+}
+
 interface WebHookData {
 	id: string;
 	walletAddressId: string;
@@ -18,6 +24,7 @@ interface WebHookData {
 	balance: string;
 	incomingAmount?: Amount;
 	completed?: boolean;
+	metadata: MetadataWebHookDTO;
 }
 
 export class EventWebHookDTO {

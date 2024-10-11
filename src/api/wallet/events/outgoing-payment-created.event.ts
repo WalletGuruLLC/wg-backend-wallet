@@ -11,6 +11,8 @@ export class OutGoingPaymentCreatedEvent implements EventWebHook {
 	constructor(private readonly walletService: WalletService) {}
 	async trigger(eventWebHookDTO: EventWebHookDTO, wallet): Promise<void> {
 		const docClient = new DocumentClient();
+		const recieverWallet = eventWebHookDTO?.data?.receiver.split('/');
+		const incomingPaymentId = recieverWallet?.[4];
 		const depositOutgoingPaymentInput = {
 			outgoingPaymentId: eventWebHookDTO?.data?.id,
 			idempotencyKey: uuidv4(),
@@ -33,15 +35,20 @@ export class OutGoingPaymentCreatedEvent implements EventWebHook {
 		};
 
 		try {
-			const result = await docClient.update(params).promise();
+			if (!eventWebHookDTO?.data?.metadata?.type) {
+				await docClient.update(params).promise();
+			}
 
-			setTimeout(async () => {
-				await this.walletService.createDepositOutgoingMutationService(
-					depositOutgoingPaymentInput
-				);
-			}, 500);
-
-			return convertToCamelCase(result);
+			const incomingPayment = await this.walletService.getIncomingPayment(
+				incomingPaymentId
+			);
+			if (incomingPayment?.metadata?.type !== 'PROVIDER') {
+				setTimeout(async () => {
+					await this.walletService.createDepositOutgoingMutationService(
+						depositOutgoingPaymentInput
+					);
+				}, 500);
+			}
 		} catch (error) {
 			Sentry.captureException(error);
 			throw new Error(

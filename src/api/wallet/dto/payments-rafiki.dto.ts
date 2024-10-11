@@ -3,6 +3,7 @@ import {
 	IsString,
 	IsNumber,
 	ValidateNested,
+	IsOptional,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -40,8 +41,8 @@ export class ReceiverInputDTO {
 	walletAddressUrl: string;
 
 	@IsString()
-	@IsNotEmpty()
-	walletAddressId: string;
+	@IsOptional()
+	walletAddressId?: string;
 }
 
 export class GeneralReceiverInputDTO {
@@ -98,4 +99,14 @@ export class DepositOutgoingPaymentInputDTO {
 	@IsString()
 	@IsNotEmpty()
 	outgoingPaymentId: string;
+}
+
+export class ActionOugoingPaymentDto {
+	@IsString()
+	@IsNotEmpty()
+	outgoingPaymentId: string;
+
+	@IsString()
+	@IsNotEmpty()
+	action: string;
 }

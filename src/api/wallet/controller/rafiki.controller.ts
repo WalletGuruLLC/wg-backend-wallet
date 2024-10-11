@@ -33,6 +33,7 @@ import { CreateServiceProviderWalletAddressDto } from '../dto/create-rafiki-serv
 import { customValidationPipe } from '../../validation.pipe';
 import { addApiSignatureHeader } from 'src/utils/helpers/signatureHelper';
 import {
+	ActionOugoingPaymentDto,
 	CreateQuoteInputDTO,
 	DepositDTO,
 	DepositOutgoingPaymentInputDTO,
@@ -41,6 +42,8 @@ import {
 } from '../dto/payments-rafiki.dto';
 import { isValidStringLength } from 'src/utils/helpers/isValidStringLength';
 import { v4 as uuidv4 } from 'uuid';
+import { convertToCamelCase } from 'src/utils/helpers/convertCamelCase';
+import { CreatePaymentDTO } from '../dto/create-payment-rafiki.dto';
 
 @ApiTags('wallet-rafiki')
 @Controller('api/v1/wallets-rafiki')
@@ -373,6 +376,12 @@ export class RafikiWalletController {
 				const outgoingPayment = await this.walletService.createOutgoingPayment(
 					inputOutgoing
 				);
+
+				await this.walletService.sendMoneyMailConfirmation(
+					inputOutgoing,
+					outgoingPayment
+				);
+
 				return res.status(200).send({
 					data: outgoingPayment,
 					customCode: 'WGE0150',
@@ -387,55 +396,55 @@ export class RafikiWalletController {
 		}
 	}
 
-	@Post('receiver')
-	@ApiOperation({ summary: 'Create a receiver' })
-	@ApiResponse({ status: 201, description: 'Receiver created successfully.' })
-	@ApiResponse({ status: 400, description: 'Bad Request' })
-	async createReceiver(
-		@Body() input: GeneralReceiverInputDTO,
-		@Req() req,
-		@Res() res
-	) {
-		try {
-			await addApiSignatureHeader(req, req.body);
-			const receiver = await this.walletService.createReceiver(input);
-			return res.status(200).send({
-				data: receiver,
-				customCode: 'WGE0152',
-			});
-		} catch (error) {
-			Sentry.captureException(error);
-			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
-				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-				customCode: 'WGE0153',
-			});
-		}
-	}
+	// @Post('receiver')
+	// @ApiOperation({ summary: 'Create a receiver' })
+	// @ApiResponse({ status: 201, description: 'Receiver created successfully.' })
+	// @ApiResponse({ status: 400, description: 'Bad Request' })
+	// async createReceiver(
+	// 	@Body() input: GeneralReceiverInputDTO,
+	// 	@Req() req,
+	// 	@Res() res
+	// ) {
+	// 	try {
+	// 		await addApiSignatureHeader(req, req.body);
+	// 		const receiver = await this.walletService.createReceiver(input);
+	// 		return res.status(200).send({
+	// 			data: receiver,
+	// 			customCode: 'WGE0152',
+	// 		});
+	// 	} catch (error) {
+	// 		Sentry.captureException(error);
+	// 		return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+	// 			statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+	// 			customCode: 'WGE0153',
+	// 		});
+	// 	}
+	// }
 
-	@Post('quote')
-	@ApiOperation({ summary: 'Create a quote' })
-	@ApiResponse({ status: 201, description: 'Quote created successfully.' })
-	@ApiResponse({ status: 400, description: 'Bad Request' })
-	async createQuote(
-		@Body() input: CreateQuoteInputDTO,
-		@Req() req,
-		@Res() res
-	) {
-		try {
-			await addApiSignatureHeader(req, req.body);
-			const quote = await this.walletService.createQuote(input);
-			return res.status(200).send({
-				data: quote,
-				customCode: 'WGE0154',
-			});
-		} catch (error) {
-			Sentry.captureException(error);
-			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
-				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-				customCode: 'WGE0155',
-			});
-		}
-	}
+	// @Post('quote')
+	// @ApiOperation({ summary: 'Create a quote' })
+	// @ApiResponse({ status: 201, description: 'Quote created successfully.' })
+	// @ApiResponse({ status: 400, description: 'Bad Request' })
+	// async createQuote(
+	// 	@Body() input: CreateQuoteInputDTO,
+	// 	@Req() req,
+	// 	@Res() res
+	// ) {
+	// 	try {
+	// 		await addApiSignatureHeader(req, req.body);
+	// 		const quote = await this.walletService.createQuote(input);
+	// 		return res.status(200).send({
+	// 			data: quote,
+	// 			customCode: 'WGE0154',
+	// 		});
+	// 	} catch (error) {
+	// 		Sentry.captureException(error);
+	// 		return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+	// 			statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+	// 			customCode: 'WGE0155',
+	// 		});
+	// 	}
+	// }
 
 	@Get('exchange-rates')
 	@ApiOperation({ summary: 'List all exchange rates' })
@@ -563,6 +572,189 @@ export class RafikiWalletController {
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
 				customCode: 'WGE0083',
+			});
+		}
+	}
+
+	@Post('create/incoming-payment')
+	@ApiOperation({ summary: 'Create a Incoming Payment' })
+	@ApiResponse({
+		status: 201,
+		description: 'InconmingPayment created successfully.',
+	})
+	@ApiResponse({ status: 400, description: 'Bad Request' })
+	async createIncomingPayment(
+		@Body() input: CreatePaymentDTO,
+		@Req() req,
+		@Res() res,
+		@Headers() headers: MapOfStringToList
+	) {
+		let token;
+
+		try {
+			token = headers.authorization ?? '';
+			const instanceVerifier = await this.verifyService.getVerifiedFactory();
+			await instanceVerifier.verify(token.toString().split(' ')[1]);
+		} catch (error) {
+			Sentry.captureException(error);
+
+			return res.status(HttpStatus.UNAUTHORIZED).send({
+				statusCode: HttpStatus.UNAUTHORIZED,
+				customCode: 'WGE0021',
+			});
+		}
+
+		try {
+			const userWallet = await this.walletService.getWalletByRafikyId(
+				input.walletAddressId
+			);
+
+			if (!userWallet) {
+				return res.status(HttpStatus.NOT_FOUND).send({
+					statusCode: HttpStatus.NOT_FOUND,
+					customCode: 'WGE0074',
+				});
+			}
+
+			const userWalletByToken = convertToCamelCase(
+				await this.walletService.getWalletByToken(token)
+			);
+
+			if (userWalletByToken?.walletDb?.userId !== userWallet?.userId) {
+				return res.status(HttpStatus.UNAUTHORIZED).send({
+					statusCode: HttpStatus.UNAUTHORIZED,
+					customCode: 'WGE0021',
+				});
+			}
+
+			const providerWallet = await this.walletService.getWalletByAddress(
+				input.walletAddressUrl
+			);
+
+			if (!providerWallet) {
+				return res.status(HttpStatus.NOT_FOUND).send({
+					statusCode: HttpStatus.NOT_FOUND,
+					customCode: 'WGE0074',
+				});
+			}
+
+			const incomingPayment = await this.walletService.createIncomingPayment(
+				input,
+				providerWallet,
+				userWalletByToken
+			);
+
+			return res.status(HttpStatus.OK).send({
+				data: convertToCamelCase(incomingPayment),
+				statusCode: HttpStatus.OK,
+				customCode: 'WGE0164',
+			});
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0165',
+				message: error.message,
+			});
+		}
+	}
+
+	@Post('action/outgoing-payment')
+	@ApiOperation({ summary: 'Action outgoing payment' })
+	@ApiResponse({
+		status: 201,
+		description: 'Action outgoing payment created successfully.',
+	})
+	@ApiResponse({ status: 400, description: 'Bad Request' })
+	async actionOutgoingPayment(
+		@Body() input: ActionOugoingPaymentDto,
+		@Req() req,
+		@Res() res,
+		@Headers() headers: MapOfStringToList
+	) {
+		let token;
+
+		try {
+			token = headers.authorization ?? '';
+			const instanceVerifier = await this.verifyService.getVerifiedFactory();
+			await instanceVerifier.verify(token.toString().split(' ')[1]);
+		} catch (error) {
+			Sentry.captureException(error);
+
+			return res.status(HttpStatus.UNAUTHORIZED).send({
+				statusCode: HttpStatus.UNAUTHORIZED,
+				customCode: 'WGE0021',
+			});
+		}
+
+		try {
+			await addApiSignatureHeader(req, req.body);
+
+			const incomingPayment = await this.walletService.completePayment(
+				input?.outgoingPaymentId,
+				input?.action
+			);
+
+			if (incomingPayment?.action == 'hc') {
+				return res.status(HttpStatus.OK).send({
+					statusCode: HttpStatus.OK,
+					customCode: 'WGE0210',
+				});
+			} else {
+				return res.status(HttpStatus.BAD_REQUEST).send({
+					statusCode: HttpStatus.BAD_REQUEST,
+					customCode: incomingPayment?.statusCode,
+				});
+			}
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0211',
+				message: error.message,
+			});
+		}
+	}
+
+	@Get('list-incoming-payments')
+	@ApiOperation({ summary: 'List all user incoming payments' })
+	async listIncomingPayments(
+		@Headers() headers: MapOfStringToList,
+		@Res() res
+	) {
+		let token;
+		try {
+			token = headers.authorization ?? '';
+			const instanceVerifier = await this.verifyService.getVerifiedFactory();
+			await instanceVerifier.verify(token.toString().split(' ')[1]);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new HttpException(
+				{
+					statusCode: HttpStatus.UNAUTHORIZED,
+					customCode: 'WGE0021',
+					customMessage: errorCodes.WGE0021?.description,
+					customMessageEs: errorCodes.WGE0021?.descriptionEs,
+				},
+				HttpStatus.UNAUTHORIZED
+			);
+		}
+
+		try {
+			const incomingPayments = await this.walletService.listIncomingPayments(
+				token
+			);
+			return res.status(HttpStatus.OK).send({
+				statusCode: HttpStatus.OK,
+				customCode: 'WGS0138',
+				data: { incomingPayments },
+			});
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0137',
+				message: error.message,
 			});
 		}
 	}
