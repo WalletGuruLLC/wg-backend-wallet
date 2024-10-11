@@ -260,7 +260,7 @@ export class AuthGateway
 				`Client ${client.id} failed to authenticate. in activity`
 			);
 		}
-		return { event: 'response', data: 'Stop processed.' };
+		// return { event: 'response', data: 'Stop processed.' };
 	}
 
 	@SubscribeMessage('get-payment-parameters') async getPaymentParameters(
