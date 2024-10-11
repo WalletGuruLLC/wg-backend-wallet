@@ -983,7 +983,8 @@ export class WalletService {
 
 			if (userIncoming?.status && userWallet) {
 				const postedDebits: number =
-					(userWallet?.postedDebits || 0) + parseInt(incomingPayment.incomingAmount.value);
+					(userWallet?.postedDebits || 0) +
+					parseInt(incomingPayment.incomingAmount.value);
 
 				const pendingDebits: number =
 					(userWallet?.pendingDebits || 0) -
@@ -1003,7 +1004,20 @@ export class WalletService {
 					ReturnValues: 'ALL_NEW',
 				};
 
+				const userIncomingParams = {
+					Key: {
+						Id: userIncoming.id,
+					},
+					TableName: 'UserIncoming',
+					UpdateExpression: 'SET Status = :status',
+					ExpressionAttributeValues: {
+						':status': false,
+					},
+					ReturnValues: 'ALL_NEW',
+				};
+
 				await docClient.update(params).promise();
+				await docClient.update(userIncomingParams).promise();
 			}
 		} catch (error) {
 			throw new Error(`Error canceling incoming payment: ${error.message}`);
