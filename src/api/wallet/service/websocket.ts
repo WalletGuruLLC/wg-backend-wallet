@@ -151,7 +151,7 @@ export class AuthGateway
 		return { event: 'response', data: 'Authentication processed.' };
 	}
 
-	@SubscribeMessage('play')
+	@SubscribeMessage('activity')
 	async handlePlay(client: Socket, data: any): Promise<WsResponse<string>> {
 		const headers = client.handshake.headers;
 		const parsedData = JSON.parse(data);
@@ -160,8 +160,15 @@ export class AuthGateway
 			headers['public-key']?.toString();
 		const nonceData =
 			parsedData['x-nonce']?.toString() || headers['nonce']?.toString();
-		const sessionIdData = parsedData.sessionId?.toString();
-
+		const action = parsedData.action?.toString();
+		const activityId = parsedData.activityId?.toString();
+		const paymentType = parsedData.paymentType?.toString();
+		const wgUserId = parsedData.wgUserId?.toString();
+		const objectSecret = await this.authService.getServiceProviderWihtPublicKey(
+			publicKeyData
+		);
+		const serviceProviderId = objectSecret?.ServiceProviderId;
+		const walletAddress = await this.authService.findWalletByUserId(wgUserId);
 		if (!publicKeyData) {
 			client.emit('error', {
 				message: 'Public key missing!',
@@ -180,54 +187,94 @@ export class AuthGateway
 				sessionId: '',
 			});
 			client.disconnect();
-			this.logger.error(`Client ${client.id} failed to authenticate.`);
+			this.logger.error(
+				`Client ${client.id} failed to authenticate. in activity`
+			);
 		}
-		if (!sessionIdData) {
+		if (!activityId) {
 			client.emit('error', {
-				message: 'You need send session id',
+				message: 'You need send activity id',
 				statusCode: 'WGE0152',
 				sessionId: '',
 			});
 			client.disconnect();
-			this.logger.error(`Client ${client.id} failed to authenticate.`);
+			this.logger.error(
+				`Client ${client.id} failed to authenticate. in activity`
+			);
 		}
+		const data_aux = { ...parsedData };
+		delete data_aux['x-nonce'];
+		delete data_aux['x-public-key'];
+		delete data_aux['x-timestamp'];
 		const timestamp = Math.floor(new Date().getTime() / 1000);
 		const tokenPromises = [];
 
 		for (let i = -5; i <= 5; i++) {
 			tokenPromises.push(
-				this.authService.generateToken({}, `${timestamp + i}`, publicKeyData)
+				this.authService.generateToken(
+					data_aux,
+					`${timestamp + i}`,
+					publicKeyData
+				)
 			);
 		}
 
 		const validTokenRange = await Promise.all(tokenPromises);
 
 		if (validTokenRange.includes(nonceData)) {
-			const responsePlay = await this.authService.processParameterFlow(
-				parsedData['parameter-id']?.toString(),
-				parsedData['token']?.toString(),
-				parsedData['wallet-address-id']?.toString(),
-				parsedData['service-provider-id']?.toString()
-			);
-			if (responsePlay?.action == 'hc') {
-				setTimeout(() => {
-					client.emit('hc', {
+			if (action == 'play') {
+				const responsePlay = await this.authService.processParameterFlow(
+					paymentType,
+					walletAddress?.walletDb,
+					walletAddress?.walletAsset,
+					serviceProviderId,
+					wgUserId
+				);
+				if (responsePlay?.action == 'hc') {
+					setTimeout(() => {
+						client.emit('hc', {
+							message: 'Ok',
+							statusCode: 'WGS0053',
+							activityId: activityId,
+						});
+					}, 2800);
+				} else {
+					client.emit('error', {
 						message: responsePlay?.message,
 						statusCode: responsePlay?.statusCode,
-						outgoingPaymentId: responsePlay?.data,
+					});
+					client.disconnect();
+				}
+			} else {
+				setTimeout(() => {
+					client.emit('hc', {
+						message: 'Ok',
+						statusCode: 'WGS0053',
+						activityId: activityId,
 					});
 				}, 2800);
-			} else {
-				client.emit('error', {
-					message: responsePlay?.message,
-					statusCode: responsePlay?.statusCode,
-				});
-				client.disconnect();
 			}
 		} else {
 			client.disconnect();
-			this.logger.error(`Client ${client.id} failed to authenticate.`);
+			this.logger.error(
+				`Client ${client.id} failed to authenticate. in activity`
+			);
 		}
 		return { event: 'response', data: 'Stop processed.' };
+	}
+
+	@SubscribeMessage('get-payment-parameters') async getPaymentParameters(
+		client: Socket,
+		data: any
+	): Promise<WsResponse<string>> {
+		const headers = client.handshake.headers;
+		const parsedData = JSON.parse(data);
+		const publicKeyData =
+			parsedData['x-public-key']?.toString() ||
+			headers['public-key']?.toString();
+		const paymentParameters = await this.authService.getPaymentParameters(
+			publicKeyData
+		);
+		return { event: 'get-payment-parameters', data: paymentParameters };
 	}
 }
