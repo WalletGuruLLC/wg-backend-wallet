@@ -28,12 +28,11 @@ import { Rates } from '../entities/rates.entity';
 import { RatesSchema } from '../entities/rates.schema';
 import { DocumentClient } from 'aws-sdk/clients/dynamodb';
 import { CreateIncomingUserDto } from '../dto/incoming-user.dto';
-import { isGreaterValue } from 'src/utils/helpers/isGreaterValueToSend';
 import { SqsService } from '../sqs/sqs.service';
 import { UserIncomingPayment } from '../entities/user-incoming.entity';
 import { UserIncomingSchema } from '../entities/user-incoming.schema';
-import { ReceiverInputDTO } from '../dto/payments-rafiki.dto';
 import { CreatePaymentDTO } from '../dto/create-payment-rafiki.dto';
+import { adjustValueByCurrency } from 'src/utils/helpers/adjustValueCurrecy';
 
 @Injectable()
 export class WalletService {
@@ -368,6 +367,22 @@ export class WalletService {
 	async findWallet(id: string): Promise<Wallet> {
 		const walletById = await this.dbInstance.scan('Id').eq(id).exec();
 		return walletById[0];
+	}
+
+	async findWalletByUserId(userId: string): Promise<any> {
+		const walletById = await this.dbInstance
+			.scan()
+			.filter('UserId')
+			.eq(userId)
+			.exec();
+
+		const walletInfo = await this.graphqlService.listWalletInfo(
+			walletById?.[0]?.RafikiId
+		);
+		return {
+			walletDb: walletById?.[0]?.RafikiId,
+			walletAsset: walletInfo.data.walletAddress.asset,
+		};
 	}
 
 	async getWalletAddressExist(address: string) {
@@ -886,7 +901,7 @@ export class WalletService {
 	async expireDate() {
 		const fechaActual = new Date();
 		fechaActual.setMonth(fechaActual.getMonth() + 1);
-		return fechaActual.toISOString();
+		return `${fechaActual.toISOString()}`;
 	}
 
 	async createIncomingPayment(
@@ -896,6 +911,7 @@ export class WalletService {
 	) {
 		try {
 			const expireDate = await this.expireDate();
+			console.log('expireDate', expireDate);
 			const updateInput = {
 				metadata: {
 					description: '',
@@ -908,9 +924,8 @@ export class WalletService {
 					value: input.incomingAmount,
 				},
 				walletAddressUrl: input.walletAddressUrl,
-				expiresAt: expireDate,
+				// expiresAt: expireDate, //TODO: uncomment when the expire date is fixed
 			};
-
 			const balance =
 				userWallet?.walletDb?.postedCredits -
 				(userWallet?.walletDb?.pendingDebits +
@@ -938,6 +953,7 @@ export class WalletService {
 				ServiceProviderId: providerWallet?.providerId,
 				UserId: userWallet.walletDb?.userId,
 				IncomingPaymentId: incomingPaymentId,
+				ReceiverId: incomingPayment?.createReceiver?.receiver?.id,
 			};
 
 			return await this.dbUserIncoming.create(userIncomingPayment);
@@ -996,6 +1012,18 @@ export class WalletService {
 		hmac.update(payload);
 		const digest = hmac.digest('hex');
 		return `${digest}`;
+	}
+
+	async getServiceProviderWihtPublicKey(publicKey: string): Promise<any> {
+		const socket = await this.dbInstanceSocket
+			.scan('PublicKey')
+			.eq(publicKey)
+			.exec();
+		const objectSecret = socket?.[0];
+		if (!objectSecret) {
+			return '';
+		}
+		return objectSecret;
 	}
 
 	verifyToken(token: string, body: any, secret: string): boolean {
@@ -1184,37 +1212,51 @@ export class WalletService {
 		return filteredAsset;
 	}
 
+	async getPaymentsParameters(serviceProviderId: string): Promise<any> {
+		const docClient = new DocumentClient();
+
+		const params: DocumentClient.ScanInput = {
+			TableName: 'PaymentParameters',
+			IndexName: 'ServiceProviderIdIndex',
+			FilterExpression: 'ServiceProviderId = :serviceProviderId',
+			ExpressionAttributeValues: {
+				':serviceProviderId': serviceProviderId,
+			},
+		};
+
+		try {
+			const result = await docClient.scan(params).promise();
+			const paymentParameters = convertToCamelCase(result.Items || []);
+			return paymentParameters;
+		} catch (error) {
+			console.log('error', error?.message);
+		}
+	}
+
 	async validatePaymentParameterId(
 		paymentId: string,
-		token: string,
 		serviceProviderId: string
 	) {
-		const response = await axios.get(
-			this.AUTH_MICRO_URL +
-				`/api/v1/providers/list/payment-parameters?items=10&serviceProviderId=${serviceProviderId}`,
-			{
-				headers: {
-					Authorization: token,
-				},
-			}
-		);
-
-		const parameters = response?.data?.data?.paymentParameters;
-
-		const assetValue = await this.filterParameterById(parameters, paymentId);
-
-		return assetValue?.id ? assetValue : {};
+		try {
+			const response = await this.getPaymentsParameters(serviceProviderId);
+			const parameters = response;
+			const parameter = await this.filterParameterById(parameters, paymentId);
+			return parameter?.id ? parameter : {};
+		} catch (error) {
+			console.log('error', error.message);
+		}
+		return {};
 	}
 
 	async processParameterFlow(
 		parameterId,
-		token,
 		walletAddressId,
-		serviceProviderId
+		walletAsset,
+		serviceProviderId,
+		userId
 	) {
 		const parameterExists = await this.validatePaymentParameterId(
 			parameterId,
-			token,
 			serviceProviderId
 		);
 
@@ -1227,13 +1269,21 @@ export class WalletService {
 		}
 
 		const incomingPayment = await this.dbIncomingUser
-			.query('ServiceProviderId')
+			.scan('ServiceProviderId')
 			.eq(serviceProviderId)
 			.exec();
 
 		const quoteInput = {
 			walletAddressId: walletAddressId,
-			receiver: incomingPayment?.[0]?.IncomingPaymentId,
+			receiver: incomingPayment?.[0]?.ReceiverId,
+			receiveAmount: {
+				value: adjustValueByCurrency(
+					parameterExists?.cost,
+					walletAsset?.code ?? 'USD'
+				),
+				assetCode: walletAsset?.asset ?? 'USD',
+				assetScale: walletAsset?.scale ?? 2,
+			},
 		};
 
 		const quote = await this.createQuote(quoteInput);
@@ -1242,7 +1292,7 @@ export class WalletService {
 			incomingPayment?.[0]?.IncomingPaymentId
 		);
 
-		if (incomingState?.state !== 'COMPLETED') {
+		if (incomingState?.state == 'COMPLETED') {
 			return {
 				action: 'error',
 				message: 'Missing funds',
@@ -1253,7 +1303,13 @@ export class WalletService {
 		const inputOutgoing = {
 			walletAddressId: walletAddressId,
 			quoteId: quote?.createQuote?.quote?.id,
+			metadata: {
+				description: '',
+				type: 'PROVIDER',
+				wgUser: userId,
+			},
 		};
+
 		const outgoing = await this.createOutgoingPayment(inputOutgoing);
 
 		return {
@@ -1278,8 +1334,8 @@ export class WalletService {
 				console.log('data', data);
 				response = {
 					action: 'hc',
-					message: 'Payment accepted successfully',
-					statusCode: 'WGE0200',
+					message: 'Request accepted successfully',
+					statusCode: 'WGS0052',
 					activityId: activityId,
 				};
 				break;
@@ -1287,11 +1343,11 @@ export class WalletService {
 			case 'reject':
 				data = await this.cancelOutgoingPayment({
 					id: outgoingPaymentId,
-					reason: 'Reject payment',
+					reason: 'Reject payment request',
 				});
 				response = {
 					action: 'error',
-					message: 'Payment rejected',
+					message: 'Reject payment request',
 					statusCode: 'WGE0201',
 					activityId: activityId,
 				};
@@ -1304,7 +1360,7 @@ export class WalletService {
 				});
 				response = {
 					action: 'error',
-					message: 'Payment timed out and was cancelled',
+					message: 'Payment request timed out and was cancelled',
 					statusCode: 'WGE0202',
 					activityId: activityId,
 				};
@@ -1447,6 +1503,41 @@ export class WalletService {
 			return;
 		} catch (error) {
 			throw new Error(`Error creating outgoing payment: ${error.message}`);
+		}
+	}
+	async getPaymentParameters(publicKey: any) {
+		try {
+			const socketKeys = await this.dbInstanceSocket
+				.scan('PublicKey')
+				.eq(publicKey)
+				.exec();
+			const docClient = new DocumentClient();
+			const params = {
+				TableName: 'PaymentParameters',
+				IndexName: 'ServiceProviderIdIndex',
+				KeyConditionExpression: `ServiceProviderId = :serviceproviderid`,
+				ExpressionAttributeValues: {
+					':serviceproviderid': socketKeys[0].ServiceProviderId,
+				},
+			};
+			try {
+				const result = await docClient.query(params).promise();
+				const results = result.Items?.map(item => ({
+					serviceProviderId: item?.ServiceProviderId,
+					id: item?.Id,
+					active: item?.Active,
+					name: item?.Name,
+					interval: item?.Interval,
+				}));
+				return convertToCamelCase(results);
+			} catch (error) {
+				Sentry.captureException(error);
+				throw new Error(`Error fetching wallet: ${error.message}`);
+			}
+		} catch (error) {
+			throw new Error(
+				`Error creating deposit outoing mutation: ${error.message}`
+			);
 		}
 	}
 }
