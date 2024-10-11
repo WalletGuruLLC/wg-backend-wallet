@@ -44,6 +44,7 @@ import { isValidStringLength } from 'src/utils/helpers/isValidStringLength';
 import { v4 as uuidv4 } from 'uuid';
 import { convertToCamelCase } from 'src/utils/helpers/convertCamelCase';
 import { CreatePaymentDTO } from '../dto/create-payment-rafiki.dto';
+import { AuthGateway } from '../service/websocket';
 
 @ApiTags('wallet-rafiki')
 @Controller('api/v1/wallets-rafiki')
@@ -51,7 +52,8 @@ import { CreatePaymentDTO } from '../dto/create-payment-rafiki.dto';
 export class RafikiWalletController {
 	constructor(
 		private readonly walletService: WalletService,
-		private readonly verifyService: VerifyService
+		private readonly verifyService: VerifyService,
+		private readonly authGateway: AuthGateway
 	) {}
 
 	@Post('address')
@@ -695,11 +697,20 @@ export class RafikiWalletController {
 			);
 
 			if (incomingPayment?.action == 'hc') {
+				this.authGateway.server.emit(incomingPayment?.action, {
+					message: 'Payment request accepted',
+					statusCode: 'WGS0054',
+				});
+
 				return res.status(HttpStatus.OK).send({
 					statusCode: HttpStatus.OK,
 					customCode: 'WGE0210',
 				});
 			} else {
+				this.authGateway.server.emit(incomingPayment?.action, {
+					message: 'Payment request rejected',
+					statusCode: 'WGS0055',
+				});
 				return res.status(HttpStatus.BAD_REQUEST).send({
 					statusCode: HttpStatus.BAD_REQUEST,
 					customCode: incomingPayment?.statusCode,

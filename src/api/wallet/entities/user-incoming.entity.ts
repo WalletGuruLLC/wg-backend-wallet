@@ -5,6 +5,7 @@ export class UserIncomingPayment extends Document {
 	ServiceProviderId?: string;
 	UserId?: string;
 	IncomingPaymentId?: string;
+	ReceiverId?: string;
 	Status?: boolean;
 	CreateDate?: string;
 	UpdateDate?: string;

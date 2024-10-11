@@ -4,8 +4,7 @@ import { gql } from '@apollo/client/core';
 
 @Injectable()
 export class GraphqlService {
-	constructor(private readonly apolloClientService: ApolloClientService) {
-	}
+	constructor(private readonly apolloClientService: ApolloClientService) {}
 
 	async createWalletAddress(input: any) {
 		const mutation = gql`
@@ -71,7 +70,7 @@ export class GraphqlService {
 		after: string | null,
 		before: string | null,
 		first: number | null,
-		last: number | null,
+		last: number | null
 	) {
 		const query = gql`
 			query GetAssets(
@@ -190,28 +189,28 @@ export class GraphqlService {
 	async createReceiver(input: any) {
 		const mutation = gql`
 			mutation CreateReceiver($input: CreateReceiverInput!) {
-			createReceiver(input: $input) {
-				receiver {
-					completed
-					createdAt
-					expiresAt
-					metadata
-					id
-					incomingAmount {
-						assetCode
-						assetScale
-						value
+				createReceiver(input: $input) {
+					receiver {
+						completed
+						createdAt
+						expiresAt
+						metadata
+						id
+						incomingAmount {
+							assetCode
+							assetScale
+							value
+						}
+						walletAddressUrl
+						receivedAmount {
+							assetCode
+							assetScale
+							value
+						}
+						updatedAt
 					}
-					walletAddressUrl
-					receivedAmount {
-						assetCode
-						assetScale
-						value
-					}
-					updatedAt
 				}
 			}
-		}
 		`;
 
 		const variables = { input };
