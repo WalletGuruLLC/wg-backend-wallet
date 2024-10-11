@@ -794,10 +794,14 @@ export class RafikiWalletController {
 		}
 
 		try {
-			await this.walletService.cancelIncomingPaymentId(id, token);
+			const response = await this.walletService.cancelIncomingPaymentId(
+				id,
+				token
+			);
 			return res.status(HttpStatus.OK).send({
 				statusCode: HttpStatus.OK,
 				customCode: 'WGE0166',
+				data: { cancelIncomingPayment: response },
 			});
 		} catch (error) {
 			Sentry.captureException(error);

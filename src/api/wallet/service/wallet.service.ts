@@ -1016,10 +1016,13 @@ export class WalletService {
 					ReturnValues: 'ALL_NEW',
 				};
 
-				await this.cancelIncomingPayment(incomingPaymentId);
+				const incomingCancelResponse = await this.cancelIncomingPayment(
+					incomingPaymentId
+				);
 
 				await docClient.update(params).promise();
 				await docClient.update(userIncomingParams).promise();
+				return incomingCancelResponse;
 			}
 		} catch (error) {
 			throw new Error(`Error canceling incoming payment: ${error.message}`);

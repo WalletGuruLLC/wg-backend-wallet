@@ -490,15 +490,24 @@ export class GraphqlService {
 			mutation CancelIncomingPayment($input: CancelIncomingPaymentInput!) {
 				cancelIncomingPayment(input: $input) {
 					payment {
-						id
-						state
+						client
+						createdAt
 						expiresAt
-						walletAddressId
-						receivedAmount {
-							value
+						id
+						incomingAmount {
 							assetCode
 							assetScale
+							value
 						}
+						liquidity
+						metadata
+						receivedAmount {
+							assetCode
+							assetScale
+							value
+						}
+						state
+						walletAddressId
 					}
 				}
 			}
