@@ -440,11 +440,8 @@ export class GraphqlService {
 						quote {
 							createdAt
 							expiresAt
-							highEstimatedExchangeRate
 							id
-							lowEstimatedExchangeRate
-							maxPacketAmount
-							minExchangeRate
+							estimatedExchangeRate
 							walletAddressId
 							receiveAmount {
 								assetCode

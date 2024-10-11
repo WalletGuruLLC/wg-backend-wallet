@@ -843,8 +843,8 @@ export class WalletService {
 
 	async expireDate() {
 		const fechaActual = new Date();
-		fechaActual.setMonth(fechaActual.getMonth() + 12);
-		return fechaActual;
+		fechaActual.setMonth(fechaActual.getMonth() + 1);
+		return fechaActual.toISOString();
 	}
 
 	async createIncomingPayment(
@@ -853,6 +853,7 @@ export class WalletService {
 		userWallet
 	) {
 		try {
+			const expireDate = await this.expireDate();
 			const updateInput = {
 				metadata: {
 					description: '',
@@ -865,7 +866,7 @@ export class WalletService {
 					value: input.incomingAmount,
 				},
 				walletAddressUrl: input.walletAddressUrl,
-				expiresAt: this.expireDate(),
+				expiresAt: expireDate,
 			};
 
 			const balance =
