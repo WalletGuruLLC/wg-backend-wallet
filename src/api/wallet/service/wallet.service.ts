@@ -962,6 +962,51 @@ export class WalletService {
 		}
 	}
 
+	async cancelIncomingPaymentId(incomingPaymentId: string, token: string) {
+		try {
+			const userIncoming = await this.getUserIncomingPaymentById(
+				incomingPaymentId
+			);
+			const incomingPayment = await this.getIncomingPaymentById(
+				incomingPaymentId
+			);
+			const userWallet = convertToCamelCase(await this.getUserByToken(token));
+
+			if (!userIncoming) {
+				throw new Error(`Error finding user incoming`);
+			}
+
+			if (!incomingPayment) {
+				throw new Error(`Error finding incoming payment`);
+			}
+
+			if (userIncoming?.status && userWallet) {
+				const postedDebits: number =
+					(userWallet?.postedDebits || 0) + parseInt(incomingPayment);
+
+				const pendingDebits: number =
+					(userWallet?.pendingDebits || 0) -
+					parseInt(incomingPayment.incomingAmount.value);
+
+				const params = {
+					Key: {
+						Id: userWallet.id,
+					},
+					TableName: 'Wallets',
+					UpdateExpression:
+						'SET PostedDebits = :postedDebits, PendingDebits = :pendingDebits',
+					ExpressionAttributeValues: {
+						':postedDebits': postedDebits,
+						':pendingDebits': pendingDebits,
+					},
+					ReturnValues: 'ALL_NEW',
+				};
+			}
+		} catch (error) {
+			throw new Error(`Error canceling incoming payment: ${error.message}`);
+		}
+	}
+
 	async createQuote(input: any) {
 		try {
 			return await this.graphqlService.createQuote(input);

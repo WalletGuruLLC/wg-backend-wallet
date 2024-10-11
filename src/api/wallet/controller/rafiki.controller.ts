@@ -11,6 +11,7 @@ import {
 	Query,
 	Req,
 	Param,
+	Patch,
 } from '@nestjs/common';
 
 import {
@@ -20,6 +21,7 @@ import {
 	ApiBearerAuth,
 	ApiBody,
 	ApiQuery,
+	ApiOkResponse,
 } from '@nestjs/swagger';
 
 import { WalletService } from '../service/wallet.service';
@@ -765,6 +767,43 @@ export class RafikiWalletController {
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
 				customCode: 'WGE0137',
 				message: error.message,
+			});
+		}
+	}
+
+	@Patch(':id/cancel-incoming')
+	@ApiOkResponse({
+		description: 'Incoming Payment has been cancelled.',
+	})
+	async cancelIncoming(
+		@Param('id') id: string,
+		@Headers() headers: MapOfStringToList,
+		@Res() res
+	) {
+		let token;
+		try {
+			token = headers.authorization ?? '';
+			const instanceVerifier = await this.verifyService.getVerifiedFactory();
+			await instanceVerifier.verify(token.toString().split(' ')[1]);
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.UNAUTHORIZED).send({
+				statusCode: HttpStatus.UNAUTHORIZED,
+				customCode: 'WGE0001',
+			});
+		}
+
+		try {
+			await this.walletService.cancelIncomingPaymentId(id, token);
+			return res.status(HttpStatus.OK).send({
+				statusCode: HttpStatus.OK,
+				customCode: 'WGE0076',
+			});
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0087',
 			});
 		}
 	}
