@@ -10,6 +10,7 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 	constructor(private readonly walletService: WalletService) {}
 	async trigger(eventWebHookDTO: EventWebHookDTO, wallet): Promise<void> {
 		const docClient = new DocumentClient();
+		const userId = eventWebHookDTO?.data?.metadata?.wgUser;
 		const credits =
 			(wallet.pendingCredits || 0) +
 			parseInt(eventWebHookDTO.data.incomingAmount.value);
@@ -26,7 +27,27 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 		};
 
 		try {
+			if (userId) {
+				const userWallet = await this.walletService.getWalletByUser(userId);
+				const debits =
+					(userWallet.pendingDebits || 0) +
+					parseInt(eventWebHookDTO.data.incomingAmount.value);
+				const userWalletParams = {
+					Key: {
+						Id: userWallet.id,
+					},
+					TableName: 'Wallets',
+					UpdateExpression: 'SET PendingDebits = :pendingDebits',
+					ExpressionAttributeValues: {
+						':pendingDebits': debits,
+					},
+					ReturnValues: 'ALL_NEW',
+				};
+				await docClient.update(userWalletParams).promise();
+			}
+
 			const result = await docClient.update(params).promise();
+
 			return convertToCamelCase(result);
 		} catch (error) {
 			Sentry.captureException(error);
