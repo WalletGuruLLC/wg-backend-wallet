@@ -35,7 +35,10 @@ export class OutGoingPaymentCreatedEvent implements EventWebHook {
 		};
 
 		try {
-			const result = await docClient.update(params).promise();
+			if (!eventWebHookDTO?.data?.metadata?.type) {
+				await docClient.update(params).promise();
+			}
+
 			const incomingPayment = await this.walletService.getIncomingPayment(
 				incomingPaymentId
 			);
@@ -46,8 +49,6 @@ export class OutGoingPaymentCreatedEvent implements EventWebHook {
 					);
 				}, 500);
 			}
-
-			return convertToCamelCase(result);
 		} catch (error) {
 			Sentry.captureException(error);
 			throw new Error(

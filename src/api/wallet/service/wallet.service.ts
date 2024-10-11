@@ -1106,8 +1106,10 @@ export class WalletService {
 			TableName: 'UserIncoming',
 			IndexName: 'UserIdIndex',
 			KeyConditionExpression: `UserId = :userId`,
+			FilterExpression: 'Status = :status',
 			ExpressionAttributeValues: {
 				':userId': userId,
+				':status': true,
 			},
 		};
 
@@ -1117,6 +1119,28 @@ export class WalletService {
 		} catch (error) {
 			Sentry.captureException(error);
 			throw new Error(`Error fetching wallet by userId: ${error.message}`);
+		}
+	}
+
+	async getUserIncomingPaymentById(incomingPaymentId: string) {
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'UserIncoming',
+			IndexName: 'IncomingPaymentIdIndex',
+			KeyConditionExpression: `IncomingPaymentId = :incomingPaymentId`,
+			ExpressionAttributeValues: {
+				':incomingPaymentId': incomingPaymentId,
+			},
+		};
+
+		try {
+			const result = await docClient.query(params).promise();
+			return convertToCamelCase(result?.Items?.[0]);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new Error(
+				`Error fetching incoming payment by userId: ${error.message}`
+			);
 		}
 	}
 
@@ -1310,6 +1334,26 @@ export class WalletService {
 		} catch (error) {
 			Sentry.captureException(error);
 			throw new Error(`Error fetching wallet by address: ${error.message}`);
+		}
+	}
+
+	async getWalletByUser(userId: string) {
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'Wallets',
+			IndexName: 'UserIdIndex',
+			KeyConditionExpression: `UserId  = :userId`,
+			ExpressionAttributeValues: {
+				':userId': userId,
+			},
+		};
+
+		try {
+			const result = await docClient.query(params).promise();
+			return convertToCamelCase(result.Items?.[0]);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new Error(`Error fetching wallet by user: ${error.message}`);
 		}
 	}
 
