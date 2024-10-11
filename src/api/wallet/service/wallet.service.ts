@@ -1120,6 +1120,30 @@ export class WalletService {
 		}
 	}
 
+	async getUserIncomingPaymentById(incomingPaymentId: string) {
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'UserIncoming',
+			IndexName: 'IncomingPaymentIdIndex',
+			KeyConditionExpression: `IncomingPaymentId = :incomingPaymentId`,
+			FilterExpression: 'Status = :status',
+			ExpressionAttributeValues: {
+				':incomingPaymentId': incomingPaymentId,
+				':status': true,
+			},
+		};
+
+		try {
+			const result = await docClient.query(params).promise();
+			return convertToCamelCase(result?.Items?.[0]);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new Error(
+				`Error fetching incoming payment by userId: ${error.message}`
+			);
+		}
+	}
+
 	async getIncomingPaymentById(incomingPaymentId: string) {
 		try {
 			const incomingPayment = await this.graphqlService.getIncomingPayment(
