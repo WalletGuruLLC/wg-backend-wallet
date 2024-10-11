@@ -151,7 +151,7 @@ export class AuthGateway
 		return { event: 'response', data: 'Authentication processed.' };
 	}
 
-	@SubscribeMessage('play')
+	@SubscribeMessage('activity')
 	async handlePlay(client: Socket, data: any): Promise<WsResponse<string>> {
 		const headers = client.handshake.headers;
 		const parsedData = JSON.parse(data);
@@ -160,8 +160,15 @@ export class AuthGateway
 			headers['public-key']?.toString();
 		const nonceData =
 			parsedData['x-nonce']?.toString() || headers['nonce']?.toString();
-		const sessionIdData = parsedData.sessionId?.toString();
-
+		const activityId = parsedData.activityId?.toString();
+		const paymentType = parsedData.paymentType?.toString();
+		const action = parsedData.action?.toString();
+		const wgUserId = parsedData.wgUserId?.toString();
+		const objectSecret = await this.authService.getServiceProviderWihtPublicKey(
+			publicKeyData
+		);
+		console.log(objectSecret);
+		let serviceProviderId = objectSecret?.ServiceProviderId;
 		if (!publicKeyData) {
 			client.emit('error', {
 				message: 'Public key missing!',
@@ -180,23 +187,27 @@ export class AuthGateway
 				sessionId: '',
 			});
 			client.disconnect();
-			this.logger.error(`Client ${client.id} failed to authenticate.`);
+			this.logger.error(`Client ${client.id} failed to authenticate. in activity`);
 		}
-		if (!sessionIdData) {
+		if (!activityId) {
 			client.emit('error', {
-				message: 'You need send session id',
+				message: 'You need send activity id',
 				statusCode: 'WGE0152',
 				sessionId: '',
 			});
 			client.disconnect();
-			this.logger.error(`Client ${client.id} failed to authenticate.`);
+			this.logger.error(`Client ${client.id} failed to authenticate. in activity`);
 		}
+		const data_aux = { ...parsedData };
+		delete data_aux['x-nonce'];
+		delete data_aux['x-public-key'];
+		delete data_aux['x-timestamp'];
 		const timestamp = Math.floor(new Date().getTime() / 1000);
 		const tokenPromises = [];
 
 		for (let i = -5; i <= 5; i++) {
 			tokenPromises.push(
-				this.authService.generateToken({}, `${timestamp + i}`, publicKeyData)
+				this.authService.generateToken(data_aux, `${timestamp + i}`, publicKeyData)
 			);
 		}
 
@@ -204,10 +215,9 @@ export class AuthGateway
 
 		if (validTokenRange.includes(nonceData)) {
 			const responsePlay = await this.authService.processParameterFlow(
-				parsedData['parameter-id']?.toString(),
-				parsedData['token']?.toString(),
+				paymentType,
 				parsedData['wallet-address-id']?.toString(),
-				parsedData['service-provider-id']?.toString()
+				serviceProviderId,
 			);
 			if (responsePlay?.action == 'hc') {
 				setTimeout(() => {
@@ -226,7 +236,7 @@ export class AuthGateway
 			}
 		} else {
 			client.disconnect();
-			this.logger.error(`Client ${client.id} failed to authenticate.`);
+			this.logger.error(`Client ${client.id} failed to authenticate. in activity`);
 		}
 		return { event: 'response', data: 'Stop processed.' };
 	}

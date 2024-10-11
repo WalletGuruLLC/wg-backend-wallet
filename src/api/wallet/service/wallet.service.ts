@@ -43,6 +43,7 @@ export class WalletService {
 	private dbRates: Model<Rates>;
 	private dbUserIncoming: Model<UserIncomingPayment>;
 	private readonly AUTH_MICRO_URL: string;
+	private readonly APP_SECRET: string;
 	private readonly DOMAIN_WALLET_URL: string;
 
 	constructor(
@@ -66,6 +67,7 @@ export class WalletService {
 		);
 		this.dbRates = dynamoose.model<Rates>('Rates', RatesSchema);
 		this.AUTH_MICRO_URL = this.configService.get<string>('AUTH_URL');
+		this.APP_SECRET = this.configService.get<string>('APP_SECRET');
 		this.DOMAIN_WALLET_URL = this.configService.get<string>(
 			'DOMAIN_WALLET_URL',
 			'https://cloud-nine-wallet-backend/accounts'
@@ -844,7 +846,7 @@ export class WalletService {
 	async expireDate() {
 		const fechaActual = new Date();
 		fechaActual.setMonth(fechaActual.getMonth() + 1);
-		return fechaActual.toISOString();
+		return `${fechaActual.toISOString()}`;
 	}
 
 	async createIncomingPayment(
@@ -854,6 +856,7 @@ export class WalletService {
 	) {
 		try {
 			const expireDate = await this.expireDate();
+			console.log('expireDate', expireDate);
 			const updateInput = {
 				metadata: {
 					description: '',
@@ -866,9 +869,8 @@ export class WalletService {
 					value: input.incomingAmount,
 				},
 				walletAddressUrl: input.walletAddressUrl,
-				expiresAt: expireDate,
+				// expiresAt: expireDate, //TODO: uncomment when the expire date is fixed
 			};
-
 			const balance =
 				userWallet?.walletDb?.postedCredits -
 				(userWallet?.walletDb?.pendingDebits +
@@ -954,6 +956,20 @@ export class WalletService {
 		hmac.update(payload);
 		const digest = hmac.digest('hex');
 		return `${digest}`;
+	}
+
+	async getServiceProviderWihtPublicKey(
+		publicKey: string
+	): Promise<any> {
+		const socket = await this.dbInstanceSocket
+			.scan('PublicKey')
+			.eq(publicKey)
+			.exec();
+		const objectSecret = socket?.[0];
+		if (!objectSecret) {
+			return '';
+		}
+		return objectSecret;
 	}
 
 	verifyToken(token: string, body: any, secret: string): boolean {
@@ -1100,35 +1116,39 @@ export class WalletService {
 
 	async validatePaymentParameterId(
 		paymentId: string,
-		token: string,
 		serviceProviderId: string
 	) {
-		const response = await axios.get(
-			this.AUTH_MICRO_URL +
+		try {
+			console.log('Bearer ' + this.APP_SECRET)
+			const response = await axios.get(
+				this.AUTH_MICRO_URL +
 				`/api/v1/providers/list/payment-parameters?items=10&serviceProviderId=${serviceProviderId}`,
-			{
-				headers: {
-					Authorization: token,
-				},
-			}
-		);
+				{
+					headers: {
+						Authorization: 'Bearer ' + this.APP_SECRET,
+					},
+				}
+			);
+			console.log('response', response.data)
 
-		const parameters = response?.data?.data?.paymentParameters;
+			const parameters = response?.data?.data?.paymentParameters;
 
-		const assetValue = await this.filterParameterById(parameters, paymentId);
-
-		return assetValue?.id ? assetValue : {};
+			const assetValue = await this.filterParameterById(parameters, paymentId);
+			console.log(assetValue)
+			return assetValue?.id ? assetValue : {};
+		}catch (error) {
+			console.log('error', error.message)
+		}
+		return {};
 	}
 
 	async processParameterFlow(
 		parameterId,
-		token,
 		walletAddressId,
 		serviceProviderId
 	) {
 		const parameterExists = await this.validatePaymentParameterId(
 			parameterId,
-			token,
 			serviceProviderId
 		);
 

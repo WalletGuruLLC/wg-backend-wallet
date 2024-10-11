@@ -597,7 +597,6 @@ export class RafikiWalletController {
 			await instanceVerifier.verify(token.toString().split(' ')[1]);
 		} catch (error) {
 			Sentry.captureException(error);
-
 			return res.status(HttpStatus.UNAUTHORIZED).send({
 				statusCode: HttpStatus.UNAUTHORIZED,
 				customCode: 'WGE0021',
