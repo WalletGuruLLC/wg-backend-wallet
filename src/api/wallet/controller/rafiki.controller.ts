@@ -47,16 +47,24 @@ import { v4 as uuidv4 } from 'uuid';
 import { convertToCamelCase } from 'src/utils/helpers/convertCamelCase';
 import { CreatePaymentDTO } from '../dto/create-payment-rafiki.dto';
 import { AuthGateway } from '../service/websocket';
+import axios from 'axios';
+import { ConfigService } from '@nestjs/config';
+import { adjustValue } from 'src/utils/helpers/generalAdjustValue';
 
 @ApiTags('wallet-rafiki')
 @Controller('api/v1/wallets-rafiki')
 @ApiBearerAuth('JWT')
 export class RafikiWalletController {
+	private readonly AUTH_MICRO_URL: string;
+
 	constructor(
 		private readonly walletService: WalletService,
 		private readonly verifyService: VerifyService,
-		private readonly authGateway: AuthGateway
-	) {}
+		private readonly authGateway: AuthGateway,
+		private configService: ConfigService
+	) {
+		this.AUTH_MICRO_URL = this.configService.get<string>('AUTH_URL');
+	}
 
 	@Post('address')
 	@ApiOperation({ summary: 'Create a new wallet address' })
@@ -353,15 +361,200 @@ export class RafikiWalletController {
 	})
 	@ApiResponse({ status: 400, description: 'Bad Request' })
 	async createTransaction(
+		@Headers() headers: MapOfStringToList,
 		@Body() input: ReceiverInputDTO,
 		@Req() req,
 		@Res() res
 	) {
 		try {
+			let token;
+			try {
+				token = headers.authorization ?? '';
+				const instanceVerifier = await this.verifyService.getVerifiedFactory();
+				await instanceVerifier.verify(token.toString().split(' ')[1]);
+			} catch (error) {
+				Sentry.captureException(error);
+				throw new HttpException(
+					{
+						statusCode: HttpStatus.UNAUTHORIZED,
+						customCode: 'WGE0021',
+						customMessage: errorCodes.WGE0021?.description,
+						customMessageEs: errorCodes.WGE0021?.descriptionEs,
+					},
+					HttpStatus.UNAUTHORIZED
+				);
+			}
+
+			let userInfo = await axios.get(
+				this.AUTH_MICRO_URL + '/api/v1/users/current-user',
+				{
+					headers: {
+						Authorization: token,
+					},
+				}
+			);
+			userInfo = userInfo.data;
+
+			const userId = userInfo?.data?.id;
+
+			const userWallet = await this.walletService.getWalletByRafikyId(
+				input.walletAddressId
+			);
+
+			if (!userWallet) {
+				return res.status(HttpStatus.NOT_FOUND).send({
+					statusCode: HttpStatus.NOT_FOUND,
+					customCode: 'WGE0074',
+				});
+			}
+
+			const userWalletByToken = convertToCamelCase(
+				await this.walletService.getWalletByToken(token)
+			);
+
+			if (userWalletByToken?.walletDb?.userId !== userWallet?.userId) {
+				return res.status(HttpStatus.UNAUTHORIZED).send({
+					statusCode: HttpStatus.UNAUTHORIZED,
+					customCode: 'WGE0021',
+				});
+			}
+
 			await addApiSignatureHeader(req, req.body);
 			const inputReceiver = {
-				metadata: input.metadata,
-				incomingAmount: input.incomingAmount,
+				metadata: {
+					type: 'USER',
+					wgUser: userId,
+					description: '',
+				},
+				incomingAmount: {
+					assetCode: userWalletByToken?.walletAsset?.code,
+					assetScale: userWalletByToken?.walletAsset?.scale,
+					value: adjustValue(
+						input?.amount,
+						userWalletByToken?.walletAsset?.scale
+					),
+				},
+				walletAddressUrl: input.walletAddressUrl,
+			};
+
+			console.log('inputReceiver', inputReceiver);
+			const receiver = await this.walletService.createReceiver(inputReceiver);
+			const quoteInput = {
+				walletAddressId: input?.walletAddressId,
+				receiver: receiver?.createReceiver?.receiver?.id,
+			};
+
+			setTimeout(async () => {
+				const quote = await this.walletService.createQuote(quoteInput);
+				const inputOutgoing = {
+					walletAddressId: input?.walletAddressId,
+					quoteId: quote?.createQuote?.quote?.id,
+				};
+				const outgoingPayment = await this.walletService.createOutgoingPayment(
+					inputOutgoing
+				);
+
+				await this.walletService.sendMoneyMailConfirmation(
+					inputOutgoing,
+					outgoingPayment
+				);
+
+				return res.status(200).send({
+					data: outgoingPayment,
+					customCode: 'WGE0150',
+				});
+			}, 500);
+		} catch (error) {
+			console.log('error', error?.message);
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0151',
+			});
+		}
+	}
+
+	@Post('service-provider-link')
+	@ApiOperation({ summary: 'Create a transaction to link service provider' })
+	@ApiResponse({
+		status: 201,
+		description: 'transaction created successfully.',
+	})
+	@ApiResponse({ status: 400, description: 'Bad Request' })
+	async linkTransactionProvider(
+		@Headers() headers: MapOfStringToList,
+		@Body() input: ReceiverInputDTO,
+		@Req() req,
+		@Res() res
+	) {
+		try {
+			let token;
+			try {
+				token = headers.authorization ?? '';
+				const instanceVerifier = await this.verifyService.getVerifiedFactory();
+				await instanceVerifier.verify(token.toString().split(' ')[1]);
+			} catch (error) {
+				Sentry.captureException(error);
+				throw new HttpException(
+					{
+						statusCode: HttpStatus.UNAUTHORIZED,
+						customCode: 'WGE0021',
+						customMessage: errorCodes.WGE0021?.description,
+						customMessageEs: errorCodes.WGE0021?.descriptionEs,
+					},
+					HttpStatus.UNAUTHORIZED
+				);
+			}
+
+			let userInfo = await axios.get(
+				this.AUTH_MICRO_URL + '/api/v1/users/current-user',
+				{
+					headers: {
+						Authorization: token,
+					},
+				}
+			);
+			userInfo = userInfo.data;
+
+			const userId = userInfo?.data?.id;
+
+			const userWallet = await this.walletService.getWalletByRafikyId(
+				input.walletAddressId
+			);
+
+			if (!userWallet) {
+				return res.status(HttpStatus.NOT_FOUND).send({
+					statusCode: HttpStatus.NOT_FOUND,
+					customCode: 'WGE0074',
+				});
+			}
+
+			const userWalletByToken = convertToCamelCase(
+				await this.walletService.getWalletByToken(token)
+			);
+
+			if (userWalletByToken?.walletDb?.userId !== userWallet?.userId) {
+				return res.status(HttpStatus.UNAUTHORIZED).send({
+					statusCode: HttpStatus.UNAUTHORIZED,
+					customCode: 'WGE0021',
+				});
+			}
+
+			await addApiSignatureHeader(req, req.body);
+			const inputReceiver = {
+				metadata: {
+					type: 'LINK',
+					wgUser: userId,
+					description: '',
+				},
+				incomingAmount: {
+					assetCode: userWalletByToken?.walletAsset?.code,
+					assetScale: userWalletByToken?.walletAsset?.scale,
+					value: adjustValue(
+						input?.amount,
+						userWalletByToken?.walletAsset?.scale
+					),
+				},
 				walletAddressUrl: input.walletAddressUrl,
 			};
 
