@@ -163,6 +163,17 @@ export class WalletController {
 				});
 			}
 
+			const urlRegex = /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*\.[^\s]{2,}$/i;
+			if (
+				updateWalletDto.walletAddress &&
+				!urlRegex.test(updateWalletDto.walletAddress)
+			) {
+				return res.status(HttpStatus.NOT_FOUND).send({
+					statusCode: HttpStatus.NOT_FOUND,
+					customCode: 'WGE0084',
+				});
+			}
+
 			if (updateWalletDto?.walletAddress) {
 				const walletAddresFind = await this.walletService.findWalletByUrl(
 					updateWalletDto?.walletAddress

@@ -209,24 +209,11 @@ export class WalletService {
 		updateWalletDto: UpdateWalletDto
 	): Promise<Wallet | null> {
 		try {
-			const urlRegex = /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*\.[^\s]{2,}$/i;
-			if (!urlRegex.test(updateWalletDto.walletAddress)) {
-				throw new HttpException(
-					{
-						statusCode: HttpStatus.BAD_REQUEST,
-						customCode: 'WGE0084',
-						customMessage: errorCodes.WGE0084?.description,
-						customMessageEs: errorCodes.WGE0084?.descriptionEs,
-					},
-					HttpStatus.BAD_REQUEST
-				);
-			}
-
 			const updateWalletDtoConverted = {
 				Id: id,
-				Name: updateWalletDto.name.trim(),
-				WalletType: updateWalletDto.walletType.trim(),
-				WalletAddress: updateWalletDto.walletAddress.trim(),
+				Name: updateWalletDto?.name?.trim(),
+				WalletType: updateWalletDto?.walletType?.trim(),
+				WalletAddress: updateWalletDto?.walletAddress?.trim(),
 			};
 
 			const updateObject = Object.entries(updateWalletDtoConverted).reduce(
