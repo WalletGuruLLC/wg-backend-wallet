@@ -209,24 +209,11 @@ export class WalletService {
 		updateWalletDto: UpdateWalletDto
 	): Promise<Wallet | null> {
 		try {
-			const urlRegex = /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*\.[^\s]{2,}$/i;
-			if (!urlRegex.test(updateWalletDto.walletAddress)) {
-				throw new HttpException(
-					{
-						statusCode: HttpStatus.BAD_REQUEST,
-						customCode: 'WGE0084',
-						customMessage: errorCodes.WGE0084?.description,
-						customMessageEs: errorCodes.WGE0084?.descriptionEs,
-					},
-					HttpStatus.BAD_REQUEST
-				);
-			}
-
 			const updateWalletDtoConverted = {
 				Id: id,
-				Name: updateWalletDto.name.trim(),
-				WalletType: updateWalletDto.walletType.trim(),
-				WalletAddress: updateWalletDto.walletAddress.trim(),
+				Name: updateWalletDto?.name?.trim(),
+				WalletType: updateWalletDto?.walletType?.trim(),
+				WalletAddress: updateWalletDto?.walletAddress?.trim(),
 			};
 
 			const updateObject = Object.entries(updateWalletDtoConverted).reduce(
@@ -383,6 +370,19 @@ export class WalletService {
 			walletDb: walletById?.[0]?.RafikiId,
 			walletAsset: walletInfo.data.walletAddress.asset,
 		};
+	}
+
+	async findWalletByUrl(address: string): Promise<any> {
+		const walletByUrl = await this.dbInstance
+			.scan('WalletAddress')
+			.eq(address)
+			.exec();
+		return walletByUrl[0];
+	}
+
+	async findWalletByName(name: string): Promise<any> {
+		const walletByName = await this.dbInstance.scan('Name').eq(name).exec();
+		return walletByName[0];
 	}
 
 	async getWalletAddressExist(address: string) {
