@@ -162,6 +162,31 @@ export class WalletController {
 					customCode: 'WGE0074',
 				});
 			}
+
+			if (updateWalletDto?.walletAddress) {
+				const walletAddresFind = await this.walletService.findWalletByUrl(
+					updateWalletDto?.walletAddress
+				);
+				if (walletAddresFind) {
+					return res.status(HttpStatus.NOT_FOUND).send({
+						statusCode: HttpStatus.NOT_FOUND,
+						customCode: 'WGE0201',
+					});
+				}
+			}
+
+			if (updateWalletDto?.name) {
+				const walletNameFind = await this.walletService.findWalletByName(
+					updateWalletDto?.name
+				);
+				if (walletNameFind) {
+					return res.status(HttpStatus.NOT_FOUND).send({
+						statusCode: HttpStatus.NOT_FOUND,
+						customCode: 'WGE0202',
+					});
+				}
+			}
+
 			const walletUpdated = await this.walletService.update(
 				id,
 				updateWalletDto

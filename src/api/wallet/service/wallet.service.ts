@@ -385,6 +385,19 @@ export class WalletService {
 		};
 	}
 
+	async findWalletByUrl(address: string): Promise<any> {
+		const walletByUrl = await this.dbInstance
+			.scan('WalletAddress')
+			.eq(address)
+			.exec();
+		return walletByUrl[0];
+	}
+
+	async findWalletByName(name: string): Promise<any> {
+		const walletByName = await this.dbInstance.scan('Name').eq(name).exec();
+		return walletByName[0];
+	}
+
 	async getWalletAddressExist(address: string) {
 		const wallets = await this.dbInstance
 			.scan('WalletAddress')
