@@ -28,13 +28,8 @@ export class MetadataDTO {
 }
 
 export class ReceiverInputDTO {
-	@ValidateNested()
-	@Type(() => MetadataDTO)
-	metadata: MetadataDTO;
-
-	@ValidateNested()
-	@Type(() => IncomingAmountDTO)
-	incomingAmount: IncomingAmountDTO;
+	@IsNumber()
+	amount: number;
 
 	@IsString()
 	@IsNotEmpty()
