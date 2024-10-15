@@ -904,6 +904,11 @@ export class RafikiWalletController {
 			);
 
 			if (incomingPayment?.action == 'hc') {
+				this.authGateway.server.emit(incomingPayment?.action, {
+					message: 'Payment request accepted',
+					statusCode: 'WGS0054',
+				});
+
 				return res.status(HttpStatus.OK).send({
 					statusCode: HttpStatus.OK,
 					customCode: 'WGE0210',
