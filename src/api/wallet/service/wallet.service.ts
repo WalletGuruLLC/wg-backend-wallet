@@ -1524,7 +1524,7 @@ export class WalletService {
 				value: valueFormatted / pow,
 				asset:
 					outGoingPayment.createOutgoingPayment.payment.receiveAmount.assetCode,
-				walletAddress: walletInfo.walletAddress.split('/').pop(),
+				walletAddress: walletInfo.walletAddress,
 				date: formattedDate,
 			};
 
@@ -1572,7 +1572,7 @@ export class WalletService {
 			const receiverValue = {
 				value: valueReceiverFormatted / pow,
 				asset: incomingPayment.incomingAmount.assetCode,
-				walletAddress: receiverInfo.walletAddress.split('/').pop(),
+				walletAddress: receiverInfo.walletAddress,
 				date: receiverDateFormatted,
 			};
 
