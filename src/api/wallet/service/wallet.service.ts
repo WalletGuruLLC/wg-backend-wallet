@@ -1566,7 +1566,7 @@ export class WalletService {
 			};
 
 			const sqsMsg = {
-				event: 'SEND_MONEY_CONFIRMATION',
+				event: 'RECEIVE_MONEY_CONFIRMATION',
 				email: receiver.Item.Email,
 				username:
 					receiver.Item.FirstName +
