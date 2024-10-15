@@ -1514,17 +1514,25 @@ export class WalletService {
 
 			const formattedDate = `${day}/${month}/${year} - ${hours}:${minutes}`;
 
+			const valueFormatted = parseInt(
+				outGoingPayment.createOutgoingPayment.payment.receiveAmount.value
+			);
+			const pow = Math.pow(
+				10,
+				parseInt(
+					outGoingPayment.createOutgoingPayment.payment.receiveAmount.assetScale
+				)
+			);
 			const value = {
-				value:
-					outGoingPayment.createOutgoingPayment.payment.receiveAmount.value,
+				value: valueFormatted / pow,
 				asset:
 					outGoingPayment.createOutgoingPayment.payment.receiveAmount.assetCode,
-				walletAddress: walletInfo.walletAddress.split('/')[4],
+				walletAddress: walletInfo.walletAddress,
 				date: formattedDate,
 			};
 
 			const sqsMessage = {
-				event: 'RECEIVE_MONEY_CONFIRMATION',
+				event: 'SEND_MONEY_CONFIRMATION',
 				email: result.Item.Email,
 				username:
 					result.Item.FirstName +
@@ -1561,15 +1569,18 @@ export class WalletService {
 
 			const receiverDateFormatted = `${receiverDay}/${receiverMonth}/${receiverYear} - ${receiverHours}:${receiverMinutes}`;
 
+			const valueReceiverFormatted = parseInt(
+				incomingPayment.incomingAmount.value
+			);
 			const receiverValue = {
-				value: incomingPayment.incomingAmount.value,
+				value: valueReceiverFormatted / pow,
 				asset: incomingPayment.incomingAmount.assetCode,
-				walletAddress: receiverInfo.walletAddress.split('/')[4],
+				walletAddress: receiverInfo.walletAddress,
 				date: receiverDateFormatted,
 			};
 
 			const sqsMsg = {
-				event: 'SEND_MONEY_CONFIRMATION',
+				event: 'RECEIVE_MONEY_CONFIRMATION',
 				email: receiver.Item.Email,
 				username:
 					receiver.Item.FirstName +
