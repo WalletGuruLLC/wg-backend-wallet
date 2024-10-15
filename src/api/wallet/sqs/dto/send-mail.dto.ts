@@ -3,7 +3,7 @@ export class sendMailDto {
 	email: string;
 	username: string;
 	value: {
-		value: string;
+		value: number;
 		asset: string;
 		walletAddress: string;
 		date: string;
