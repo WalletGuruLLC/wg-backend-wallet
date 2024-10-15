@@ -1201,7 +1201,10 @@ export class WalletService {
 			TableName: 'UserIncoming',
 			IndexName: 'UserIdIndex',
 			KeyConditionExpression: `UserId = :userId`,
-			FilterExpression: 'Status = :status',
+			FilterExpression: '#status = :status',
+			ExpressionAttributeNames: {
+				'#status': 'Status',
+			},
 			ExpressionAttributeValues: {
 				':userId': userId,
 				':status': true,
