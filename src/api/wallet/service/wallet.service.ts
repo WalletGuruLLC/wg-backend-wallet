@@ -33,12 +33,20 @@ import { UserIncomingPayment } from '../entities/user-incoming.entity';
 import { UserIncomingSchema } from '../entities/user-incoming.schema';
 import { CreatePaymentDTO } from '../dto/create-payment-rafiki.dto';
 import { adjustValueByCurrency } from 'src/utils/helpers/adjustValueCurrecy';
+import { Transaction, TransactionType } from '../entities/transactions.entity';
+import { TransactionsSchema } from '../entities/transactions.schema';
+import { User } from '../entities/user.entity';
+import { UserSchema } from '../entities/user.schema';
+import { adjustValue } from 'src/utils/helpers/generalAdjustValue';
+import { calcularTotalCosto } from 'src/utils/helpers/calcularTotalTransactionPlat';
 
 @Injectable()
 export class WalletService {
 	private dbInstance: Model<Wallet>;
 	private dbInstanceSocket: Model<SocketKey>;
 	private dbIncomingUser: Model<UserIncomingPayment>;
+	private dbTransactions: Model<Transaction>;
+	private dbUserInstance: Model<User>;
 	private dbRates: Model<Rates>;
 	private dbUserIncoming: Model<UserIncomingPayment>;
 	private readonly AUTH_MICRO_URL: string;
@@ -49,6 +57,7 @@ export class WalletService {
 		private readonly graphqlService: GraphqlService,
 		private readonly sqsService: SqsService
 	) {
+		this.dbUserInstance = dynamoose.model<User>('Users', UserSchema);
 		this.dbIncomingUser = dynamoose.model<UserIncomingPayment>(
 			'UserIncoming',
 			UserIncomingSchema
@@ -62,6 +71,10 @@ export class WalletService {
 		this.dbUserIncoming = dynamoose.model<UserIncomingPayment>(
 			'UserIncoming',
 			UserIncomingSchema
+		);
+		this.dbTransactions = dynamoose.model<Transaction>(
+			'Transactions',
+			TransactionsSchema
 		);
 		this.dbRates = dynamoose.model<Rates>('Rates', RatesSchema);
 		this.AUTH_MICRO_URL = this.configService.get<string>('AUTH_URL');
@@ -931,7 +944,10 @@ export class WalletService {
 				incomingAmount: {
 					assetCode: userWallet?.walletAsset?.code,
 					assetScale: userWallet?.walletAsset?.scale,
-					value: input.incomingAmount,
+					value: adjustValue(
+						input.incomingAmount,
+						userWallet?.walletAsset?.scale
+					),
 				},
 				walletAddressUrl: input.walletAddressUrl,
 				// expiresAt: expireDate, //TODO: uncomment when the expire date is fixed
@@ -965,6 +981,25 @@ export class WalletService {
 				IncomingPaymentId: incomingPaymentId,
 				ReceiverId: incomingPayment?.createReceiver?.receiver?.id,
 			};
+
+			await this.dbTransactions.create({
+				Type: 'IncomingPayment',
+				IncomingPaymentId: incomingPaymentId,
+				WalletAddressId: incomingPayment?.createReceiver?.receiver?.id,
+				State: incomingPayment?.createReceiver?.receiver?.state ?? 'PENDING',
+				IncomingAmount: {
+					_Typename: 'Amount',
+					value:
+						incomingPayment?.createReceiver?.receiver?.incomingAmount?.value,
+					assetCode:
+						incomingPayment?.createReceiver?.receiver?.incomingAmount
+							?.assetCode,
+					assetScale:
+						incomingPayment?.createReceiver?.receiver?.incomingAmount
+							?.assetScale,
+				},
+				Description: '',
+			});
 
 			return await this.dbUserIncoming.create(userIncomingPayment);
 		} catch (error) {
@@ -1401,7 +1436,12 @@ export class WalletService {
 			receiver: incomingPayment?.[0]?.ReceiverId,
 			receiveAmount: {
 				value: adjustValueByCurrency(
-					parameterExists?.cost,
+					calcularTotalCosto(
+						parameterExists?.base,
+						parameterExists?.comision,
+						parameterExists?.cost,
+						parameterExists?.percent
+					),
 					walletAsset?.code ?? 'USD'
 				),
 				assetCode: walletAsset?.asset ?? 'USD',
@@ -1434,6 +1474,25 @@ export class WalletService {
 		};
 
 		const outgoing = await this.createOutgoingPayment(inputOutgoing);
+
+		await this.dbTransactions.create({
+			Type: 'OutgoingPayment',
+			OutgoingPaymentId: outgoing?.createOutgoingPayment?.payment?.id,
+			WalletAddressId:
+				outgoing?.createOutgoingPayment?.payment?.walletAddressId,
+			State: outgoing?.createOutgoingPayment?.payment?.state,
+			Metadata: outgoing?.createOutgoingPayment?.payment?.metadata,
+			Receiver: outgoing?.createOutgoingPayment?.payment?.receiver,
+			ReceiveAmount: {
+				_Typename: 'Amount',
+				value: outgoing?.createOutgoingPayment?.payment?.receiveAmount?.value,
+				assetCode:
+					outgoing?.createOutgoingPayment?.payment?.receiveAmount?.assetCode,
+				assetScale:
+					outgoing?.createOutgoingPayment?.payment?.receiveAmount?.assetScale,
+			},
+			Description: '',
+		});
 
 		return {
 			action: 'hc',
@@ -1673,5 +1732,103 @@ export class WalletService {
 				`Error creating deposit outoing mutation: ${error.message}`
 			);
 		}
+	}
+
+	async listTransactionsDynamo(token: string, search: string) {
+		if (!search) {
+			search = 'all';
+		}
+
+		const walletDb = await this.getUserByToken(token);
+		const walletAddressId = walletDb.RafikiId;
+
+		const transactions = await this.dbTransactions.scan().exec();
+
+		const outgoingArray = transactions.filter(
+			transaction =>
+				transaction.WalletAddressId === walletAddressId &&
+				transaction.Type === 'OutgoingPayment'
+		);
+
+		const incomingArray = transactions.filter(
+			transaction =>
+				transaction.WalletAddressId === walletAddressId &&
+				transaction.Type === 'IncomingPayment'
+		);
+
+		const outgoingProcessed: any[] = outgoingArray.map(object => ({
+			type: object.Type,
+			outgoingPaymentId: object.OutgoingPaymentId,
+			walletAddressId: object.WalletAddressId,
+			state: object.State,
+			metadata: object.Metadata,
+			receiver: object.Receiver,
+			receiveAmount: object.ReceiveAmount,
+			createdAt: object.CreatedAt,
+		}));
+
+		const incomingProcessed: any[] = incomingArray.map(object => ({
+			type: object.Type,
+			incomingPaymentId: object.IncomingPaymentId,
+			walletAddressId: object.WalletAddressId,
+			state: object.State,
+			incomingAmount: object.IncomingAmount,
+			createdAt: object.CreatedAt,
+		}));
+
+		const combinedArray: TransactionType[] =
+			incomingProcessed.concat(outgoingProcessed);
+
+		const incomingSorted = incomingProcessed.sort(
+			(a, b) =>
+				new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+		);
+
+		const outgoingSorted = outgoingProcessed.sort(
+			(a, b) =>
+				new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+		);
+
+		const combinedSorted = combinedArray.sort(
+			(a, b) =>
+				new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+		);
+
+		if (search === 'credit') {
+			return convertToCamelCase(incomingSorted);
+		} else if (search === 'debit') {
+			return convertToCamelCase(outgoingSorted);
+		} else {
+			return convertToCamelCase(combinedSorted);
+		}
+	}
+
+	async updateListServiceProviders(id: string, address: string) {
+		const wallet = await this.findWalletByUrl(address);
+		const serviceProvider = wallet?.ProviderId;
+		const user = await this.dbUserInstance.get({ Id: id });
+
+		if (!user) {
+			throw new Error(`User with ID ${id} not found`);
+		}
+
+		const linkedProviders: string[] = user.LinkedServiceProviders ?? [];
+
+		if (linkedProviders.includes(serviceProvider)) {
+			throw new Error(`ServiceProvider ${serviceProvider} already linked`);
+		}
+
+		linkedProviders.push(serviceProvider);
+
+		const updatedUser = await this.dbUserInstance.update({
+			Id: id,
+			LinkedServiceProviders: linkedProviders,
+		});
+
+		return {
+			id: updatedUser?.Id,
+			email: updatedUser?.Email,
+			linkedServiceProviders: updatedUser?.LinkedServiceProviders,
+		};
 	}
 }
