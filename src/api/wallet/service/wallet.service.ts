@@ -834,6 +834,15 @@ export class WalletService {
 				const incomingPayment = await this.getIncomingPayment(
 					userIncomingPayment?.incomingPaymentId
 				);
+				const user = await this.getWalletUserById(userWallet?.UserId);
+
+				const providerWallet = await this.getWalletByRafikyId(
+					incomingPayment.walletAddressId
+				);
+
+				const provider = await this.getWalletByProviderId(
+					providerWallet?.providerId
+				);
 
 				if (
 					incomingPayment.state !== 'COMPLETED' ||
@@ -842,7 +851,8 @@ export class WalletService {
 					const incomingConverted = {
 						type: incomingPayment.__typename,
 						id: incomingPayment.id,
-						walletAddressId: incomingPayment.walletAddressId,
+						provider: provider.name,
+						ownerUser: `${user?.firstName} ${user?.lastName}`,
 						state: incomingPayment.state,
 						incomingAmount: incomingPayment.incomingAmount,
 						createdAt: incomingPayment.createdAt,
@@ -1238,6 +1248,40 @@ export class WalletService {
 			Sentry.captureException(error);
 			throw new Error(
 				`Error fetching incoming payment by userId: ${error.message}`
+			);
+		}
+	}
+
+	async getWalletUserById(userId: string) {
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'Users',
+			Key: { Id: userId },
+		};
+
+		try {
+			const result = await docClient.get(params).promise();
+			return convertToCamelCase(result?.Item);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new Error(`Error fetching user by userId: ${error.message}`);
+		}
+	}
+
+	async getWalletByProviderId(providerId: string) {
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'Providers',
+			Key: { Id: providerId },
+		};
+
+		try {
+			const result = await docClient.get(params).promise();
+			return convertToCamelCase(result?.Item);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new Error(
+				`Error fetching provider by providerId: ${error.message}`
 			);
 		}
 	}
