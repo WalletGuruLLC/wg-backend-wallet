@@ -1516,12 +1516,12 @@ export class WalletService {
 					outGoingPayment.createOutgoingPayment.payment.receiveAmount.value,
 				asset:
 					outGoingPayment.createOutgoingPayment.payment.receiveAmount.assetCode,
-				walletAddress: walletInfo.walletAddress.split('/')[4],
+				walletAddress: walletInfo.walletAddress.split('/').pop(),
 				date: formattedDate,
 			};
 
 			const sqsMessage = {
-				event: 'RECEIVE_MONEY_CONFIRMATION',
+				event: 'SEND_MONEY_CONFIRMATION',
 				email: result.Item.Email,
 				username:
 					result.Item.FirstName +
@@ -1561,12 +1561,12 @@ export class WalletService {
 			const receiverValue = {
 				value: incomingPayment.incomingAmount.value,
 				asset: incomingPayment.incomingAmount.assetCode,
-				walletAddress: receiverInfo.walletAddress.split('/')[4],
+				walletAddress: receiverInfo.walletAddress.split('/').pop(),
 				date: receiverDateFormatted,
 			};
 
 			const sqsMsg = {
-				event: 'SEND_MONEY_CONFIRMATION',
+				event: 'RECEIVE_MONEY_CONFIRMATION',
 				email: receiver.Item.Email,
 				username:
 					receiver.Item.FirstName +
