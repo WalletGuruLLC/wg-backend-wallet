@@ -10,11 +10,9 @@ export const TransactionsSchema = new dynamoose.Schema(
 		},
 		Type: {
 			type: String,
-			required: true,
 		},
 		OutgoingPaymentId: {
 			type: String,
-			required: true,
 			index: {
 				global: true,
 				name: 'OutgoingPaymentIdIndex',
@@ -22,7 +20,6 @@ export const TransactionsSchema = new dynamoose.Schema(
 		},
 		IncomingPaymentId: {
 			type: String,
-			required: true,
 			index: {
 				global: true,
 				name: 'IncomingPaymentIdIndex',
@@ -30,7 +27,6 @@ export const TransactionsSchema = new dynamoose.Schema(
 		},
 		WalletAddressId: {
 			type: String,
-			required: true,
 			index: {
 				global: true,
 				name: 'WalletAddressIdIndex',
@@ -38,7 +34,6 @@ export const TransactionsSchema = new dynamoose.Schema(
 		},
 		State: {
 			type: String,
-			required: true,
 		},
 		Metadata: {
 			type: Object,
@@ -46,11 +41,9 @@ export const TransactionsSchema = new dynamoose.Schema(
 		},
 		Receiver: {
 			type: String,
-			required: true,
 		},
 		IncomingAmount: {
 			type: Object,
-			required: true,
 			schema: {
 				_Typename: String,
 				value: String,
@@ -60,7 +53,6 @@ export const TransactionsSchema = new dynamoose.Schema(
 		},
 		ReceiveAmount: {
 			type: Object,
-			required: true,
 			schema: {
 				_Typename: String,
 				value: String,
@@ -74,7 +66,6 @@ export const TransactionsSchema = new dynamoose.Schema(
 		},
 		Description: {
 			type: String,
-			required: true,
 		},
 	},
 	{

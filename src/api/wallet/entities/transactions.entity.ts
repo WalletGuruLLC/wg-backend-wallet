@@ -10,14 +10,14 @@ export interface Amount {
 export class Transaction extends Document {
 	Id: string;
 	Type: string;
-	OutgoingPaymentId: string;
-	IncomingPaymentId: string;
+	OutgoingPaymentId?: string;
+	IncomingPaymentId?: string;
 	WalletAddressId: string;
 	State: string;
 	Metadata?: object | null;
 	Receiver: string;
-	IncomingAmount: Amount;
-	ReceiveAmount: Amount;
+	IncomingAmount?: Amount;
+	ReceiveAmount?: Amount;
 	CreatedAt: Date;
 	Description: string;
 }

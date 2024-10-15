@@ -985,7 +985,7 @@ export class WalletService {
 				Type: 'IncomingPayment',
 				IncomingPaymentId: incomingPaymentId,
 				WalletAddressId: incomingPayment?.createReceiver?.receiver?.id,
-				State: incomingPayment?.createReceiver?.receiver?.state,
+				State: incomingPayment?.createReceiver?.receiver?.state ?? 'PENDING',
 				IncomingAmount: {
 					_Typename: 'Amount',
 					value:

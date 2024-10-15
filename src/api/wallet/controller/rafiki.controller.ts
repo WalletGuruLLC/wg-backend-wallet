@@ -467,7 +467,8 @@ export class RafikiWalletController {
 					WalletAddressId:
 						outgoingPayment?.createOutgoingPayment?.payment?.walletAddressId,
 					State: outgoingPayment?.createOutgoingPayment?.payment?.state,
-					Metadata: outgoingPayment?.createOutgoingPayment?.payment?.metadata,
+					Metadata:
+						outgoingPayment?.createOutgoingPayment?.payment?.metadata || {},
 					Receiver: outgoingPayment?.createOutgoingPayment?.payment?.receiver,
 					ReceiveAmount: {
 						_Typename: 'Amount',
@@ -813,6 +814,8 @@ export class RafikiWalletController {
 		}
 
 		try {
+			await addApiSignatureHeader(req, req.body);
+
 			const userWallet = await this.walletService.getWalletByRafikyId(
 				input.walletAddressId
 			);
