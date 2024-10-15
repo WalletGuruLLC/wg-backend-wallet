@@ -33,6 +33,7 @@ import { UserIncomingPayment } from '../entities/user-incoming.entity';
 import { UserIncomingSchema } from '../entities/user-incoming.schema';
 import { CreatePaymentDTO } from '../dto/create-payment-rafiki.dto';
 import { adjustValueByCurrency } from 'src/utils/helpers/adjustValueCurrecy';
+import { adjustValue } from 'src/utils/helpers/generalAdjustValue';
 
 @Injectable()
 export class WalletService {
@@ -931,7 +932,10 @@ export class WalletService {
 				incomingAmount: {
 					assetCode: userWallet?.walletAsset?.code,
 					assetScale: userWallet?.walletAsset?.scale,
-					value: input.incomingAmount,
+					value: adjustValue(
+						input.incomingAmount,
+						userWallet?.walletAsset?.scale
+					),
 				},
 				walletAddressUrl: input.walletAddressUrl,
 				// expiresAt: expireDate, //TODO: uncomment when the expire date is fixed
