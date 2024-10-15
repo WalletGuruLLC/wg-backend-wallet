@@ -28,13 +28,8 @@ export class MetadataDTO {
 }
 
 export class ReceiverInputDTO {
-	@ValidateNested()
-	@Type(() => MetadataDTO)
-	metadata: MetadataDTO;
-
-	@ValidateNested()
-	@Type(() => IncomingAmountDTO)
-	incomingAmount: IncomingAmountDTO;
+	@IsNumber()
+	amount: number;
 
 	@IsString()
 	@IsNotEmpty()
@@ -43,6 +38,20 @@ export class ReceiverInputDTO {
 	@IsString()
 	@IsOptional()
 	walletAddressId?: string;
+}
+
+export class LinkInputDTO {
+	@IsString()
+	@IsNotEmpty()
+	walletAddressUrl: string;
+
+	@IsString()
+	@IsOptional()
+	walletAddressId?: string;
+
+	@IsString()
+	@IsOptional()
+	sessionId?: string;
 }
 
 export class GeneralReceiverInputDTO {
