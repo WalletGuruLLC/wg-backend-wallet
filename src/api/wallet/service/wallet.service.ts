@@ -37,6 +37,7 @@ import { Transaction, TransactionType } from '../entities/transactions.entity';
 import { TransactionsSchema } from '../entities/transactions.schema';
 import { User } from '../entities/user.entity';
 import { UserSchema } from '../entities/user.schema';
+import { adjustValue } from 'src/utils/helpers/generalAdjustValue';
 
 @Injectable()
 export class WalletService {
@@ -942,7 +943,10 @@ export class WalletService {
 				incomingAmount: {
 					assetCode: userWallet?.walletAsset?.code,
 					assetScale: userWallet?.walletAsset?.scale,
-					value: input.incomingAmount,
+					value: adjustValue(
+						input.incomingAmount,
+						userWallet?.walletAsset?.scale
+					),
 				},
 				walletAddressUrl: input.walletAddressUrl,
 				// expiresAt: expireDate, //TODO: uncomment when the expire date is fixed
