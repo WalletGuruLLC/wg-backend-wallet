@@ -843,6 +843,7 @@ export class WalletService {
 						type: incomingPayment.__typename,
 						id: incomingPayment.id,
 						walletAddressId: incomingPayment.walletAddressId,
+						ownerWalletAddress: userWallet?.WalletAddress,
 						state: incomingPayment.state,
 						incomingAmount: incomingPayment.incomingAmount,
 						createdAt: incomingPayment.createdAt,
