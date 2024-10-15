@@ -207,6 +207,7 @@ export class GraphqlService {
 							assetScale
 							value
 						}
+						state
 						updatedAt
 					}
 				}

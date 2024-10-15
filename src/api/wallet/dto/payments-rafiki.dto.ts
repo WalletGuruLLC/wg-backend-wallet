@@ -40,6 +40,20 @@ export class ReceiverInputDTO {
 	walletAddressId?: string;
 }
 
+export class LinkInputDTO {
+	@IsString()
+	@IsNotEmpty()
+	walletAddressUrl: string;
+
+	@IsString()
+	@IsOptional()
+	walletAddressId?: string;
+
+	@IsString()
+	@IsOptional()
+	sessionId?: string;
+}
+
 export class GeneralReceiverInputDTO {
 	@ValidateNested()
 	@Type(() => MetadataDTO)
