@@ -38,6 +38,7 @@ import { TransactionsSchema } from '../entities/transactions.schema';
 import { User } from '../entities/user.entity';
 import { UserSchema } from '../entities/user.schema';
 import { adjustValue } from 'src/utils/helpers/generalAdjustValue';
+import { calcularTotalCosto } from 'src/utils/helpers/calcularTotalTransactionPlat';
 
 @Injectable()
 export class WalletService {
@@ -1435,7 +1436,12 @@ export class WalletService {
 			receiver: incomingPayment?.[0]?.ReceiverId,
 			receiveAmount: {
 				value: adjustValueByCurrency(
-					parameterExists?.cost,
+					calcularTotalCosto(
+						parameterExists?.base,
+						parameterExists?.comision,
+						parameterExists?.cost,
+						parameterExists?.percent
+					),
 					walletAsset?.code ?? 'USD'
 				),
 				assetCode: walletAsset?.asset ?? 'USD',
