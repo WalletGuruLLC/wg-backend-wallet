@@ -524,7 +524,11 @@ export class RafikiWalletController {
 			return res.status(HttpStatus.OK).send({
 				statusCode: HttpStatus.OK,
 				customCode: 'WGE0172',
-				data: { wallet: deposit },
+				data: {
+					wallet: {
+						walletDb: deposit,
+					},
+				},
 			});
 		} catch (error) {
 			Sentry.captureException(error);
