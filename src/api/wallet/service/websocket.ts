@@ -136,19 +136,16 @@ export class AuthGateway
 
 		if (validTokenRange.includes(nonceData)) {
 			this.logger.log(`Client ${client.id} authenticated successfully.`);
-			setTimeout(() => {
-				client.emit('hc', {
-					message: 'Account linked',
-					statusCode: 'WGS0051',
-					sessionId: sessionIdData,
-					wgUserId: '2d782139-4fa4-41f5-b1f3-b89a3a7897cc',
-				});
-			}, 2800);
+			// TODO: Guardar sessionId en la base de datos
+			client.emit('hc', {
+				message: 'Ok',
+				statusCode: 'WGS0053',
+				sessionId: sessionIdData,
+			});
 		} else {
 			client.disconnect();
 			this.logger.error(`Client ${client.id} failed to authenticate.`);
 		}
-		return { event: 'response', data: 'Authentication processed.' };
 	}
 
 	@SubscribeMessage('activity')

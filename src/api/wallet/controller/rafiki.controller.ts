@@ -6,14 +6,13 @@ import {
 	Post,
 	Get,
 	Headers,
-	UsePipes,
 	Res,
 	Query,
 	Req,
 	Param,
 	Patch,
 } from '@nestjs/common';
-
+import * as dynamoose from 'dynamoose';
 import {
 	ApiTags,
 	ApiOperation,
@@ -40,6 +39,7 @@ import {
 	DepositDTO,
 	DepositOutgoingPaymentInputDTO,
 	GeneralReceiverInputDTO,
+	LinkInputDTO,
 	ReceiverInputDTO,
 } from '../dto/payments-rafiki.dto';
 import { isValidStringLength } from 'src/utils/helpers/isValidStringLength';
@@ -50,12 +50,16 @@ import { AuthGateway } from '../service/websocket';
 import axios from 'axios';
 import { ConfigService } from '@nestjs/config';
 import { adjustValue } from 'src/utils/helpers/generalAdjustValue';
+import { Model } from 'dynamoose/dist/Model';
+import { Transaction } from '../entities/transactions.entity';
+import { TransactionsSchema } from '../entities/transactions.schema';
 
 @ApiTags('wallet-rafiki')
 @Controller('api/v1/wallets-rafiki')
 @ApiBearerAuth('JWT')
 export class RafikiWalletController {
 	private readonly AUTH_MICRO_URL: string;
+	private dbTransactions: Model<Transaction>;
 
 	constructor(
 		private readonly walletService: WalletService,
@@ -64,6 +68,10 @@ export class RafikiWalletController {
 		private configService: ConfigService
 	) {
 		this.AUTH_MICRO_URL = this.configService.get<string>('AUTH_URL');
+		this.dbTransactions = dynamoose.model<Transaction>(
+			'Transactions',
+			TransactionsSchema
+		);
 	}
 
 	@Post('address')
@@ -345,7 +353,6 @@ export class RafikiWalletController {
 			});
 		} catch (error) {
 			Sentry.captureException(error);
-			console.log('error', error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
 				customCode: 'WGE0137',
@@ -437,7 +444,6 @@ export class RafikiWalletController {
 				walletAddressUrl: input.walletAddressUrl,
 			};
 
-			console.log('inputReceiver', inputReceiver);
 			const receiver = await this.walletService.createReceiver(inputReceiver);
 			const quoteInput = {
 				walletAddressId: input?.walletAddressId,
@@ -454,10 +460,43 @@ export class RafikiWalletController {
 					inputOutgoing
 				);
 
+				const transaction = {
+					Type: 'OutgoingPayment',
+					OutgoingPaymentId:
+						outgoingPayment?.createOutgoingPayment?.payment?.id,
+					WalletAddressId:
+						outgoingPayment?.createOutgoingPayment?.payment?.walletAddressId,
+					State: outgoingPayment?.createOutgoingPayment?.payment?.state,
+					Metadata:
+						outgoingPayment?.createOutgoingPayment?.payment?.metadata || {},
+					Receiver: outgoingPayment?.createOutgoingPayment?.payment?.receiver,
+					ReceiveAmount: {
+						_Typename: 'Amount',
+						value:
+							outgoingPayment?.createOutgoingPayment?.payment?.receiveAmount
+								?.value,
+						assetCode:
+							outgoingPayment?.createOutgoingPayment?.payment?.receiveAmount
+								?.assetCode,
+						assetScale:
+							outgoingPayment?.createOutgoingPayment?.payment?.receiveAmount
+								?.assetScale,
+					},
+					Description: '',
+				};
+
+				await this.dbTransactions.create(transaction);
+
 				await this.walletService.sendMoneyMailConfirmation(
 					inputOutgoing,
 					outgoingPayment
 				);
+
+				this.authGateway.server.emit('hc', {
+					message: '',
+					statusCode: 'WGS0054',
+					data: transaction,
+				});
 
 				return res.status(200).send({
 					data: outgoingPayment,
@@ -465,7 +504,6 @@ export class RafikiWalletController {
 				});
 			}, 500);
 		} catch (error) {
-			console.log('error', error?.message);
 			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
@@ -483,7 +521,7 @@ export class RafikiWalletController {
 	@ApiResponse({ status: 400, description: 'Bad Request' })
 	async linkTransactionProvider(
 		@Headers() headers: MapOfStringToList,
-		@Body() input: ReceiverInputDTO,
+		@Body() input: LinkInputDTO,
 		@Req() req,
 		@Res() res
 	) {
@@ -540,50 +578,22 @@ export class RafikiWalletController {
 				});
 			}
 
-			await addApiSignatureHeader(req, req.body);
-			const inputReceiver = {
-				metadata: {
-					type: 'LINK',
-					wgUser: userId,
-					description: '',
-				},
-				incomingAmount: {
-					assetCode: userWalletByToken?.walletAsset?.code,
-					assetScale: userWalletByToken?.walletAsset?.scale,
-					value: adjustValue(
-						input?.amount,
-						userWalletByToken?.walletAsset?.scale
-					),
-				},
-				walletAddressUrl: input.walletAddressUrl,
-			};
+			const linkProvider = await this.walletService.updateListServiceProviders(
+				userId,
+				input?.walletAddressUrl
+			);
 
-			const receiver = await this.walletService.createReceiver(inputReceiver);
-			const quoteInput = {
-				walletAddressId: input?.walletAddressId,
-				receiver: receiver?.createReceiver?.receiver?.id,
-			};
+			this.authGateway.server.emit('hc', {
+				message: 'Account linked',
+				statusCode: 'WGS0051',
+				sessionId: input?.sessionId,
+				wgUserId: userId,
+			});
 
-			setTimeout(async () => {
-				const quote = await this.walletService.createQuote(quoteInput);
-				const inputOutgoing = {
-					walletAddressId: input?.walletAddressId,
-					quoteId: quote?.createQuote?.quote?.id,
-				};
-				const outgoingPayment = await this.walletService.createOutgoingPayment(
-					inputOutgoing
-				);
-
-				await this.walletService.sendMoneyMailConfirmation(
-					inputOutgoing,
-					outgoingPayment
-				);
-
-				return res.status(200).send({
-					data: outgoingPayment,
-					customCode: 'WGE0150',
-				});
-			}, 500);
+			return res.status(200).send({
+				data: linkProvider,
+				customCode: 'WGE0150',
+			});
 		} catch (error) {
 			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
@@ -667,7 +677,6 @@ export class RafikiWalletController {
 				...exchangeRates,
 			});
 		} catch (error) {
-			console.log('error', error);
 			Sentry.captureException(error);
 			return res.status(500).send({
 				customCode: 'WGE0163',
@@ -805,6 +814,8 @@ export class RafikiWalletController {
 		}
 
 		try {
+			await addApiSignatureHeader(req, req.body);
+
 			const userWallet = await this.walletService.getWalletByRafikyId(
 				input.walletAddressId
 			);
