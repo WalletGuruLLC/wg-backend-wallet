@@ -1803,7 +1803,45 @@ export class WalletService {
 		}
 	}
 
-	async updateListServiceProviders(id: string, address: string) {
+	async getProviderById(providerId: string) {
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'Providers',
+			Key: { Id: providerId },
+		};
+
+		try {
+			const result = await docClient.get(params).promise();
+			return convertToCamelCase(result?.Item);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new Error(`Error fetching user by userId: ${error.message}`);
+		}
+	}
+
+	async getLinkedProvidersUserById(userId: string) {
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'Users',
+			Key: { Id: userId },
+		};
+
+		try {
+			const result = await docClient.get(params).promise();
+			const linkedProviders = result?.Item?.LinkedServiceProviders;
+			return convertToCamelCase(linkedProviders);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new Error(`Error fetching user by userId: ${error.message}`);
+		}
+	}
+
+	async updateListServiceProviders(
+		id: string,
+		address: string,
+		sessionId: string
+	) {
+		const docClient = new DocumentClient();
 		const wallet = await this.findWalletByUrl(address);
 		const serviceProvider = wallet?.ProviderId;
 		const user = await this.dbUserInstance.get({ Id: id });
@@ -1812,23 +1850,44 @@ export class WalletService {
 			throw new Error(`User with ID ${id} not found`);
 		}
 
-		const linkedProviders: string[] = user.LinkedServiceProviders ?? [];
+		const linkedProviders: any[] = user.LinkedServiceProviders ?? [];
 
-		if (linkedProviders.includes(serviceProvider)) {
+		if (
+			linkedProviders.some(
+				provider => provider.serviceProviderId === serviceProvider
+			)
+		) {
 			throw new Error(`ServiceProvider ${serviceProvider} already linked`);
 		}
 
-		linkedProviders.push(serviceProvider);
+		const provider = await this.getProviderById(serviceProvider);
 
-		const updatedUser = await this.dbUserInstance.update({
-			Id: id,
-			LinkedServiceProviders: linkedProviders,
-		});
+		const providerObject = {
+			serviceProviderId: serviceProvider,
+			sessionId: sessionId,
+			vinculationDate: new Date().toISOString(),
+		};
+
+		linkedProviders.push(providerObject);
+
+		const updateParams = {
+			TableName: 'Users',
+			Key: { Id: id },
+			UpdateExpression: 'SET LinkedServiceProviders = :linkedProviders',
+			ExpressionAttributeValues: {
+				':linkedProviders': linkedProviders,
+			},
+			ReturnValues: 'ALL_NEW',
+		};
+
+		await docClient.update(updateParams).promise();
 
 		return {
-			id: updatedUser?.Id,
-			email: updatedUser?.Email,
-			linkedServiceProviders: updatedUser?.LinkedServiceProviders,
+			serviceProviderId: providerObject?.serviceProviderId,
+			sessionId: providerObject?.sessionId,
+			vinculationDate: providerObject?.vinculationDate,
+			walletUrl: address,
+			serviceProviderName: provider?.name,
 		};
 	}
 }

@@ -580,7 +580,8 @@ export class RafikiWalletController {
 
 			const linkProvider = await this.walletService.updateListServiceProviders(
 				userId,
-				input?.walletAddressUrl
+				input?.walletAddressUrl,
+				input?.sessionId
 			);
 
 			this.authGateway.server.emit('hc', {
@@ -592,6 +593,65 @@ export class RafikiWalletController {
 
 			return res.status(200).send({
 				data: linkProvider,
+				customCode: 'WGE0150',
+			});
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0151',
+			});
+		}
+	}
+
+	@Get('linked-providers')
+	@ApiOperation({ summary: 'Get linked service providers' })
+	@ApiResponse({
+		status: 201,
+		description: 'Linked providrs retrieved successfully.',
+	})
+	@ApiResponse({ status: 400, description: 'Bad Request' })
+	async getLinkedProvidersUserById(
+		@Headers() headers: MapOfStringToList,
+		@Req() req,
+		@Res() res
+	) {
+		try {
+			let token;
+			try {
+				token = headers.authorization ?? '';
+				const instanceVerifier = await this.verifyService.getVerifiedFactory();
+				await instanceVerifier.verify(token.toString().split(' ')[1]);
+			} catch (error) {
+				Sentry.captureException(error);
+				throw new HttpException(
+					{
+						statusCode: HttpStatus.UNAUTHORIZED,
+						customCode: 'WGE0021',
+						customMessage: errorCodes.WGE0021?.description,
+						customMessageEs: errorCodes.WGE0021?.descriptionEs,
+					},
+					HttpStatus.UNAUTHORIZED
+				);
+			}
+
+			let userInfo = await axios.get(
+				this.AUTH_MICRO_URL + '/api/v1/users/current-user',
+				{
+					headers: {
+						Authorization: token,
+					},
+				}
+			);
+			userInfo = userInfo.data;
+
+			const userId = userInfo?.data?.id;
+
+			const linkedProviders =
+				await this.walletService.getLinkedProvidersUserById(userId);
+
+			return res.status(200).send({
+				data: linkedProviders,
 				customCode: 'WGE0150',
 			});
 		} catch (error) {
