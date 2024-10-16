@@ -1000,6 +1000,7 @@ export class WalletService {
 
 			return await this.dbUserIncoming.create(userIncomingPayment);
 		} catch (error) {
+			Sentry.captureException(error);
 			throw new Error(`Error creating incoming payment: ${error.message}`);
 		}
 	}
@@ -1051,7 +1052,10 @@ export class WalletService {
 						Id: userIncoming.id,
 					},
 					TableName: 'UserIncoming',
-					UpdateExpression: 'SET Status = :status',
+					ExpressionAttributeNames: {
+						'#status': 'Status',
+					},
+					UpdateExpression: 'SET #status = :status',
 					ExpressionAttributeValues: {
 						':status': false,
 					},
@@ -1067,6 +1071,7 @@ export class WalletService {
 				return incomingCancelResponse;
 			}
 		} catch (error) {
+			Sentry.captureException(error);
 			throw new Error(`Error canceling incoming payment: ${error.message}`);
 		}
 	}
@@ -1386,6 +1391,7 @@ export class WalletService {
 			return await this.graphqlService.cancelIncomingPayment({ id: id });
 		} catch (error) {
 			console.log('error', error?.message);
+			Sentry.captureException(error);
 			throw new Error(`Error cancel incoming payment: ${error.message}`);
 		}
 	}
