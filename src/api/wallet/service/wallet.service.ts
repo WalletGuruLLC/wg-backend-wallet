@@ -931,10 +931,9 @@ export class WalletService {
 		input: CreatePaymentDTO,
 		providerWallet,
 		userWallet
-	) {
+	): Promise<any> {
 		try {
 			const expireDate = await this.expireDate();
-			console.log('expireDate', expireDate);
 			const updateInput = {
 				metadata: {
 					description: '',
@@ -958,13 +957,10 @@ export class WalletService {
 					userWallet?.walletDb?.postedDebits);
 
 			if (input.incomingAmount > balance) {
-				throw new HttpException(
-					{
-						statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-						customCode: 'WGE0137',
-					},
-					HttpStatus.INTERNAL_SERVER_ERROR
-				);
+				return {
+					statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+					customCode: 'WGE0137',
+				};
 			}
 
 			const incomingPayment = await this.graphqlService.createReceiver(
@@ -1003,7 +999,11 @@ export class WalletService {
 
 			return await this.dbUserIncoming.create(userIncomingPayment);
 		} catch (error) {
-			throw new Error(`Error creating incoming payment: ${error.message}`);
+			Sentry.captureException(error);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0165',
+			};
 		}
 	}
 
@@ -1019,11 +1019,17 @@ export class WalletService {
 			const userWallet = convertToCamelCase(await this.getUserByToken(token));
 
 			if (!userIncoming) {
-				throw new Error(`Error finding user incoming`);
+				return {
+					statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+					customCode: 'WGE0167',
+				};
 			}
 
 			if (!incomingPayment) {
-				throw new Error(`Error finding incoming payment`);
+				return {
+					statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+					customCode: 'WGE0167',
+				};
 			}
 
 			if (userIncoming?.status && userWallet) {
@@ -1054,7 +1060,10 @@ export class WalletService {
 						Id: userIncoming.id,
 					},
 					TableName: 'UserIncoming',
-					UpdateExpression: 'SET Status = :status',
+					ExpressionAttributeNames: {
+						'#status': 'Status',
+					},
+					UpdateExpression: 'SET #status = :status',
 					ExpressionAttributeValues: {
 						':status': false,
 					},
@@ -1070,7 +1079,11 @@ export class WalletService {
 				return incomingCancelResponse;
 			}
 		} catch (error) {
-			throw new Error(`Error canceling incoming payment: ${error.message}`);
+			Sentry.captureException(error);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0167',
+			};
 		}
 	}
 
@@ -1078,7 +1091,12 @@ export class WalletService {
 		try {
 			return await this.graphqlService.createQuote(input);
 		} catch (error) {
-			throw new Error(`Error creating quote: ${error.message}`);
+			Sentry.captureException(error);
+
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0151',
+			};
 		}
 	}
 
@@ -1086,7 +1104,12 @@ export class WalletService {
 		try {
 			return await this.graphqlService.createOutgoingPayment(input);
 		} catch (error) {
-			throw new Error(`Error creating outgoing payment: ${error.message}`);
+			Sentry.captureException(error);
+
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0151',
+			};
 		}
 	}
 
@@ -1094,7 +1117,11 @@ export class WalletService {
 		try {
 			return await this.graphqlService.getOutgoingPayment(id);
 		} catch (error) {
-			throw new Error(`Error fetching outgoing payment: ${error.message}`);
+			Sentry.captureException(error);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0137',
+			};
 		}
 	}
 
@@ -1102,7 +1129,11 @@ export class WalletService {
 		try {
 			return await this.graphqlService.getInconmingPayment(id);
 		} catch (error) {
-			throw new Error(`Error fetching incoming payment: ${error.message}`);
+			Sentry.captureException(error);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0137',
+			};
 		}
 	}
 
@@ -1197,28 +1228,63 @@ export class WalletService {
 	async createDeposit(input: any) {
 		const walletAddress = input.walletAddressId;
 		const amount = input.amount;
-		const walletInfo = await this.graphqlService.listWalletInfo(walletAddress);
-		const scale = walletInfo.data.walletAddress.asset.scale;
-		const amountUpdated = amount * Math.pow(10, scale);
+
 		const walletDynamo = await this.dbInstance
 			.scan('RafikiId')
 			.eq(walletAddress)
 			.exec();
-		const dynamoAmount = (walletDynamo[0].PostedCredits || 0) + amountUpdated;
-		const db = await this.dbInstance.update({
-			Id: walletDynamo[0].Id,
-			PostedCredits: dynamoAmount,
-		});
-		if (db.PublicKey) {
-			delete db.PublicKey;
+
+		const userId = walletDynamo[0]?.UserId;
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'Users',
+			Key: { Id: userId },
+		};
+		const userDynamo = await docClient.get(params).promise();
+
+		if (
+			userDynamo.Item.FirstFunding !== undefined &&
+			userDynamo.Item.FirstFunding === false
+		) {
+			const walletInfo = await this.graphqlService.listWalletInfo(
+				walletAddress
+			);
+			const scale = walletInfo.data.walletAddress.asset.scale;
+			const amountUpdated = amount * Math.pow(10, scale);
+
+			const dynamoAmount = (walletDynamo[0].PostedCredits || 0) + amountUpdated;
+			const db = await this.dbInstance.update({
+				Id: walletDynamo[0].Id,
+				PostedCredits: dynamoAmount,
+			});
+			if (db.PublicKey) {
+				delete db.PublicKey;
+			}
+			if (db.PrivateKey) {
+				delete db.PrivateKey;
+			}
+			if (db.RafikiId) {
+				delete db.RafikiId;
+			}
+
+			const userIncomingParams = {
+				Key: {
+					Id: userId,
+				},
+				TableName: 'Users',
+				UpdateExpression: 'SET FirstFunding = :firstFunding',
+				ExpressionAttributeValues: {
+					':firstFunding': true,
+				},
+				ReturnValues: 'ALL_NEW',
+			};
+
+			await docClient.update(userIncomingParams).promise();
+
+			return await convertToCamelCase(db);
+		} else {
+			return;
 		}
-		if (db.PrivateKey) {
-			delete db.PrivateKey;
-		}
-		if (db.RafikiId) {
-			delete db.RafikiId;
-		}
-		return await convertToCamelCase(db);
 	}
 	async getWalletByRafikyId(rafikiId: string) {
 		const docClient = new DocumentClient();
@@ -1236,7 +1302,10 @@ export class WalletService {
 			return convertToCamelCase(result.Items?.[0]);
 		} catch (error) {
 			Sentry.captureException(error);
-			throw new Error(`Error fetching wallet: ${error.message}`);
+			return {
+				statusCode: HttpStatus.NOT_FOUND,
+				customCode: 'WGE0074',
+			};
 		}
 	}
 
@@ -1261,7 +1330,10 @@ export class WalletService {
 			return convertToCamelCase(result?.Items);
 		} catch (error) {
 			Sentry.captureException(error);
-			throw new Error(`Error fetching wallet by userId: ${error.message}`);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0137',
+			};
 		}
 	}
 
@@ -1281,9 +1353,10 @@ export class WalletService {
 			return convertToCamelCase(result?.Items?.[0]);
 		} catch (error) {
 			Sentry.captureException(error);
-			throw new Error(
-				`Error fetching incoming payment by userId: ${error.message}`
-			);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0167',
+			};
 		}
 	}
 
@@ -1299,7 +1372,10 @@ export class WalletService {
 			return convertToCamelCase(result?.Item);
 		} catch (error) {
 			Sentry.captureException(error);
-			throw new Error(`Error fetching user by userId: ${error.message}`);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0137',
+			};
 		}
 	}
 
@@ -1315,9 +1391,10 @@ export class WalletService {
 			return convertToCamelCase(result?.Item);
 		} catch (error) {
 			Sentry.captureException(error);
-			throw new Error(
-				`Error fetching provider by providerId: ${error.message}`
-			);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0137',
+			};
 		}
 	}
 
@@ -1328,7 +1405,11 @@ export class WalletService {
 			);
 			return incomingPayment;
 		} catch (error) {
-			throw new Error('Failed to get incoming payment.');
+			Sentry.captureException(error);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0167',
+			};
 		}
 	}
 
@@ -1344,7 +1425,7 @@ export class WalletService {
 		try {
 			return await this.graphqlService.cancelOutgoingPayment(input);
 		} catch (error) {
-			console.log('error', error?.message);
+			Sentry.captureException(error);
 			throw new Error(`Error cancel outgoing payment: ${error.message}`);
 		}
 	}
@@ -1353,8 +1434,11 @@ export class WalletService {
 		try {
 			return await this.graphqlService.cancelIncomingPayment({ id: id });
 		} catch (error) {
-			console.log('error', error?.message);
-			throw new Error(`Error cancel incoming payment: ${error.message}`);
+			Sentry.captureException(error);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0167',
+			};
 		}
 	}
 
@@ -1387,7 +1471,7 @@ export class WalletService {
 			const paymentParameters = convertToCamelCase(result.Items || []);
 			return paymentParameters;
 		} catch (error) {
-			console.log('error', error?.message);
+			Sentry.captureException(error);
 		}
 	}
 
@@ -1401,7 +1485,7 @@ export class WalletService {
 			const parameter = await this.filterParameterById(parameters, paymentId);
 			return parameter?.id ? parameter : {};
 		} catch (error) {
-			console.log('error', error.message);
+			Sentry.captureException(error);
 		}
 		return {};
 	}
@@ -1803,32 +1887,114 @@ export class WalletService {
 		}
 	}
 
-	async updateListServiceProviders(id: string, address: string) {
+	async getUserInfoById(userId: string) {
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'Users',
+			Key: { Id: userId },
+		};
+
+		try {
+			const result = await docClient.get(params).promise();
+			return convertToCamelCase(result?.Item);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new Error(`Error fetching user by userId: ${error.message}`);
+		}
+	}
+
+	async getProviderById(providerId: string) {
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'Providers',
+			Key: { Id: providerId },
+		};
+
+		try {
+			const result = await docClient.get(params).promise();
+			return convertToCamelCase(result?.Item);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new Error(`Error fetching user by userId: ${error.message}`);
+		}
+	}
+
+	async getLinkedProvidersUserById(userId: string) {
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'Users',
+			Key: { Id: userId },
+		};
+
+		try {
+			const result = await docClient.get(params).promise();
+			const linkedProviders = result?.Item?.LinkedServiceProviders;
+			return convertToCamelCase(linkedProviders);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new Error(`Error fetching user by userId: ${error.message}`);
+		}
+	}
+
+	async updateListServiceProviders(
+		id: string,
+		address: string,
+		sessionId: string
+	): Promise<any> {
+		const docClient = new DocumentClient();
 		const wallet = await this.findWalletByUrl(address);
 		const serviceProvider = wallet?.ProviderId;
-		const user = await this.dbUserInstance.get({ Id: id });
+		const user = await this.getUserInfoById(id);
 
 		if (!user) {
 			throw new Error(`User with ID ${id} not found`);
 		}
 
-		const linkedProviders: string[] = user.LinkedServiceProviders ?? [];
+		const linkedProviders: any[] = user.linkedServiceProviders ?? [];
 
-		if (linkedProviders.includes(serviceProvider)) {
-			throw new Error(`ServiceProvider ${serviceProvider} already linked`);
+		if (
+			linkedProviders.some(
+				provider => provider.serviceProviderId === serviceProvider
+			)
+		) {
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0210',
+			};
 		}
 
-		linkedProviders.push(serviceProvider);
+		const provider = await this.getProviderById(serviceProvider);
 
-		const updatedUser = await this.dbUserInstance.update({
-			Id: id,
-			LinkedServiceProviders: linkedProviders,
-		});
-
-		return {
-			id: updatedUser?.Id,
-			email: updatedUser?.Email,
-			linkedServiceProviders: updatedUser?.LinkedServiceProviders,
+		const providerObject = {
+			serviceProviderId: serviceProvider,
+			sessionId: sessionId,
+			vinculationDate: new Date().toISOString(),
+			walletUrl: address,
+			serviceProviderName: provider?.name,
 		};
+
+		linkedProviders.push(providerObject);
+
+		const updateParams = {
+			TableName: 'Users',
+			Key: { Id: id },
+			UpdateExpression: 'SET LinkedServiceProviders = :linkedProviders',
+			ExpressionAttributeValues: {
+				':linkedProviders': linkedProviders,
+			},
+			ReturnValues: 'ALL_NEW',
+		};
+
+		await docClient.update(updateParams).promise();
+
+		const linkedProvider = {
+			serviceProviderId: providerObject?.serviceProviderId,
+			sessionId: providerObject?.sessionId,
+			vinculationDate: providerObject?.vinculationDate,
+			walletUrl: address,
+			serviceProviderName: provider?.name,
+		};
+
+		return linkedProvider;
 	}
 }
