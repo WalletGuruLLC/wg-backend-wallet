@@ -1048,6 +1048,13 @@ export class RafikiWalletController {
 			const incomingPayments = await this.walletService.listIncomingPayments(
 				token
 			);
+
+			if (incomingPayments?.customCode) {
+				return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+					statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+					customCode: incomingPayments?.customCode,
+				});
+			}
 			return res.status(HttpStatus.OK).send({
 				statusCode: HttpStatus.OK,
 				customCode: 'WGS0138',

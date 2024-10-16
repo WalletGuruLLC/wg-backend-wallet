@@ -1091,7 +1091,12 @@ export class WalletService {
 		try {
 			return await this.graphqlService.createQuote(input);
 		} catch (error) {
-			throw new Error(`Error creating quote: ${error.message}`);
+			Sentry.captureException(error);
+
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0151',
+			};
 		}
 	}
 
@@ -1099,7 +1104,12 @@ export class WalletService {
 		try {
 			return await this.graphqlService.createOutgoingPayment(input);
 		} catch (error) {
-			throw new Error(`Error creating outgoing payment: ${error.message}`);
+			Sentry.captureException(error);
+
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0151',
+			};
 		}
 	}
 
@@ -1107,7 +1117,11 @@ export class WalletService {
 		try {
 			return await this.graphqlService.getOutgoingPayment(id);
 		} catch (error) {
-			throw new Error(`Error fetching outgoing payment: ${error.message}`);
+			Sentry.captureException(error);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0137',
+			};
 		}
 	}
 
@@ -1115,7 +1129,11 @@ export class WalletService {
 		try {
 			return await this.graphqlService.getInconmingPayment(id);
 		} catch (error) {
-			throw new Error(`Error fetching incoming payment: ${error.message}`);
+			Sentry.captureException(error);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0137',
+			};
 		}
 	}
 
@@ -1284,7 +1302,10 @@ export class WalletService {
 			return convertToCamelCase(result.Items?.[0]);
 		} catch (error) {
 			Sentry.captureException(error);
-			throw new Error(`Error fetching wallet: ${error.message}`);
+			return {
+				statusCode: HttpStatus.NOT_FOUND,
+				customCode: 'WGE0074',
+			};
 		}
 	}
 
@@ -1309,7 +1330,10 @@ export class WalletService {
 			return convertToCamelCase(result?.Items);
 		} catch (error) {
 			Sentry.captureException(error);
-			throw new Error(`Error fetching wallet by userId: ${error.message}`);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0137',
+			};
 		}
 	}
 
@@ -1329,9 +1353,10 @@ export class WalletService {
 			return convertToCamelCase(result?.Items?.[0]);
 		} catch (error) {
 			Sentry.captureException(error);
-			throw new Error(
-				`Error fetching incoming payment by userId: ${error.message}`
-			);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0167',
+			};
 		}
 	}
 
@@ -1347,7 +1372,10 @@ export class WalletService {
 			return convertToCamelCase(result?.Item);
 		} catch (error) {
 			Sentry.captureException(error);
-			throw new Error(`Error fetching user by userId: ${error.message}`);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0137',
+			};
 		}
 	}
 
@@ -1363,9 +1391,10 @@ export class WalletService {
 			return convertToCamelCase(result?.Item);
 		} catch (error) {
 			Sentry.captureException(error);
-			throw new Error(
-				`Error fetching provider by providerId: ${error.message}`
-			);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0137',
+			};
 		}
 	}
 
@@ -1376,7 +1405,11 @@ export class WalletService {
 			);
 			return incomingPayment;
 		} catch (error) {
-			throw new Error('Failed to get incoming payment.');
+			Sentry.captureException(error);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0167',
+			};
 		}
 	}
 
