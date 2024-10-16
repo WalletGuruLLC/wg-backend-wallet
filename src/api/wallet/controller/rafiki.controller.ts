@@ -856,7 +856,9 @@ export class RafikiWalletController {
 			);
 
 			return res.status(HttpStatus.OK).send({
-				data: convertToCamelCase(incomingPayment),
+				data: {
+					incomingPaymentResponse: convertToCamelCase(incomingPayment)
+				},
 				statusCode: HttpStatus.OK,
 				customCode: 'WGE0164',
 			});
