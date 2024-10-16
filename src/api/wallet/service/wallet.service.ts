@@ -934,7 +934,6 @@ export class WalletService {
 	): Promise<any> {
 		try {
 			const expireDate = await this.expireDate();
-			console.log('expireDate', expireDate);
 			const updateInput = {
 				metadata: {
 					description: '',
@@ -1393,7 +1392,7 @@ export class WalletService {
 		try {
 			return await this.graphqlService.cancelOutgoingPayment(input);
 		} catch (error) {
-			console.log('error', error?.message);
+			Sentry.captureException(error);
 			throw new Error(`Error cancel outgoing payment: ${error.message}`);
 		}
 	}
@@ -1402,9 +1401,11 @@ export class WalletService {
 		try {
 			return await this.graphqlService.cancelIncomingPayment({ id: id });
 		} catch (error) {
-			console.log('error', error?.message);
 			Sentry.captureException(error);
-			throw new Error(`Error cancel incoming payment: ${error.message}`);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0167',
+			};
 		}
 	}
 
@@ -1437,7 +1438,7 @@ export class WalletService {
 			const paymentParameters = convertToCamelCase(result.Items || []);
 			return paymentParameters;
 		} catch (error) {
-			console.log('error', error?.message);
+			Sentry.captureException(error);
 		}
 	}
 
@@ -1451,7 +1452,7 @@ export class WalletService {
 			const parameter = await this.filterParameterById(parameters, paymentId);
 			return parameter?.id ? parameter : {};
 		} catch (error) {
-			console.log('error', error.message);
+			Sentry.captureException(error);
 		}
 		return {};
 	}
