@@ -521,6 +521,12 @@ export class RafikiWalletController {
 	async createDeposit(@Body() input: DepositDTO, @Req() req, @Res() res) {
 		try {
 			const deposit = await this.walletService.createDeposit(input);
+			if (!deposit) {
+				return res.status(HttpStatus.BAD_REQUEST).send({
+					statusCode: HttpStatus.BAD_REQUEST,
+					customCode: 'WGE0175',
+				});
+			}
 			return res.status(HttpStatus.OK).send({
 				statusCode: HttpStatus.OK,
 				customCode: 'WGE0172',

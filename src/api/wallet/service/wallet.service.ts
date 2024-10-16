@@ -1152,28 +1152,63 @@ export class WalletService {
 	async createDeposit(input: any) {
 		const walletAddress = input.walletAddressId;
 		const amount = input.amount;
-		const walletInfo = await this.graphqlService.listWalletInfo(walletAddress);
-		const scale = walletInfo.data.walletAddress.asset.scale;
-		const amountUpdated = amount * Math.pow(10, scale);
+
 		const walletDynamo = await this.dbInstance
 			.scan('RafikiId')
 			.eq(walletAddress)
 			.exec();
-		const dynamoAmount = (walletDynamo[0].PostedCredits || 0) + amountUpdated;
-		const db = await this.dbInstance.update({
-			Id: walletDynamo[0].Id,
-			PostedCredits: dynamoAmount,
-		});
-		if (db.PublicKey) {
-			delete db.PublicKey;
+
+		const userId = walletDynamo[0]?.UserId;
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'Users',
+			Key: { Id: userId },
+		};
+		const userDynamo = await docClient.get(params).promise();
+
+		if (
+			userDynamo.Item.FirstFunding !== undefined &&
+			userDynamo.Item.FirstFunding === false
+		) {
+			const walletInfo = await this.graphqlService.listWalletInfo(
+				walletAddress
+			);
+			const scale = walletInfo.data.walletAddress.asset.scale;
+			const amountUpdated = amount * Math.pow(10, scale);
+
+			const dynamoAmount = (walletDynamo[0].PostedCredits || 0) + amountUpdated;
+			const db = await this.dbInstance.update({
+				Id: walletDynamo[0].Id,
+				PostedCredits: dynamoAmount,
+			});
+			if (db.PublicKey) {
+				delete db.PublicKey;
+			}
+			if (db.PrivateKey) {
+				delete db.PrivateKey;
+			}
+			if (db.RafikiId) {
+				delete db.RafikiId;
+			}
+
+			const userIncomingParams = {
+				Key: {
+					Id: userId,
+				},
+				TableName: 'Users',
+				UpdateExpression: 'SET FirstFunding = :firstFunding',
+				ExpressionAttributeValues: {
+					':firstFunding': true,
+				},
+				ReturnValues: 'ALL_NEW',
+			};
+
+			await docClient.update(userIncomingParams).promise();
+
+			return await convertToCamelCase(db);
+		} else {
+			return;
 		}
-		if (db.PrivateKey) {
-			delete db.PrivateKey;
-		}
-		if (db.RafikiId) {
-			delete db.RafikiId;
-		}
-		return await convertToCamelCase(db);
 	}
 	async getWalletByRafikyId(rafikiId: string) {
 		const docClient = new DocumentClient();
