@@ -754,68 +754,74 @@ export class WalletService {
 		}
 
 		const walletDb = await this.getUserByToken(token);
+		const rafikiId = walletDb.RafikiId;
+		const docClient = new DocumentClient();
 
-		const transactions = await this.graphqlService.listTransactions(
-			walletDb.RafikiId
-		);
+		const outgoingParams: DocumentClient.ScanInput = {
+			TableName: 'Transactions',
+			FilterExpression: '#WalletAddressId = :WalletAddressId',
+			ExpressionAttributeNames: {
+				'#WalletAddressId': 'WalletAddressId',
+			},
+			ExpressionAttributeValues: {
+				':WalletAddressId': rafikiId,
+			},
+		};
+		const dynamoOutgoingPayments = await docClient
+			.scan(outgoingParams)
+			.promise();
 
-		const outgoingArray = [];
-		const incomingArray = [];
+		const walletAddresses = [];
 
-		for (
-			let index = 0;
-			index < 10 &&
-			index < transactions.data.walletAddress.outgoingPayments.edges.length;
-			index++
-		) {
-			const object =
-				transactions.data.walletAddress.outgoingPayments.edges[index];
-			const objectConverted = {
-				type: object.node.__typename,
-				outgoingPaymentId: object.node.id,
-				walletAddressId: object.node.walletAddressId,
-				state: object.node.state,
-				metadata: object.node.metadata,
-				receiver: object.node.receiver,
-				receiveAmount: object.node.receiveAmount,
-				createdAt: object.node.createdAt,
-			};
-			outgoingArray.push(objectConverted);
-			const incomingPaymentId = object.node.receiver.split('/')[4];
-			const incomingPayment = await this.getIncomingPayment(incomingPaymentId);
-
-			if (incomingPayment.state !== 'EXPIRED') {
-				const incomingConverted = {
-					type: incomingPayment.__typename,
-					incomingPaymentId: incomingPayment.id,
-					walletAddressId: incomingPayment.walletAddressId,
-					state: incomingPayment.state,
-					incomingAmount: incomingPayment.incomingAmount,
-					createdAt: incomingPayment.createdAt,
-				};
-				incomingArray.push(incomingConverted);
-			}
+		for (let index = 0; index < dynamoOutgoingPayments.Items.length; index++) {
+			walletAddresses.push(dynamoOutgoingPayments.Items[index].Receiver);
 		}
-		const combinedArray = incomingArray.concat(outgoingArray);
 
-		const incomingSorted = incomingArray.sort(
-			(a: any, b: any) =>
-				new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+		const expressionAttributeValues = walletAddresses.reduce(
+			(acc, url, index) => {
+				acc[`:walletAddress${index}`] = url;
+				return acc;
+			},
+			{}
 		);
 
-		const outGoingSorted = outgoingArray.sort(
-			(a: any, b: any) =>
-				new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-		);
-		const combinedSorted = combinedArray.sort(
-			(a: any, b: any) =>
-				new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-		);
+		const filterExpression = `#WalletAddressId IN (${walletAddresses
+			.map((_, index) => `:walletAddress${index}`)
+			.join(', ')})`;
+
+		const IncomingParams: DocumentClient.ScanInput = {
+			TableName: 'Transactions',
+			FilterExpression: filterExpression,
+			ExpressionAttributeNames: {
+				'#WalletAddressId': 'WalletAddressId',
+			},
+			ExpressionAttributeValues: expressionAttributeValues,
+		};
+
+		const dynamoIncomingPayments = await docClient
+			.scan(IncomingParams)
+			.promise();
+
 		if (search === 'credit') {
+			const incomingSorted = dynamoIncomingPayments.Items.sort(
+				(a: any, b: any) =>
+					new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+			);
 			return convertToCamelCase(incomingSorted);
 		} else if (search === 'debit') {
+			const outGoingSorted = dynamoOutgoingPayments.Items.sort(
+				(a: any, b: any) =>
+					new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+			);
 			return convertToCamelCase(outGoingSorted);
 		} else {
+			const combinedArray = dynamoIncomingPayments.Items.concat(
+				dynamoOutgoingPayments.Items
+			);
+			const combinedSorted = combinedArray.sort(
+				(a: any, b: any) =>
+					new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+			);
 			return convertToCamelCase(combinedSorted);
 		}
 	}
