@@ -1090,6 +1090,14 @@ export class RafikiWalletController {
 				id,
 				token
 			);
+
+			if (response?.customCode) {
+				return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+					statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+					customCode: response?.customCode,
+				});
+			}
+
 			return res.status(HttpStatus.OK).send({
 				statusCode: HttpStatus.OK,
 				customCode: 'WGE0166',

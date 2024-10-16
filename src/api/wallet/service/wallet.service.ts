@@ -1001,7 +1001,10 @@ export class WalletService {
 			return await this.dbUserIncoming.create(userIncomingPayment);
 		} catch (error) {
 			Sentry.captureException(error);
-			throw new Error(`Error creating incoming payment: ${error.message}`);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0165',
+			};
 		}
 	}
 
@@ -1017,11 +1020,17 @@ export class WalletService {
 			const userWallet = convertToCamelCase(await this.getUserByToken(token));
 
 			if (!userIncoming) {
-				throw new Error(`Error finding user incoming`);
+				return {
+					statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+					customCode: 'WGE0167',
+				};
 			}
 
 			if (!incomingPayment) {
-				throw new Error(`Error finding incoming payment`);
+				return {
+					statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+					customCode: 'WGE0167',
+				};
 			}
 
 			if (userIncoming?.status && userWallet) {
@@ -1072,7 +1081,10 @@ export class WalletService {
 			}
 		} catch (error) {
 			Sentry.captureException(error);
-			throw new Error(`Error canceling incoming payment: ${error.message}`);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0167',
+			};
 		}
 	}
 
