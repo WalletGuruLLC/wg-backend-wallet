@@ -931,7 +931,7 @@ export class WalletService {
 		input: CreatePaymentDTO,
 		providerWallet,
 		userWallet
-	) {
+	): Promise<any> {
 		try {
 			const expireDate = await this.expireDate();
 			console.log('expireDate', expireDate);
@@ -958,13 +958,10 @@ export class WalletService {
 					userWallet?.walletDb?.postedDebits);
 
 			if (input.incomingAmount > balance) {
-				throw new HttpException(
-					{
-						statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-						customCode: 'WGE0137',
-					},
-					HttpStatus.INTERNAL_SERVER_ERROR
-				);
+				return {
+					statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+					customCode: 'WGE0137',
+				};
 			}
 
 			const incomingPayment = await this.graphqlService.createReceiver(
@@ -1891,7 +1888,7 @@ export class WalletService {
 		id: string,
 		address: string,
 		sessionId: string
-	) {
+	): Promise<any> {
 		const docClient = new DocumentClient();
 		const wallet = await this.findWalletByUrl(address);
 		const serviceProvider = wallet?.ProviderId;
@@ -1908,7 +1905,10 @@ export class WalletService {
 				provider => provider.serviceProviderId === serviceProvider
 			)
 		) {
-			throw new Error(`ServiceProvider ${serviceProvider} already linked`);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0210',
+			};
 		}
 
 		const provider = await this.getProviderById(serviceProvider);
@@ -1917,6 +1917,8 @@ export class WalletService {
 			serviceProviderId: serviceProvider,
 			sessionId: sessionId,
 			vinculationDate: new Date().toISOString(),
+			walletUrl: address,
+			serviceProviderName: provider?.name,
 		};
 
 		linkedProviders.push(providerObject);
@@ -1933,12 +1935,14 @@ export class WalletService {
 
 		await docClient.update(updateParams).promise();
 
-		return {
+		const linkedProvider = {
 			serviceProviderId: providerObject?.serviceProviderId,
 			sessionId: providerObject?.sessionId,
 			vinculationDate: providerObject?.vinculationDate,
 			walletUrl: address,
 			serviceProviderName: provider?.name,
 		};
+
+		return linkedProvider;
 	}
 }
