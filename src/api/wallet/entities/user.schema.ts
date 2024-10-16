@@ -142,7 +142,7 @@ export const UserSchema = new dynamoose.Schema(
 		},
 		LinkedServiceProviders: {
 			type: Array,
-			schema: [String],
+			schema: [Object],
 		},
 	},
 	{
