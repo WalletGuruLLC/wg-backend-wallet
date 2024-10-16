@@ -584,6 +584,13 @@ export class RafikiWalletController {
 				input?.sessionId
 			);
 
+			if (linkProvider?.customCode) {
+				return res.status(HttpStatus.NOT_FOUND).send({
+					statusCode: HttpStatus.NOT_FOUND,
+					customCode: linkProvider?.customCode,
+				});
+			}
+
 			this.authGateway.server.emit('hc', {
 				message: 'Account linked',
 				statusCode: 'WGS0051',
@@ -592,7 +599,9 @@ export class RafikiWalletController {
 			});
 
 			return res.status(200).send({
-				data: linkProvider,
+				data: {
+					linkedProvider: linkProvider,
+				},
 				customCode: 'WGE0150',
 			});
 		} catch (error) {
@@ -651,7 +660,9 @@ export class RafikiWalletController {
 				await this.walletService.getLinkedProvidersUserById(userId);
 
 			return res.status(200).send({
-				data: linkedProviders,
+				data: {
+					linkedProviders: linkedProviders,
+				},
 				customCode: 'WGE0150',
 			});
 		} catch (error) {
@@ -920,6 +931,13 @@ export class RafikiWalletController {
 				providerWallet,
 				userWalletByToken
 			);
+
+			if (incomingPayment?.customCode) {
+				return res.status(HttpStatus.NOT_FOUND).send({
+					statusCode: HttpStatus.NOT_FOUND,
+					customCode: incomingPayment?.customCode,
+				});
+			}
 
 			return res.status(HttpStatus.OK).send({
 				data: convertToCamelCase(incomingPayment),
