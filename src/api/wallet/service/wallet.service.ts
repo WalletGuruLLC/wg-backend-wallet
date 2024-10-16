@@ -1803,6 +1803,22 @@ export class WalletService {
 		}
 	}
 
+	async getUserInfoById(userId: string) {
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'Users',
+			Key: { Id: userId },
+		};
+
+		try {
+			const result = await docClient.get(params).promise();
+			return convertToCamelCase(result?.Item);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new Error(`Error fetching user by userId: ${error.message}`);
+		}
+	}
+
 	async getProviderById(providerId: string) {
 		const docClient = new DocumentClient();
 		const params = {
@@ -1844,13 +1860,13 @@ export class WalletService {
 		const docClient = new DocumentClient();
 		const wallet = await this.findWalletByUrl(address);
 		const serviceProvider = wallet?.ProviderId;
-		const user = await this.dbUserInstance.get({ Id: id });
+		const user = await this.getUserInfoById(id);
 
 		if (!user) {
 			throw new Error(`User with ID ${id} not found`);
 		}
 
-		const linkedProviders: any[] = user.LinkedServiceProviders ?? [];
+		const linkedProviders: any[] = user.linkedServiceProviders ?? [];
 
 		if (
 			linkedProviders.some(
