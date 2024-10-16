@@ -934,7 +934,6 @@ export class WalletService {
 	): Promise<any> {
 		try {
 			const expireDate = await this.expireDate();
-			console.log('expireDate', expireDate);
 			const updateInput = {
 				metadata: {
 					description: '',
@@ -1000,7 +999,11 @@ export class WalletService {
 
 			return await this.dbUserIncoming.create(userIncomingPayment);
 		} catch (error) {
-			throw new Error(`Error creating incoming payment: ${error.message}`);
+			Sentry.captureException(error);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0165',
+			};
 		}
 	}
 
@@ -1016,11 +1019,17 @@ export class WalletService {
 			const userWallet = convertToCamelCase(await this.getUserByToken(token));
 
 			if (!userIncoming) {
-				throw new Error(`Error finding user incoming`);
+				return {
+					statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+					customCode: 'WGE0167',
+				};
 			}
 
 			if (!incomingPayment) {
-				throw new Error(`Error finding incoming payment`);
+				return {
+					statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+					customCode: 'WGE0167',
+				};
 			}
 
 			if (userIncoming?.status && userWallet) {
@@ -1051,7 +1060,10 @@ export class WalletService {
 						Id: userIncoming.id,
 					},
 					TableName: 'UserIncoming',
-					UpdateExpression: 'SET Status = :status',
+					ExpressionAttributeNames: {
+						'#status': 'Status',
+					},
+					UpdateExpression: 'SET #status = :status',
 					ExpressionAttributeValues: {
 						':status': false,
 					},
@@ -1067,7 +1079,11 @@ export class WalletService {
 				return incomingCancelResponse;
 			}
 		} catch (error) {
-			throw new Error(`Error canceling incoming payment: ${error.message}`);
+			Sentry.captureException(error);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0167',
+			};
 		}
 	}
 
@@ -1075,7 +1091,12 @@ export class WalletService {
 		try {
 			return await this.graphqlService.createQuote(input);
 		} catch (error) {
-			throw new Error(`Error creating quote: ${error.message}`);
+			Sentry.captureException(error);
+
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0151',
+			};
 		}
 	}
 
@@ -1083,7 +1104,12 @@ export class WalletService {
 		try {
 			return await this.graphqlService.createOutgoingPayment(input);
 		} catch (error) {
-			throw new Error(`Error creating outgoing payment: ${error.message}`);
+			Sentry.captureException(error);
+
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0151',
+			};
 		}
 	}
 
@@ -1091,7 +1117,11 @@ export class WalletService {
 		try {
 			return await this.graphqlService.getOutgoingPayment(id);
 		} catch (error) {
-			throw new Error(`Error fetching outgoing payment: ${error.message}`);
+			Sentry.captureException(error);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0137',
+			};
 		}
 	}
 
@@ -1099,7 +1129,11 @@ export class WalletService {
 		try {
 			return await this.graphqlService.getInconmingPayment(id);
 		} catch (error) {
-			throw new Error(`Error fetching incoming payment: ${error.message}`);
+			Sentry.captureException(error);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0137',
+			};
 		}
 	}
 
@@ -1268,7 +1302,10 @@ export class WalletService {
 			return convertToCamelCase(result.Items?.[0]);
 		} catch (error) {
 			Sentry.captureException(error);
-			throw new Error(`Error fetching wallet: ${error.message}`);
+			return {
+				statusCode: HttpStatus.NOT_FOUND,
+				customCode: 'WGE0074',
+			};
 		}
 	}
 
@@ -1293,7 +1330,10 @@ export class WalletService {
 			return convertToCamelCase(result?.Items);
 		} catch (error) {
 			Sentry.captureException(error);
-			throw new Error(`Error fetching wallet by userId: ${error.message}`);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0137',
+			};
 		}
 	}
 
@@ -1313,9 +1353,10 @@ export class WalletService {
 			return convertToCamelCase(result?.Items?.[0]);
 		} catch (error) {
 			Sentry.captureException(error);
-			throw new Error(
-				`Error fetching incoming payment by userId: ${error.message}`
-			);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0167',
+			};
 		}
 	}
 
@@ -1331,7 +1372,10 @@ export class WalletService {
 			return convertToCamelCase(result?.Item);
 		} catch (error) {
 			Sentry.captureException(error);
-			throw new Error(`Error fetching user by userId: ${error.message}`);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0137',
+			};
 		}
 	}
 
@@ -1347,9 +1391,10 @@ export class WalletService {
 			return convertToCamelCase(result?.Item);
 		} catch (error) {
 			Sentry.captureException(error);
-			throw new Error(
-				`Error fetching provider by providerId: ${error.message}`
-			);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0137',
+			};
 		}
 	}
 
@@ -1360,7 +1405,11 @@ export class WalletService {
 			);
 			return incomingPayment;
 		} catch (error) {
-			throw new Error('Failed to get incoming payment.');
+			Sentry.captureException(error);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0167',
+			};
 		}
 	}
 
@@ -1376,7 +1425,7 @@ export class WalletService {
 		try {
 			return await this.graphqlService.cancelOutgoingPayment(input);
 		} catch (error) {
-			console.log('error', error?.message);
+			Sentry.captureException(error);
 			throw new Error(`Error cancel outgoing payment: ${error.message}`);
 		}
 	}
@@ -1385,8 +1434,11 @@ export class WalletService {
 		try {
 			return await this.graphqlService.cancelIncomingPayment({ id: id });
 		} catch (error) {
-			console.log('error', error?.message);
-			throw new Error(`Error cancel incoming payment: ${error.message}`);
+			Sentry.captureException(error);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0167',
+			};
 		}
 	}
 
@@ -1419,7 +1471,7 @@ export class WalletService {
 			const paymentParameters = convertToCamelCase(result.Items || []);
 			return paymentParameters;
 		} catch (error) {
-			console.log('error', error?.message);
+			Sentry.captureException(error);
 		}
 	}
 
@@ -1433,7 +1485,7 @@ export class WalletService {
 			const parameter = await this.filterParameterById(parameters, paymentId);
 			return parameter?.id ? parameter : {};
 		} catch (error) {
-			console.log('error', error.message);
+			Sentry.captureException(error);
 		}
 		return {};
 	}
