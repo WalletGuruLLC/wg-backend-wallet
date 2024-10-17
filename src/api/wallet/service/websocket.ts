@@ -228,13 +228,11 @@ export class AuthGateway
 					wgUserId
 				);
 				if (responsePlay?.action == 'hc') {
-					setTimeout(() => {
-						client.emit('hc', {
-							message: 'Ok',
-							statusCode: 'WGS0053',
-							activityId: activityId,
-						});
-					}, 2800);
+					client.emit('hc', {
+						message: 'Ok',
+						statusCode: 'WGS0053',
+						activityId: activityId,
+					});
 				} else {
 					client.emit('error', {
 						message: responsePlay?.message,
@@ -242,14 +240,12 @@ export class AuthGateway
 					});
 					client.disconnect();
 				}
-			} else {
-				setTimeout(() => {
-					client.emit('hc', {
-						message: 'Ok',
-						statusCode: 'WGS0053',
-						activityId: activityId,
-					});
-				}, 2800);
+			} else if (action == 'stop' || action == 'pause') {
+				client.emit('hc', {
+					message: 'Ok',
+					statusCode: 'WGS0053',
+					activityId: activityId,
+				});
 			}
 		} else {
 			client.disconnect();
