@@ -5,9 +5,19 @@ import { DocumentClient } from 'aws-sdk/clients/dynamodb';
 import * as Sentry from '@sentry/nestjs';
 import { convertToCamelCase } from 'src/utils/helpers/convertCamelCase';
 import { WalletService } from '../service/wallet.service';
+import { Model } from 'dynamoose/dist/Model';
+import { Transaction } from '../entities/transactions.entity';
+import { TransactionsSchema } from '../entities/transactions.schema';
+import * as dynamoose from 'dynamoose';
 
 export class IncomingPaymentCreatedEvent implements EventWebHook {
-	constructor(private readonly walletService: WalletService) {}
+	private dbTransactions: Model<Transaction>;
+	constructor(private readonly walletService: WalletService) {
+		this.dbTransactions = dynamoose.model<Transaction>(
+			'Transactions',
+			TransactionsSchema
+		);
+	}
 	async trigger(eventWebHookDTO: EventWebHookDTO, wallet): Promise<void> {
 		const docClient = new DocumentClient();
 		const userId = eventWebHookDTO?.data?.metadata?.wgUser;
@@ -44,6 +54,33 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 					ReturnValues: 'ALL_NEW',
 				};
 				await docClient.update(userWalletParams).promise();
+			}
+
+			if (eventWebHookDTO?.data?.metadata?.type === 'PROVIDER') {
+				const recieverWallet = await this.walletService.getWalletByRafikyId(
+					eventWebHookDTO?.data?.walletAddressId
+				);
+
+				const senderWallet = await this.walletService.getWalletUserById(
+					userId
+				);
+				const transaction = {
+					Type: 'IncomingPayment',
+					IncomingPaymentId: eventWebHookDTO.data?.id,
+					ReceiverUrl: recieverWallet?.walletAddress,
+					SenderUrl: senderWallet?.walletAddress,
+					State: eventWebHookDTO.data?.state,
+					Metadata: eventWebHookDTO.data?.metadata,
+					Receiver: eventWebHookDTO.data?.receiver,
+					IncomingAmount: {
+						_Typename: 'Amount',
+						value: eventWebHookDTO.data?.incomingAmount?.value,
+						assetCode: eventWebHookDTO.data?.incomingAmount?.assetCode,
+						assetScale: eventWebHookDTO.data?.incomingAmount?.assetScale,
+					},
+					Description: '',
+				};
+				await this.dbTransactions.create(transaction);
 			}
 
 			const result = await docClient.update(params).promise();

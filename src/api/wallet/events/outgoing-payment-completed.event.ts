@@ -4,9 +4,20 @@ import { EventWebHook } from '../dto/event-webhook';
 import { DocumentClient } from 'aws-sdk/clients/dynamodb';
 import * as Sentry from '@sentry/nestjs';
 import { WalletService } from '../service/wallet.service';
+import { Model } from 'dynamoose/dist/Model';
+import { Transaction } from '../entities/transactions.entity';
+import { TransactionsSchema } from '../entities/transactions.schema';
+import * as dynamoose from 'dynamoose';
 
 export class OutGoingPaymentCompletedEvent implements EventWebHook {
-	constructor(private readonly walletService: WalletService) {}
+	private dbTransactions: Model<Transaction>;
+
+	constructor(private readonly walletService: WalletService) {
+		this.dbTransactions = dynamoose.model<Transaction>(
+			'Transactions',
+			TransactionsSchema
+		);
+	}
 	async trigger(eventWebHookDTO: EventWebHookDTO, wallet): Promise<void> {
 		const docClient = new DocumentClient();
 		const recieverWallet = eventWebHookDTO?.data?.receiver.split('/');
@@ -62,6 +73,29 @@ export class OutGoingPaymentCompletedEvent implements EventWebHook {
 				},
 				ReturnValues: 'ALL_NEW',
 			};
+
+			if (eventWebHookDTO?.data?.metadata?.type === 'PROVIDER') {
+				const userWallet = await this.walletService.getWalletByRafikyId(
+					eventWebHookDTO?.data?.walletAddressId
+				);
+				const transaction = {
+					Type: 'OutgoingPayment',
+					OutgoingPaymentId: eventWebHookDTO.data?.id,
+					ReceiverUrl: recieverWallet?.walletAddress,
+					SenderUrl: userWallet?.walletAddress,
+					State: eventWebHookDTO.data?.state,
+					Metadata: eventWebHookDTO.data?.metadata,
+					Receiver: eventWebHookDTO.data?.receiver,
+					ReceiveAmount: {
+						_Typename: 'Amount',
+						value: eventWebHookDTO.data?.receiveAmount?.value,
+						assetCode: eventWebHookDTO.data?.receiveAmount?.assetCode,
+						assetScale: eventWebHookDTO.data?.receiveAmount?.assetScale,
+					},
+					Description: '',
+				};
+				await this.dbTransactions.create(transaction);
+			}
 
 			await docClient.update(params).promise();
 			await docClient.update(recieverParams).promise();
