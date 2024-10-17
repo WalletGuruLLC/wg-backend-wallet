@@ -772,6 +772,7 @@ export class WalletService {
 			.promise();
 
 		const walletAddresses = [];
+		let dynamoIncomingPayments;
 
 		for (let index = 0; index < dynamoOutgoingPayments.Items.length; index++) {
 			walletAddresses.push(dynamoOutgoingPayments.Items[index].Receiver);
@@ -789,18 +790,20 @@ export class WalletService {
 			.map((_, index) => `:walletAddress${index}`)
 			.join(', ')})`;
 
-		const IncomingParams: DocumentClient.ScanInput = {
-			TableName: 'Transactions',
-			FilterExpression: filterExpression,
-			ExpressionAttributeNames: {
-				'#WalletAddressId': 'WalletAddressId',
-			},
-			ExpressionAttributeValues: expressionAttributeValues,
-		};
+		if (walletAddresses.length > 0) {
+			const IncomingParams: DocumentClient.ScanInput = {
+				TableName: 'Transactions',
+				FilterExpression: filterExpression,
+				ExpressionAttributeNames: {
+					'#WalletAddressId': 'WalletAddressId',
+				},
+				ExpressionAttributeValues: expressionAttributeValues,
+			};
 
-		const dynamoIncomingPayments = await docClient
-			.scan(IncomingParams)
-			.promise();
+			dynamoIncomingPayments = await docClient.scan(IncomingParams).promise();
+		} else {
+			return [];
+		}
 
 		if (search === 'credit') {
 			const incomingSorted = dynamoIncomingPayments.Items.sort(
