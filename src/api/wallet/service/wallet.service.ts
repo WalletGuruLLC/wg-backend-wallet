@@ -1054,10 +1054,6 @@ export class WalletService {
 			}
 
 			if (userIncoming?.status && userWallet) {
-				const postedDebits: number =
-					(userWallet?.postedDebits || 0) +
-					parseInt(incomingPayment.incomingAmount.value);
-
 				const pendingDebits: number =
 					(userWallet?.pendingDebits || 0) -
 					parseInt(incomingPayment.incomingAmount.value);
@@ -1067,10 +1063,8 @@ export class WalletService {
 						Id: userWallet.id,
 					},
 					TableName: 'Wallets',
-					UpdateExpression:
-						'SET PostedDebits = :postedDebits, PendingDebits = :pendingDebits',
+					UpdateExpression: 'SET PendingDebits = :pendingDebits',
 					ExpressionAttributeValues: {
-						':postedDebits': postedDebits,
 						':pendingDebits': pendingDebits,
 					},
 					ReturnValues: 'ALL_NEW',
