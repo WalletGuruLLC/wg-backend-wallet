@@ -985,10 +985,14 @@ export class WalletService {
 				UserId: userWallet.walletDb?.userId,
 				IncomingPaymentId: incomingPaymentId,
 				ReceiverId: incomingPayment?.createReceiver?.receiver?.id,
+				SenderUrl: userWallet?.walletDb?.walletAddress,
+				ReceiverUrl: input?.walletAddressUrl,
 			};
 
 			await this.dbTransactions.create({
 				Type: 'IncomingPayment',
+				SenderUrl: userWallet?.walletDb?.walletAddress,
+				ReceiverUrl: input?.walletAddressUrl,
 				IncomingPaymentId: incomingPaymentId,
 				WalletAddressId: incomingPayment?.createReceiver?.receiver?.id,
 				State: incomingPayment?.createReceiver?.receiver?.state ?? 'PENDING',
@@ -1570,6 +1574,8 @@ export class WalletService {
 
 		await this.dbTransactions.create({
 			Type: 'OutgoingPayment',
+			SenderUrl: incomingPayment?.[0]?.SenderUrl,
+			ReceiverUrl: incomingPayment?.[0]?.ReceiverUrl,
 			OutgoingPaymentId: outgoing?.createOutgoingPayment?.payment?.id,
 			WalletAddressId:
 				outgoing?.createOutgoingPayment?.payment?.walletAddressId,

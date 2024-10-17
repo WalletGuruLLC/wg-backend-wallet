@@ -462,6 +462,8 @@ export class RafikiWalletController {
 
 				const transaction = {
 					Type: 'OutgoingPayment',
+					SenderUrl: userWallet?.walletAddress,
+					ReceiverUrl: input?.walletAddressUrl,
 					OutgoingPaymentId:
 						outgoingPayment?.createOutgoingPayment?.payment?.id,
 					WalletAddressId:
