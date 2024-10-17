@@ -519,8 +519,6 @@ export class RafikiWalletController {
 					Description: '',
 				};
 
-				await this.dbTransactions.create(transaction);
-
 				await this.walletService.sendMoneyMailConfirmation(
 					inputOutgoing,
 					outgoingPayment

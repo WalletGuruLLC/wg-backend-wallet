@@ -977,27 +977,6 @@ export class WalletService {
 				ReceiverUrl: input?.walletAddressUrl,
 			};
 
-			await this.dbTransactions.create({
-				Type: 'IncomingPayment',
-				SenderUrl: userWallet?.walletDb?.walletAddress,
-				ReceiverUrl: input?.walletAddressUrl,
-				IncomingPaymentId: incomingPaymentId,
-				WalletAddressId: incomingPayment?.createReceiver?.receiver?.id,
-				State: incomingPayment?.createReceiver?.receiver?.state ?? 'PENDING',
-				IncomingAmount: {
-					_Typename: 'Amount',
-					value:
-						incomingPayment?.createReceiver?.receiver?.incomingAmount?.value,
-					assetCode:
-						incomingPayment?.createReceiver?.receiver?.incomingAmount
-							?.assetCode,
-					assetScale:
-						incomingPayment?.createReceiver?.receiver?.incomingAmount
-							?.assetScale,
-				},
-				Description: '',
-			});
-
 			return await this.dbUserIncoming.create(userIncomingPayment);
 		} catch (error) {
 			Sentry.captureException(error);
@@ -1652,32 +1631,6 @@ export class WalletService {
 		}
 
 		const outgoing = await this.createOutgoingPayment(inputOutgoing);
-
-		await this.dbTransactions.create({
-			Type: 'OutgoingPayment',
-			SenderUrl: incomingPayment?.[0]?.SenderUrl,
-			ReceiverUrl: incomingPayment?.[0]?.ReceiverUrl,
-			OutgoingPaymentId: outgoing?.createOutgoingPayment?.payment?.id,
-			WalletAddressId:
-				outgoing?.createOutgoingPayment?.payment?.walletAddressId,
-			State: outgoing?.createOutgoingPayment?.payment?.state,
-			Metadata: inputOutgoing?.metadata || {},
-			Receiver: inputOutgoing?.quoteId,
-			ReceiveAmount: {
-				_Typename: 'Amount',
-				value: outgoing?.createOutgoingPayment?.payment?.receiveAmount?.value,
-				assetCode:
-					outgoing?.createOutgoingPayment?.payment?.receiveAmount?.assetCode,
-				assetScale:
-					outgoing?.createOutgoingPayment?.payment?.receiveAmount?.assetScale,
-			},
-			Description: '',
-		});
-
-		await this.createDepositOutgoingMutationService({
-			outgoingPaymentId: outgoing?.createOutgoingPayment?.payment?.id,
-			idempotencyKey: uuidv4(),
-		});
 
 		return {
 			action: 'hc',
