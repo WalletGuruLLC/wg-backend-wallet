@@ -1051,8 +1051,7 @@ export class WalletService {
 						Id: userWallet.id,
 					},
 					TableName: 'Wallets',
-					UpdateExpression:
-						'SET PostedDebits = :postedDebits, PendingDebits = :pendingDebits',
+					UpdateExpression: 'SET PendingDebits = :pendingDebits',
 					ExpressionAttributeValues: {
 						':pendingDebits': pendingDebits,
 					},
