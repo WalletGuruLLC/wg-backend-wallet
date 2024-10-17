@@ -39,6 +39,7 @@ import { User } from '../entities/user.entity';
 import { UserSchema } from '../entities/user.schema';
 import { adjustValue } from 'src/utils/helpers/generalAdjustValue';
 import { calcularTotalCosto } from 'src/utils/helpers/calcularTotalTransactionPlat';
+import { parseStringToBoolean } from 'src/utils/helpers/parseStringToBoolean';
 
 @Injectable()
 export class WalletService {
@@ -842,17 +843,23 @@ export class WalletService {
 		}
 	}
 
-	async listIncomingPayments(token: string) {
+	async listIncomingPayments(token: string, state?: any, userInfo?: any) {
 		const userWallet = await this.getUserByToken(token);
 
 		const userIncomingPayment = await this.getIncomingPaymentsByUser(
-			userWallet?.UserId
+			userWallet?.UserId,
+			state,
+			userInfo
 		);
+
+		if (userIncomingPayment?.[0]?.state == 'BLANK') {
+			return userIncomingPayment;
+		}
 
 		const incomingPayments = [];
 
 		await Promise.all(
-			userIncomingPayment.map(async userIncomingPayment => {
+			userIncomingPayment?.map(async userIncomingPayment => {
 				const incomingPayment = await this.getIncomingPayment(
 					userIncomingPayment?.incomingPaymentId
 				);
@@ -933,6 +940,11 @@ export class WalletService {
 	async expireDate() {
 		const fechaActual = new Date();
 		fechaActual.setMonth(fechaActual.getMonth() + 1);
+		return `${fechaActual.toISOString()}`;
+	}
+
+	async currentDate() {
+		const fechaActual = new Date();
 		return `${fechaActual.toISOString()}`;
 	}
 
@@ -1318,26 +1330,61 @@ export class WalletService {
 		}
 	}
 
-	async getIncomingPaymentsByUser(userId: string) {
+	async getIncomingPaymentsByUser(
+		userId: string,
+		status?: boolean,
+		userInfo?: any
+	) {
 		const docClient = new DocumentClient();
-		const params = {
+
+		const params: any = {
 			TableName: 'UserIncoming',
 			IndexName: 'UserIdIndex',
-			KeyConditionExpression: `UserId = :userId`,
-			FilterExpression: '#status = :status',
-			ExpressionAttributeNames: {
-				'#status': 'Status',
-			},
+			KeyConditionExpression: 'UserId = :userId',
 			ExpressionAttributeValues: {
 				':userId': userId,
-				':status': true,
 			},
 		};
+		if (status !== undefined) {
+			params.FilterExpression = '#status = :status';
+			params.ExpressionAttributeNames = {
+				'#status': 'Status',
+			};
+			params.ExpressionAttributeValues[':status'] =
+				parseStringToBoolean(status);
+		}
 
 		try {
 			const result = await docClient.query(params).promise();
-			return convertToCamelCase(result?.Items);
+
+			if (!result?.Items?.length) {
+				const expireDate = await this.expireDate();
+				const currentDate = await this.currentDate();
+				const provider = await this.getWalletByProviderId(
+					userInfo?.data?.serviceProviderId
+				);
+				return [
+					{
+						type: 'IncomingPayment',
+						id: uuidv4(),
+						provider: provider?.name,
+						ownerUser: `${userInfo?.data?.firstName} ${userInfo?.data?.lastName}`,
+						state: 'BLANK',
+						incomingAmount: {
+							_Typename: 'Amount',
+							assetScale: 2,
+							assetCode: 'USD',
+							value: '0',
+						},
+						createdAt: currentDate,
+						expiresAt: expireDate,
+					},
+				];
+			}
+
+			return convertToCamelCase(result.Items);
 		} catch (error) {
+			console.log('error', error?.message);
 			Sentry.captureException(error);
 			return {
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
