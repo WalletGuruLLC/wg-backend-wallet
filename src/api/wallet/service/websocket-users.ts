@@ -54,7 +54,6 @@ export class UserWsGateway
 				statusCode: 'WGE0151',
 			});
 			client.disconnect();
-			this.logger.error(`Client ${client.id} failed to provide token`);
 			return;
 		}
 
@@ -71,7 +70,6 @@ export class UserWsGateway
 				statusCode: 'WGE0152',
 			});
 			client.disconnect();
-			this.logger.error(`Client ${client.id} provided invalid token`);
 			return;
 		}
 
@@ -84,11 +82,9 @@ export class UserWsGateway
 			token: token,
 			wgUserId: wgUserId, //TODO: set user id from database for this token
 		});
-		this.logger.log(`Client connected: ${client.id}`);
 	}
 
 	handleDisconnect(client: Socket) {
-		this.logger.log(`Client disconnected: ${client.id}`);
 		for (let i = 0; i < this.wsClients.length; i++) {
 			if (this.wsClients[i].client === client) {
 				this.wsClients.splice(i, 1);
@@ -108,7 +104,6 @@ export class UserWsGateway
 				statusCode: 'WGE0151',
 			});
 			client.disconnect();
-			this.logger.error(`Client ${client.id} failed to provide token`);
 			return;
 		}
 
@@ -120,8 +115,6 @@ export class UserWsGateway
 			const wgUserId = WalletParsed.UserId; //TODO: set user id from database for this token
 
 			for (const c of this.wsClients) {
-				// this.logger.error(`Client ${c.wgUserId}`);
-
 				if (c.wgUserId === wgUserId) {
 					c.client.emit('balance', {
 						pendingCredit: WalletParsed.PendingCredits,
