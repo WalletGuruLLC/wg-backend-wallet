@@ -493,42 +493,10 @@ export class RafikiWalletController {
 					inputOutgoing
 				);
 
-				const transaction = {
-					Type: 'OutgoingPayment',
-					SenderUrl: userWallet?.walletAddress,
-					ReceiverUrl: input?.walletAddressUrl,
-					OutgoingPaymentId:
-						outgoingPayment?.createOutgoingPayment?.payment?.id,
-					WalletAddressId:
-						outgoingPayment?.createOutgoingPayment?.payment?.walletAddressId,
-					State: outgoingPayment?.createOutgoingPayment?.payment?.state,
-					Metadata: inputReceiver?.metadata || {},
-					Receiver: quote?.createQuote?.quote?.receiver,
-					ReceiveAmount: {
-						_Typename: 'Amount',
-						value:
-							outgoingPayment?.createOutgoingPayment?.payment?.receiveAmount
-								?.value,
-						assetCode:
-							outgoingPayment?.createOutgoingPayment?.payment?.receiveAmount
-								?.assetCode,
-						assetScale:
-							outgoingPayment?.createOutgoingPayment?.payment?.receiveAmount
-								?.assetScale,
-					},
-					Description: '',
-				};
-
 				await this.walletService.sendMoneyMailConfirmation(
 					inputOutgoing,
 					outgoingPayment
 				);
-
-				this.authGateway.server.emit('hc', {
-					message: '',
-					statusCode: 'WGS0054',
-					data: transaction,
-				});
 
 				return res.status(200).send({
 					data: outgoingPayment,
