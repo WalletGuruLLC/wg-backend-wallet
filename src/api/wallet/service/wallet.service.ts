@@ -1033,7 +1033,7 @@ export class WalletService {
 			if (userIncoming?.status && userWallet) {
 				const pendingDebits: number =
 					(userWallet?.pendingDebits || 0) -
-					parseInt(incomingPayment.incomingAmount.value);
+					parseInt(incomingPayment.incomingAmount.value) - (incomingPayment.receiveAmount.value)
 
 				const params = {
 					Key: {
