@@ -31,13 +31,13 @@ export class UserWsGateway
 	}
 
 	sendMessageForAll(message: any) {
-		for (let c of this.wsClients) {
+		for (const c of this.wsClients) {
 			c.client.emit('hc', message);
 		}
 	}
 
 	sendBalance(wgUserId: string, balance: any) {
-		for (let c of this.wsClients) {
+		for (const c of this.wsClients) {
 			if (c.wgUserId === wgUserId) {
 				c.client.emit('balance', balance);
 			}
