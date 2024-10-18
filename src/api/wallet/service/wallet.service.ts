@@ -757,7 +757,6 @@ export class WalletService {
 		const walletInfo = await this.graphqlService.listWalletInfo(
 			walletDb.RafikiId
 		);
-		console.log('walletInfo', walletInfo);
 
 		return {
 			walletDb: walletDb,
