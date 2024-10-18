@@ -1632,6 +1632,11 @@ export class WalletService {
 
 		const outgoing = await this.createOutgoingPayment(inputOutgoing);
 
+		await this.createDepositOutgoingMutationService({
+			outgoingPaymentId: outgoing?.createOutgoingPayment?.payment?.id,
+			idempotencyKey: uuidv4(),
+		});
+
 		return {
 			action: 'hc',
 			message: 'Success create outgoing payment id',
