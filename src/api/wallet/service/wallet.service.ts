@@ -1541,11 +1541,15 @@ export class WalletService {
 		}
 
 		const incomingPayment = await this.dbIncomingUser
-			.scan('ServiceProviderId')
+			.query('ServiceProviderId')
 			.eq(serviceProviderId)
 			.where('SenderUrl')
 			.eq(senderUrl)
+			.where('Status')
+			.eq(true)
 			.exec();
+
+		incomingPayment.sort((a: any, b: any) => b?.createdAt - a?.createdAt);
 
 		const quoteInput = {
 			walletAddressId: walletAddressId,
