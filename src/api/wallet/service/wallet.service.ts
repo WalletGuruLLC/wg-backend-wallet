@@ -1034,10 +1034,11 @@ export class WalletService {
 			}
 
 			if (userIncoming?.status && userWallet) {
+				const receivedAmount = parseInt(incomingPayment?.receivedAmount.value);
 				const pendingDebits: number =
 					(userWallet?.pendingDebits || 0) -
 					parseInt(incomingPayment.incomingAmount.value) -
-					parseInt(incomingPayment?.receivedAmount.value);
+					receivedAmount;
 
 				const params = {
 					Key: {
@@ -1066,13 +1067,16 @@ export class WalletService {
 					ReturnValues: 'ALL_NEW',
 				};
 
-				const incomingCancelResponse = await this.cancelIncomingPayment(
-					incomingPaymentId
-				);
+				if (!receivedAmount) {
+					const incomingCancelResponse = await this.cancelIncomingPayment(
+						incomingPaymentId
+					);
+					return incomingCancelResponse;
+				}
 
-				await docClient.update(params).promise();
+				const wallet = await docClient.update(params).promise();
 				await docClient.update(userIncomingParams).promise();
-				return incomingCancelResponse;
+				return wallet?.Attributes;
 			}
 		} catch (error) {
 			Sentry.captureException(error);
