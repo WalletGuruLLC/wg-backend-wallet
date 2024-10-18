@@ -480,6 +480,7 @@ export class RafikiWalletController {
 						)?.toString(),
 					},
 					Description: '',
+					Metadata: inputReceiver?.metadata || {},
 				});
 
 				const inputOutgoing = {
@@ -499,8 +500,7 @@ export class RafikiWalletController {
 					WalletAddressId:
 						outgoingPayment?.createOutgoingPayment?.payment?.walletAddressId,
 					State: outgoingPayment?.createOutgoingPayment?.payment?.state,
-					Metadata:
-						outgoingPayment?.createOutgoingPayment?.payment?.metadata || {},
+					Metadata: inputReceiver?.metadata || {},
 					Receiver: quote?.createQuote?.quote?.receiver,
 					ReceiveAmount: {
 						_Typename: 'Amount',
