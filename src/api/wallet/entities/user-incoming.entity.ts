@@ -9,4 +9,6 @@ export class UserIncomingPayment extends Document {
 	Status?: boolean;
 	CreateDate?: string;
 	UpdateDate?: string;
+	SenderUrl: string;
+	ReceiverUrl: string;
 }

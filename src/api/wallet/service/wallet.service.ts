@@ -767,78 +767,51 @@ export class WalletService {
 		}
 
 		const walletDb = await this.getUserByToken(token);
-		const rafikiId = walletDb.RafikiId;
+		const WalletAddress = walletDb.WalletAddress;
 		const docClient = new DocumentClient();
 
 		const outgoingParams: DocumentClient.ScanInput = {
 			TableName: 'Transactions',
-			FilterExpression: '#WalletAddressId = :WalletAddressId',
+			FilterExpression:
+				'(#ReceiverUrl = :WalletAddress AND #Type = :TypeIncoming) OR (#SenderUrl = :WalletAddress AND #Type = :TypeOutgoing)',
 			ExpressionAttributeNames: {
-				'#WalletAddressId': 'WalletAddressId',
+				'#SenderUrl': 'SenderUrl',
+				'#ReceiverUrl': 'ReceiverUrl',
+				'#Type': 'Type',
 			},
 			ExpressionAttributeValues: {
-				':WalletAddressId': rafikiId,
+				':WalletAddress': WalletAddress,
+				':TypeIncoming': 'IncomingPayment',
+				':TypeOutgoing': 'OutgoingPayment',
 			},
 		};
 		const dynamoOutgoingPayments = await docClient
 			.scan(outgoingParams)
 			.promise();
 
-		const walletAddresses = [];
-		let dynamoIncomingPayments;
-
-		for (let index = 0; index < dynamoOutgoingPayments.Items.length; index++) {
-			walletAddresses.push(dynamoOutgoingPayments.Items[index].Receiver);
-		}
-
-		const expressionAttributeValues = walletAddresses.reduce(
-			(acc, url, index) => {
-				acc[`:walletAddress${index}`] = url;
-				return acc;
-			},
-			{}
+		const sortedArray = dynamoOutgoingPayments.Items.sort(
+			(a: any, b: any) =>
+				new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
 		);
 
-		const filterExpression = `#WalletAddressId IN (${walletAddresses
-			.map((_, index) => `:walletAddress${index}`)
-			.join(', ')})`;
+		if (dynamoOutgoingPayments.Items.length > 0) {
+			const incomingSorted = sortedArray.filter(
+				item => item.Type === 'IncomingPayment'
+			);
+			const outgoingSorted = sortedArray.filter(
+				item => item.Type === 'OutgoingPayment'
+			);
 
-		if (walletAddresses.length > 0) {
-			const IncomingParams: DocumentClient.ScanInput = {
-				TableName: 'Transactions',
-				FilterExpression: filterExpression,
-				ExpressionAttributeNames: {
-					'#WalletAddressId': 'WalletAddressId',
-				},
-				ExpressionAttributeValues: expressionAttributeValues,
-			};
-
-			dynamoIncomingPayments = await docClient.scan(IncomingParams).promise();
+			if (search === 'credit') {
+				return convertToCamelCase(incomingSorted);
+			} else if (search === 'debit') {
+				return convertToCamelCase(outgoingSorted);
+			} else {
+				const combinedSorted = [...incomingSorted, ...outgoingSorted];
+				return convertToCamelCase(combinedSorted);
+			}
 		} else {
 			return [];
-		}
-
-		if (search === 'credit') {
-			const incomingSorted = dynamoIncomingPayments.Items.sort(
-				(a: any, b: any) =>
-					new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-			);
-			return convertToCamelCase(incomingSorted);
-		} else if (search === 'debit') {
-			const outGoingSorted = dynamoOutgoingPayments.Items.sort(
-				(a: any, b: any) =>
-					new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-			);
-			return convertToCamelCase(outGoingSorted);
-		} else {
-			const combinedArray = dynamoIncomingPayments.Items.concat(
-				dynamoOutgoingPayments.Items
-			);
-			const combinedSorted = combinedArray.sort(
-				(a: any, b: any) =>
-					new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-			);
-			return convertToCamelCase(combinedSorted);
 		}
 	}
 
@@ -985,10 +958,14 @@ export class WalletService {
 				UserId: userWallet.walletDb?.userId,
 				IncomingPaymentId: incomingPaymentId,
 				ReceiverId: incomingPayment?.createReceiver?.receiver?.id,
+				SenderUrl: userWallet?.walletDb?.walletAddress,
+				ReceiverUrl: input?.walletAddressUrl,
 			};
 
 			await this.dbTransactions.create({
 				Type: 'IncomingPayment',
+				SenderUrl: userWallet?.walletDb?.walletAddress,
+				ReceiverUrl: input?.walletAddressUrl,
 				IncomingPaymentId: incomingPaymentId,
 				WalletAddressId: incomingPayment?.createReceiver?.receiver?.id,
 				State: incomingPayment?.createReceiver?.receiver?.state ?? 'PENDING',
@@ -1538,6 +1515,24 @@ export class WalletService {
 
 		const quote = await this.createQuote(quoteInput);
 
+		const providerWalletId = quote?.createQuote?.quote?.receiver?.split('/');
+		const incomingPaymentId = providerWalletId?.[4];
+		await this.dbTransactions.create({
+			Type: 'IncomingPayment',
+			SenderUrl: incomingPayment?.[0]?.SenderUrl,
+			ReceiverUrl: incomingPayment?.[0]?.ReceiverUrl,
+			IncomingPaymentId: incomingPaymentId,
+			WalletAddressId: quote?.createQuote?.quote?.receiver,
+			State: 'PENDING',
+			IncomingAmount: {
+				_Typename: 'Amount',
+				value: quoteInput?.receiveAmount?.value?.toString(),
+				assetCode: walletAsset?.asset ?? 'USD',
+				assetScale: walletAsset?.scale ?? 2,
+			},
+			Description: '',
+		});
+
 		const incomingState = await this.getIncomingPaymentById(
 			incomingPayment?.[0]?.IncomingPaymentId
 		);
@@ -1564,12 +1559,14 @@ export class WalletService {
 
 		await this.dbTransactions.create({
 			Type: 'OutgoingPayment',
+			SenderUrl: incomingPayment?.[0]?.SenderUrl,
+			ReceiverUrl: incomingPayment?.[0]?.ReceiverUrl,
 			OutgoingPaymentId: outgoing?.createOutgoingPayment?.payment?.id,
 			WalletAddressId:
 				outgoing?.createOutgoingPayment?.payment?.walletAddressId,
 			State: outgoing?.createOutgoingPayment?.payment?.state,
 			Metadata: outgoing?.createOutgoingPayment?.payment?.metadata,
-			Receiver: outgoing?.createOutgoingPayment?.payment?.receiver,
+			Receiver: inputOutgoing?.quoteId,
 			ReceiveAmount: {
 				_Typename: 'Amount',
 				value: outgoing?.createOutgoingPayment?.payment?.receiveAmount?.value,

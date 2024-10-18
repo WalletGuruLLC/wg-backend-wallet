@@ -35,6 +35,12 @@ export const UserIncomingSchema = new dynamoose.Schema(
 			type: Boolean,
 			default: true,
 		},
+		SenderUrl: {
+			type: String,
+		},
+		ReceiverUrl: {
+			type: String,
+		},
 	},
 	{
 		timestamps: {
