@@ -1169,7 +1169,6 @@ export class RafikiWalletController {
 		}
 	}
 
-
 	@Get('test')
 	@ApiOperation({ summary: 'Get linked service providers' })
 	@ApiResponse({
@@ -1192,7 +1191,5 @@ export class RafikiWalletController {
 			statusCode: HttpStatus.OK,
 			customCode: 'WGE0150',
 		});
-		}
-
-
+	}
 }
