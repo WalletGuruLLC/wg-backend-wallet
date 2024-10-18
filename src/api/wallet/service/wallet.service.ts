@@ -754,9 +754,11 @@ export class WalletService {
 		walletAsset: any;
 	}> {
 		const walletDb = await this.getUserByToken(token);
+
 		const walletInfo = await this.graphqlService.listWalletInfo(
 			walletDb.RafikiId
 		);
+
 		return {
 			walletDb: walletDb,
 			walletAsset: walletInfo.data.walletAddress.asset,
@@ -2087,5 +2089,9 @@ export class WalletService {
 		};
 
 		return linkedProvider;
+	}
+
+	async getWalletByTokenWS(token: string): Promise<Wallet> {
+		return await this.getUserByToken(token);
 	}
 }

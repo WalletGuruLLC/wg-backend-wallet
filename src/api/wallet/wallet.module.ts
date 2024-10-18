@@ -13,6 +13,7 @@ import { AuthGateway } from './service/websocket';
 import { WebHookController } from './controller/webhook.controller';
 import { WebHookEventService } from './service/webhook-event.service';
 import { SqsService } from './sqs/sqs.service';
+import { UserWsGateway } from './service/websocket-users';
 
 @Module({
 	imports: [ConfigModule, VerifyModule],
@@ -23,6 +24,7 @@ import { SqsService } from './sqs/sqs.service';
 		ApolloClientService,
 		GraphqlService,
 		AuthGateway,
+		UserWsGateway,
 		WebHookEventService,
 		SqsService,
 	],
