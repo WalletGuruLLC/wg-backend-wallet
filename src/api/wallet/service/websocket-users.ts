@@ -13,13 +13,13 @@ import { Logger } from '@nestjs/common';
 
 @WebSocketGateway({ cors: true, namespace: 'users-balance' })
 export class UserWsGateway
-	implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+	implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+{
 	@WebSocketServer() server: Server;
 	private logger: Logger = new Logger('MessageGateway');
 	wsClients = [];
 
-	constructor(private readonly authService: WalletService) {
-	}
+	constructor(private readonly authService: WalletService) {}
 
 	afterInit(server: any) {
 		console.log('WebSocket users initialized');
@@ -47,8 +47,7 @@ export class UserWsGateway
 	async handleConnection(client: Socket, ...args: any[]) {
 		const headers = client.handshake.headers;
 		const body = client.data.body || {};
-		const token =
-			body['x-token']?.toString() || headers['token']?.toString();
+		const token = body['x-token']?.toString() || headers['token']?.toString();
 		if (!token) {
 			client.emit('error', {
 				message: 'Token missing!',
@@ -57,6 +56,14 @@ export class UserWsGateway
 			client.disconnect();
 			this.logger.error(`Client ${client.id} failed to provide token`);
 			return;
+		}
+
+		const walletInfoToken = await this.authService.getWalletByTokenWS(token);
+		let wgUserId = '';
+		if (walletInfoToken) {
+			const walletStringfy = JSON.stringify(walletInfoToken);
+			const WalletParsed = JSON.parse(walletStringfy);
+			wgUserId = WalletParsed.UserId;
 		}
 		if (!this.validateToken(token)) {
 			client.emit('error', {
@@ -75,7 +82,7 @@ export class UserWsGateway
 		this.wsClients.push({
 			client: client,
 			token: token,
-			wgUserId: '', //TODO: set user id from database for this token
+			wgUserId: wgUserId, //TODO: set user id from database for this token
 		});
 		this.logger.log(`Client connected: ${client.id}`);
 	}
@@ -88,15 +95,13 @@ export class UserWsGateway
 				break;
 			}
 		}
-
 	}
 
 	@SubscribeMessage('balance')
 	async handleBalance(client: Socket, data: any): Promise<WsResponse<string>> {
 		const headers = client.handshake.headers;
 		const body = client.data.body || {};
-		const token =
-			body['x-token']?.toString() || headers['token']?.toString();
+		const token = body['x-token']?.toString() || headers['token']?.toString();
 		if (!token) {
 			client.emit('error', {
 				message: 'Token missing!',
@@ -106,17 +111,26 @@ export class UserWsGateway
 			this.logger.error(`Client ${client.id} failed to provide token`);
 			return;
 		}
-		const wgUserId = ''; //TODO: set user id from database for this token
-		for (let c of this.wsClients) {
-			if (c.wgUserId === wgUserId) {
-				c.client.emit('balance', {
-					pendingCredit: 0,
-					pendingDebit: 0,
-					postedCredit: 0,
-					postedDebit: 0,
-				});
+
+		const walletInfoToken = await this.authService.getWalletByTokenWS(token);
+		if (walletInfoToken) {
+			const walletStringfy = JSON.stringify(walletInfoToken);
+			const WalletParsed = JSON.parse(walletStringfy);
+
+			const wgUserId = WalletParsed.UserId; //TODO: set user id from database for this token
+
+			for (const c of this.wsClients) {
+				// this.logger.error(`Client ${c.wgUserId}`);
+
+				if (c.wgUserId === wgUserId) {
+					c.client.emit('balance', {
+						pendingCredit: WalletParsed.PendingCredits,
+						pendingDebit: WalletParsed.PendingDebits,
+						postedCredit: WalletParsed.PostedCredits,
+						postedDebit: WalletParsed.PostedDebits,
+					});
+				}
 			}
 		}
-
 	}
 }
