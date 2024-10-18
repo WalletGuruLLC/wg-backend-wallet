@@ -448,10 +448,40 @@ export class RafikiWalletController {
 			const quoteInput = {
 				walletAddressId: input?.walletAddressId,
 				receiver: receiver?.createReceiver?.receiver?.id,
+				receiveAmount: {
+					assetCode: userWalletByToken?.walletAsset?.code,
+					assetScale: userWalletByToken?.walletAsset?.scale,
+					value: adjustValue(
+						input?.amount,
+						userWalletByToken?.walletAsset?.scale
+					),
+				},
 			};
 
 			setTimeout(async () => {
 				const quote = await this.walletService.createQuote(quoteInput);
+				const providerWalletId =
+					quote?.createQuote?.quote?.receiver?.split('/');
+				const incomingPaymentId = providerWalletId?.[4];
+				await this.dbTransactions.create({
+					Type: 'IncomingPayment',
+					SenderUrl: userWallet?.walletAddress,
+					ReceiverUrl: input?.walletAddressUrl,
+					IncomingPaymentId: incomingPaymentId,
+					WalletAddressId: quote?.createQuote?.quote?.receiver,
+					State: 'PENDING',
+					IncomingAmount: {
+						_Typename: 'Amount',
+						assetCode: userWalletByToken?.walletAsset?.code,
+						assetScale: userWalletByToken?.walletAsset?.scale,
+						value: adjustValue(
+							input?.amount,
+							userWalletByToken?.walletAsset?.scale
+						)?.toString(),
+					},
+					Description: '',
+				});
+
 				const inputOutgoing = {
 					walletAddressId: input?.walletAddressId,
 					quoteId: quote?.createQuote?.quote?.id,
@@ -471,7 +501,7 @@ export class RafikiWalletController {
 					State: outgoingPayment?.createOutgoingPayment?.payment?.state,
 					Metadata:
 						outgoingPayment?.createOutgoingPayment?.payment?.metadata || {},
-					Receiver: outgoingPayment?.createOutgoingPayment?.payment?.receiver,
+					Receiver: quote?.createQuote?.quote?.receiver,
 					ReceiveAmount: {
 						_Typename: 'Amount',
 						value:

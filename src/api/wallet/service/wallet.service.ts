@@ -1548,6 +1548,24 @@ export class WalletService {
 
 		const quote = await this.createQuote(quoteInput);
 
+		const providerWalletId = quote?.createQuote?.quote?.receiver?.split('/');
+		const incomingPaymentId = providerWalletId?.[4];
+		await this.dbTransactions.create({
+			Type: 'IncomingPayment',
+			SenderUrl: incomingPayment?.[0]?.SenderUrl,
+			ReceiverUrl: incomingPayment?.[0]?.ReceiverUrl,
+			IncomingPaymentId: incomingPaymentId,
+			WalletAddressId: quote?.createQuote?.quote?.receiver,
+			State: 'PENDING',
+			IncomingAmount: {
+				_Typename: 'Amount',
+				value: quoteInput?.receiveAmount?.value?.toString(),
+				assetCode: walletAsset?.asset ?? 'USD',
+				assetScale: walletAsset?.scale ?? 2,
+			},
+			Description: '',
+		});
+
 		const incomingState = await this.getIncomingPaymentById(
 			incomingPayment?.[0]?.IncomingPaymentId
 		);
@@ -1581,7 +1599,7 @@ export class WalletService {
 				outgoing?.createOutgoingPayment?.payment?.walletAddressId,
 			State: outgoing?.createOutgoingPayment?.payment?.state,
 			Metadata: outgoing?.createOutgoingPayment?.payment?.metadata,
-			Receiver: outgoing?.createOutgoingPayment?.payment?.receiver,
+			Receiver: inputOutgoing?.quoteId,
 			ReceiveAmount: {
 				_Typename: 'Amount',
 				value: outgoing?.createOutgoingPayment?.payment?.receiveAmount?.value,
