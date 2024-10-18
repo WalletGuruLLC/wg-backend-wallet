@@ -382,6 +382,7 @@ export class WalletService {
 		);
 		return {
 			walletDb: walletById?.[0]?.RafikiId,
+			walletUrl: walletById?.[0]?.WalletAddress,
 			walletAsset: walletInfo.data.walletAddress.asset,
 		};
 	}
@@ -856,7 +857,7 @@ export class WalletService {
 						provider: provider.name,
 						ownerUser: `${user?.firstName} ${user?.lastName}`,
 						state: incomingPayment.state,
-						incomingAmount: incomingPayment.incomingAmount,
+						incomingAmount: incomingPayment?.incomingAmount,
 						createdAt: incomingPayment.createdAt,
 						expiresAt: incomingPayment?.expiresAt,
 					};
@@ -1308,7 +1309,7 @@ export class WalletService {
 		userInfo?: any
 	) {
 		const docClient = new DocumentClient();
-
+		const linkedProviders = await this.getLinkedProvidersUserById(userId);
 		const params: any = {
 			TableName: 'UserIncoming',
 			IndexName: 'UserIdIndex',
@@ -1333,7 +1334,7 @@ export class WalletService {
 				const expireDate = await this.expireDate();
 				const currentDate = await this.currentDate();
 				const provider = await this.getWalletByProviderId(
-					userInfo?.data?.serviceProviderId
+					linkedProviders?.[0]?.serviceProviderId
 				);
 				return [
 					{
@@ -1523,7 +1524,8 @@ export class WalletService {
 		walletAddressId,
 		walletAsset,
 		serviceProviderId,
-		userId
+		userId,
+		senderUrl
 	) {
 		const parameterExists = await this.validatePaymentParameterId(
 			parameterId,
@@ -1541,29 +1543,65 @@ export class WalletService {
 		const incomingPayment = await this.dbIncomingUser
 			.scan('ServiceProviderId')
 			.eq(serviceProviderId)
+			.where('SenderUrl')
+			.eq(senderUrl)
 			.exec();
 
 		const quoteInput = {
 			walletAddressId: walletAddressId,
 			receiver: incomingPayment?.[0]?.ReceiverId,
 			receiveAmount: {
-				value: adjustValueByCurrency(
+				value: adjustValue(
 					calcularTotalCosto(
 						parameterExists?.base,
 						parameterExists?.comision,
 						parameterExists?.cost,
 						parameterExists?.percent
 					),
-					walletAsset?.code ?? 'USD'
+					walletAsset?.scale
 				),
 				assetCode: walletAsset?.asset ?? 'USD',
 				assetScale: walletAsset?.scale ?? 2,
 			},
 		};
 
-		const quote = await this.createQuote(quoteInput);
+		const walletByUserId = await this.dbInstance
+			.scan('UserId')
+			.eq(userId)
+			.attributes([
+				'RafikiId',
+				'PostedCredits',
+				'PostedDebits',
+				'PendingCredits',
+				'PendingDebits',
+			])
+			.exec();
 
+		const userWallet = await walletByUserId?.[0];
+
+		const balance =
+			userWallet?.PostedCredits -
+			(userWallet?.PendingDebits + userWallet?.PostedDebits);
+
+		if (quoteInput?.receiveAmount?.value > balance) {
+			return {
+				action: 'error',
+				message: 'Missing funds',
+				statusCode: 'WGE0205',
+			};
+		}
+
+		const quote = await this.createQuote(quoteInput);
 		const providerWalletId = quote?.createQuote?.quote?.receiver?.split('/');
+
+		if (!providerWalletId) {
+			return {
+				action: 'error',
+				message: 'Invalid quote',
+				statusCode: 'WGE0205',
+			};
+		}
+
 		const incomingPaymentId = providerWalletId?.[4];
 		const inputOutgoing = {
 			walletAddressId: walletAddressId,

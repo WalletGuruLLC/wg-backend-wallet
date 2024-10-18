@@ -225,7 +225,8 @@ export class AuthGateway
 					walletAddress?.walletDb,
 					walletAddress?.walletAsset,
 					serviceProviderId,
-					wgUserId
+					wgUserId,
+					walletAddress?.walletUrl
 				);
 				if (responsePlay?.action == 'hc') {
 					client.emit('hc', {
