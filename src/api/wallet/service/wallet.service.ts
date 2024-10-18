@@ -1564,6 +1564,15 @@ export class WalletService {
 
 		const providerWalletId = quote?.createQuote?.quote?.receiver?.split('/');
 		const incomingPaymentId = providerWalletId?.[4];
+		const inputOutgoing = {
+			walletAddressId: walletAddressId,
+			quoteId: quote?.createQuote?.quote?.id,
+			metadata: {
+				description: '',
+				type: 'PROVIDER',
+				wgUser: userId,
+			},
+		};
 		await this.dbTransactions.create({
 			Type: 'IncomingPayment',
 			SenderUrl: incomingPayment?.[0]?.SenderUrl,
@@ -1571,6 +1580,7 @@ export class WalletService {
 			IncomingPaymentId: incomingPaymentId,
 			WalletAddressId: quote?.createQuote?.quote?.receiver,
 			State: 'PENDING',
+			Metadata: inputOutgoing?.metadata || {},
 			IncomingAmount: {
 				_Typename: 'Amount',
 				value: quoteInput?.receiveAmount?.value?.toString(),
@@ -1592,16 +1602,6 @@ export class WalletService {
 			};
 		}
 
-		const inputOutgoing = {
-			walletAddressId: walletAddressId,
-			quoteId: quote?.createQuote?.quote?.id,
-			metadata: {
-				description: '',
-				type: 'PROVIDER',
-				wgUser: userId,
-			},
-		};
-
 		const outgoing = await this.createOutgoingPayment(inputOutgoing);
 
 		await this.dbTransactions.create({
@@ -1612,7 +1612,7 @@ export class WalletService {
 			WalletAddressId:
 				outgoing?.createOutgoingPayment?.payment?.walletAddressId,
 			State: outgoing?.createOutgoingPayment?.payment?.state,
-			Metadata: outgoing?.createOutgoingPayment?.payment?.metadata,
+			Metadata: inputOutgoing?.metadata || {},
 			Receiver: inputOutgoing?.quoteId,
 			ReceiveAmount: {
 				_Typename: 'Amount',
@@ -1623,6 +1623,11 @@ export class WalletService {
 					outgoing?.createOutgoingPayment?.payment?.receiveAmount?.assetScale,
 			},
 			Description: '',
+		});
+
+		await this.createDepositOutgoingMutationService({
+			outgoingPaymentId: outgoing?.createOutgoingPayment?.payment?.id,
+			idempotencyKey: uuidv4(),
 		});
 
 		return {
