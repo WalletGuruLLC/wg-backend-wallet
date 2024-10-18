@@ -20,6 +20,8 @@ export class Transaction extends Document {
 	ReceiveAmount?: Amount;
 	CreatedAt: Date;
 	Description: string;
+	SenderUrl: string;
+	ReceiverUrl: string;
 }
 
 export interface BaseTransaction {
