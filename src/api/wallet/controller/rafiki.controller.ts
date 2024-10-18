@@ -53,6 +53,7 @@ import { adjustValue } from 'src/utils/helpers/generalAdjustValue';
 import { Model } from 'dynamoose/dist/Model';
 import { Transaction } from '../entities/transactions.entity';
 import { TransactionsSchema } from '../entities/transactions.schema';
+import { UserWsGateway } from '../service/websocket-users';
 
 @ApiTags('wallet-rafiki')
 @Controller('api/v1/wallets-rafiki')
@@ -65,6 +66,7 @@ export class RafikiWalletController {
 		private readonly walletService: WalletService,
 		private readonly verifyService: VerifyService,
 		private readonly authGateway: AuthGateway,
+		private readonly userWsGateway: UserWsGateway,
 		private configService: ConfigService
 	) {
 		this.AUTH_MICRO_URL = this.configService.get<string>('AUTH_URL');
@@ -1166,4 +1168,31 @@ export class RafikiWalletController {
 			});
 		}
 	}
+
+
+	@Get('test')
+	@ApiOperation({ summary: 'Get linked service providers' })
+	@ApiResponse({
+		status: 201,
+		description: 'Linked providrs retrieved successfully.',
+	})
+	@ApiResponse({ status: 400, description: 'Bad Request' })
+	async testWsUser(
+		@Headers() headers: MapOfStringToList,
+		@Req() req,
+		@Res() res
+	) {
+		this.userWsGateway.sendBalance('', {
+			pendingCredit: 0,
+			pendingDebit: 0,
+			postedCredit: 0,
+			postedDebit: 0,
+		});
+		return res.status(200).send({
+			statusCode: HttpStatus.OK,
+			customCode: 'WGE0150',
+		});
+		}
+
+
 }
