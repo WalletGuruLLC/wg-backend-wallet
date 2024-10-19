@@ -15,7 +15,6 @@ export class IncomingPaymentCompletedEvent implements EventWebHook {
 				eventWebHookDTO.data.id
 			);
 
-
 		const transactionParams = {
 			Key: {
 				Id: transaction.id,
