@@ -20,9 +20,12 @@ export class IncomingPaymentCompletedEvent implements EventWebHook {
 				Id: transaction.id,
 			},
 			TableName: 'Transactions',
-			UpdateExpression: 'SET Status = :status',
+			ExpressionAttributeNames: {
+				'#state': 'State',
+			},
+			UpdateExpression: 'SET #state = :state',
 			ExpressionAttributeValues: {
-				':status': 'COMPLETED',
+				':state': 'COMPLETED',
 			},
 			ReturnValues: 'ALL_NEW',
 		};
