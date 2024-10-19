@@ -65,6 +65,7 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 				const transaction = {
 					Type: 'IncomingPayment',
 					IncomingPaymentId: eventWebHookDTO.data?.id,
+					WalletAddressId: eventWebHookDTO?.data?.walletAddressId,
 					ReceiverUrl: recieverWallet?.walletAddress,
 					SenderUrl: senderWallet?.walletAddress,
 					State: eventWebHookDTO.data?.state,

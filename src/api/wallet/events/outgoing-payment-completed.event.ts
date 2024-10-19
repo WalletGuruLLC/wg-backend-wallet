@@ -86,6 +86,7 @@ export class OutGoingPaymentCompletedEvent implements EventWebHook {
 					State: eventWebHookDTO.data?.state,
 					Metadata: eventWebHookDTO.data?.metadata,
 					Receiver: eventWebHookDTO.data?.receiver,
+					WalletAddressId: eventWebHookDTO?.data?.walletAddressId,
 					ReceiveAmount: {
 						_Typename: 'Amount',
 						value: eventWebHookDTO.data?.receiveAmount?.value,
