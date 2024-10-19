@@ -28,9 +28,9 @@ export class IncomingPaymentCompletedEvent implements EventWebHook {
 		};
 
 		try {
-			const result = await docClient.update(params).promise();
-
-			return convertToCamelCase(result);
+			if (eventWebHookDTO?.data?.metadata?.type === 'PROVIDER') {
+				const result = await docClient.update(params).promise();
+			}
 		} catch (error) {
 			Sentry.captureException(error);
 			throw new Error(
