@@ -14,15 +14,17 @@ export class IncomingPaymentCompletedEvent implements EventWebHook {
 			await this.walletService.getTransactionByIncomingPaymentId(
 				eventWebHookDTO.data.id
 			);
-
 		const transactionParams = {
 			Key: {
 				Id: transaction.id,
 			},
 			TableName: 'Transactions',
-			UpdateExpression: 'SET Status = :status',
+			ExpressionAttributeNames: {
+				'#state': 'State',
+			},
+			UpdateExpression: 'SET #state = :state',
 			ExpressionAttributeValues: {
-				':status': 'COMPLETED',
+				':state': 'COMPLETED',
 			},
 			ReturnValues: 'ALL_NEW',
 		};
@@ -47,7 +49,7 @@ export class IncomingPaymentCompletedEvent implements EventWebHook {
 				};
 				await docClient.update(params).promise();
 			}
-			await docClient.update(transactionParams);
+			await docClient.update(transactionParams).promise();
 		} catch (error) {
 			Sentry.captureException(error);
 			throw new Error(
