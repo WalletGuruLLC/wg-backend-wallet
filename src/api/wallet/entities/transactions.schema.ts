@@ -64,10 +64,6 @@ export const TransactionsSchema = new dynamoose.Schema(
 				assetScale: Number,
 			},
 		},
-		CreatedAt: {
-			type: Date,
-			default: () => new Date(),
-		},
 		Description: {
 			type: String,
 		},
