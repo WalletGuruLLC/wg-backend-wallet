@@ -10,27 +10,10 @@ export class IncomingPaymentCompletedEvent implements EventWebHook {
 	constructor(private readonly walletService: WalletService) {}
 	async trigger(eventWebHookDTO: EventWebHookDTO, wallet): Promise<void> {
 		const docClient = new DocumentClient();
-
-		const userIncoming = await this.walletService.getUserIncomingPaymentById(
-			eventWebHookDTO.data.id
-		);
-
 		const transaction =
 			await this.walletService.getTransactionByIncomingPaymentId(
 				eventWebHookDTO.data.id
 			);
-
-		const params = {
-			Key: {
-				Id: userIncoming.id,
-			},
-			TableName: 'UserIncoming',
-			UpdateExpression: 'SET Status = :status',
-			ExpressionAttributeValues: {
-				':status': false,
-			},
-			ReturnValues: 'ALL_NEW',
-		};
 
 		const transactionParams = {
 			Key: {
@@ -46,7 +29,23 @@ export class IncomingPaymentCompletedEvent implements EventWebHook {
 
 		try {
 			if (eventWebHookDTO?.data?.metadata?.type === 'PROVIDER') {
-				const result = await docClient.update(params).promise();
+				const userIncoming =
+					await this.walletService.getUserIncomingPaymentById(
+						eventWebHookDTO.data.id
+					);
+
+				const params = {
+					Key: {
+						Id: userIncoming.id,
+					},
+					TableName: 'UserIncoming',
+					UpdateExpression: 'SET Status = :status',
+					ExpressionAttributeValues: {
+						':status': false,
+					},
+					ReturnValues: 'ALL_NEW',
+				};
+				await docClient.update(params).promise();
 			}
 			await docClient.update(transactionParams);
 		} catch (error) {
