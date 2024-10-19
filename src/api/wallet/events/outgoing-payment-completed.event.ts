@@ -74,29 +74,27 @@ export class OutGoingPaymentCompletedEvent implements EventWebHook {
 				ReturnValues: 'ALL_NEW',
 			};
 
-			if (eventWebHookDTO?.data?.metadata?.type === 'PROVIDER') {
-				const userWallet = await this.walletService.getWalletByRafikyId(
-					eventWebHookDTO?.data?.walletAddressId
-				);
-				const transaction = {
-					Type: 'OutgoingPayment',
-					OutgoingPaymentId: eventWebHookDTO.data?.id,
-					ReceiverUrl: recieverWallet?.walletAddress,
-					SenderUrl: userWallet?.walletAddress,
-					State: eventWebHookDTO.data?.state,
-					Metadata: eventWebHookDTO.data?.metadata,
-					Receiver: eventWebHookDTO.data?.receiver,
-					WalletAddressId: eventWebHookDTO?.data?.walletAddressId,
-					ReceiveAmount: {
-						_Typename: 'Amount',
-						value: eventWebHookDTO.data?.receiveAmount?.value,
-						assetCode: eventWebHookDTO.data?.receiveAmount?.assetCode,
-						assetScale: eventWebHookDTO.data?.receiveAmount?.assetScale,
-					},
-					Description: '',
-				};
-				await this.dbTransactions.create(transaction);
-			}
+			const userWallet = await this.walletService.getWalletByRafikyId(
+				eventWebHookDTO?.data?.walletAddressId
+			);
+			const transaction = {
+				Type: 'OutgoingPayment',
+				OutgoingPaymentId: eventWebHookDTO.data?.id,
+				ReceiverUrl: recieverWallet?.walletAddress,
+				SenderUrl: userWallet?.walletAddress,
+				State: eventWebHookDTO.data?.state,
+				Metadata: eventWebHookDTO.data?.metadata,
+				Receiver: eventWebHookDTO.data?.receiver,
+				WalletAddressId: eventWebHookDTO?.data?.walletAddressId,
+				ReceiveAmount: {
+					_Typename: 'Amount',
+					value: eventWebHookDTO.data?.receiveAmount?.value,
+					assetCode: eventWebHookDTO.data?.receiveAmount?.assetCode,
+					assetScale: eventWebHookDTO.data?.receiveAmount?.assetScale,
+				},
+				Description: '',
+			};
+			await this.dbTransactions.create(transaction);
 
 			await docClient.update(params).promise();
 			await docClient.update(recieverParams).promise();

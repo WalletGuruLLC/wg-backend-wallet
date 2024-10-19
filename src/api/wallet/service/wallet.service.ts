@@ -1601,22 +1601,6 @@ export class WalletService {
 				wgUser: userId,
 			},
 		};
-		await this.dbTransactions.create({
-			Type: 'IncomingPayment',
-			SenderUrl: incomingPayment?.[0]?.SenderUrl,
-			ReceiverUrl: incomingPayment?.[0]?.ReceiverUrl,
-			IncomingPaymentId: incomingPaymentId,
-			WalletAddressId: quote?.createQuote?.quote?.receiver,
-			State: 'PENDING',
-			Metadata: inputOutgoing?.metadata || {},
-			IncomingAmount: {
-				_Typename: 'Amount',
-				value: quoteInput?.receiveAmount?.value?.toString(),
-				assetCode: walletAsset?.asset ?? 'USD',
-				assetScale: walletAsset?.scale ?? 2,
-			},
-			Description: '',
-		});
 
 		const incomingState = await this.getIncomingPaymentById(
 			incomingPayment?.[0]?.IncomingPaymentId

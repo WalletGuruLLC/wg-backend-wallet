@@ -56,31 +56,29 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 				await docClient.update(userWalletParams).promise();
 			}
 
-			if (eventWebHookDTO?.data?.metadata?.type === 'PROVIDER') {
-				const recieverWallet = await this.walletService.getWalletByRafikyId(
-					eventWebHookDTO?.data?.walletAddressId
-				);
+			const recieverWallet = await this.walletService.getWalletByRafikyId(
+				eventWebHookDTO?.data?.walletAddressId
+			);
 
-				const senderWallet = await this.walletService.getWalletUserById(userId);
-				const transaction = {
-					Type: 'IncomingPayment',
-					IncomingPaymentId: eventWebHookDTO.data?.id,
-					WalletAddressId: eventWebHookDTO?.data?.walletAddressId,
-					ReceiverUrl: recieverWallet?.walletAddress,
-					SenderUrl: senderWallet?.walletAddress,
-					State: eventWebHookDTO.data?.state,
-					Metadata: eventWebHookDTO.data?.metadata,
-					Receiver: eventWebHookDTO.data?.receiver,
-					IncomingAmount: {
-						_Typename: 'Amount',
-						value: eventWebHookDTO.data?.incomingAmount?.value,
-						assetCode: eventWebHookDTO.data?.incomingAmount?.assetCode,
-						assetScale: eventWebHookDTO.data?.incomingAmount?.assetScale,
-					},
-					Description: '',
-				};
-				await this.dbTransactions.create(transaction);
-			}
+			const senderWallet = await this.walletService.getWalletUserById(userId);
+			const transaction = {
+				Type: 'IncomingPayment',
+				IncomingPaymentId: eventWebHookDTO.data?.id,
+				WalletAddressId: eventWebHookDTO?.data?.walletAddressId,
+				ReceiverUrl: recieverWallet?.walletAddress,
+				SenderUrl: senderWallet?.walletAddress,
+				State: eventWebHookDTO.data?.state,
+				Metadata: eventWebHookDTO.data?.metadata,
+				Receiver: eventWebHookDTO.data?.receiver,
+				IncomingAmount: {
+					_Typename: 'Amount',
+					value: eventWebHookDTO.data?.incomingAmount?.value,
+					assetCode: eventWebHookDTO.data?.incomingAmount?.assetCode,
+					assetScale: eventWebHookDTO.data?.incomingAmount?.assetScale,
+				},
+				Description: '',
+			};
+			await this.dbTransactions.create(transaction);
 
 			const result = await docClient.update(params).promise();
 
