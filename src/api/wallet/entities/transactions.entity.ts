@@ -1,5 +1,11 @@
 import { Document } from 'dynamoose/dist/Document';
 
+export interface Metadata {
+	type: string;
+	wgUser: string;
+	description: string;
+}
+
 export interface Amount {
 	_Typename: string;
 	value: string;
@@ -14,7 +20,7 @@ export class Transaction extends Document {
 	IncomingPaymentId?: string;
 	WalletAddressId: string;
 	State: string;
-	Metadata?: object | null;
+	Metadata?: Metadata;
 	Receiver: string;
 	IncomingAmount?: Amount;
 	ReceiveAmount?: Amount;
