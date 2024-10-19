@@ -382,6 +382,7 @@ export class WalletService {
 		);
 		return {
 			walletDb: walletById?.[0]?.RafikiId,
+			walletUrl: walletById?.[0]?.WalletAddress,
 			walletAsset: walletInfo.data.walletAddress.asset,
 		};
 	}
@@ -753,9 +754,11 @@ export class WalletService {
 		walletAsset: any;
 	}> {
 		const walletDb = await this.getUserByToken(token);
+
 		const walletInfo = await this.graphqlService.listWalletInfo(
 			walletDb.RafikiId
 		);
+
 		return {
 			walletDb: walletDb,
 			walletAsset: walletInfo.data.walletAddress.asset,
@@ -850,15 +853,26 @@ export class WalletService {
 					incomingPayment.state !== 'COMPLETED' ||
 					incomingPayment.state !== 'EXPIRED'
 				) {
+					const updatedIncomingPayment = {
+						...incomingPayment,
+						incomingAmount: {
+							...incomingPayment.incomingAmount,
+							value: (
+								parseInt(incomingPayment?.incomingAmount?.value ?? '0') -
+								parseInt(incomingPayment?.receivedAmount?.value ?? '0')
+							).toString(),
+						},
+					};
+
 					const incomingConverted = {
-						type: incomingPayment.__typename,
-						id: incomingPayment.id,
+						type: updatedIncomingPayment.__typename,
+						id: updatedIncomingPayment.id,
 						provider: provider.name,
 						ownerUser: `${user?.firstName} ${user?.lastName}`,
-						state: incomingPayment.state,
-						incomingAmount: incomingPayment.incomingAmount,
-						createdAt: incomingPayment.createdAt,
-						expiresAt: incomingPayment?.expiresAt,
+						state: updatedIncomingPayment.state,
+						incomingAmount: updatedIncomingPayment?.incomingAmount,
+						createdAt: updatedIncomingPayment.createdAt,
+						expiresAt: updatedIncomingPayment?.expiresAt,
 					};
 					incomingPayments.push(incomingConverted);
 				}
@@ -974,27 +988,6 @@ export class WalletService {
 				ReceiverUrl: input?.walletAddressUrl,
 			};
 
-			await this.dbTransactions.create({
-				Type: 'IncomingPayment',
-				SenderUrl: userWallet?.walletDb?.walletAddress,
-				ReceiverUrl: input?.walletAddressUrl,
-				IncomingPaymentId: incomingPaymentId,
-				WalletAddressId: incomingPayment?.createReceiver?.receiver?.id,
-				State: incomingPayment?.createReceiver?.receiver?.state ?? 'PENDING',
-				IncomingAmount: {
-					_Typename: 'Amount',
-					value:
-						incomingPayment?.createReceiver?.receiver?.incomingAmount?.value,
-					assetCode:
-						incomingPayment?.createReceiver?.receiver?.incomingAmount
-							?.assetCode,
-					assetScale:
-						incomingPayment?.createReceiver?.receiver?.incomingAmount
-							?.assetScale,
-				},
-				Description: '',
-			});
-
 			return await this.dbUserIncoming.create(userIncomingPayment);
 		} catch (error) {
 			Sentry.captureException(error);
@@ -1031,9 +1024,10 @@ export class WalletService {
 			}
 
 			if (userIncoming?.status && userWallet) {
+				const receivedAmount = parseInt(incomingPayment?.receivedAmount.value);
+				const incomingValue = parseInt(incomingPayment.incomingAmount.value);
 				const pendingDebits: number =
-					(userWallet?.pendingDebits || 0) -
-					parseInt(incomingPayment.incomingAmount.value);
+					(userWallet?.pendingDebits || 0) - (incomingValue - receivedAmount);
 
 				const params = {
 					Key: {
@@ -1062,13 +1056,16 @@ export class WalletService {
 					ReturnValues: 'ALL_NEW',
 				};
 
-				const incomingCancelResponse = await this.cancelIncomingPayment(
-					incomingPaymentId
-				);
+				if (!receivedAmount) {
+					const incomingCancelResponse = await this.cancelIncomingPayment(
+						incomingPaymentId
+					);
+					return incomingCancelResponse;
+				}
 
-				await docClient.update(params).promise();
+				const wallet = await docClient.update(params).promise();
 				await docClient.update(userIncomingParams).promise();
-				return incomingCancelResponse;
+				return wallet?.Attributes;
 			}
 		} catch (error) {
 			Sentry.captureException(error);
@@ -1307,7 +1304,7 @@ export class WalletService {
 		userInfo?: any
 	) {
 		const docClient = new DocumentClient();
-
+		const linkedProviders = await this.getLinkedProvidersUserById(userId);
 		const params: any = {
 			TableName: 'UserIncoming',
 			IndexName: 'UserIdIndex',
@@ -1332,8 +1329,11 @@ export class WalletService {
 				const expireDate = await this.expireDate();
 				const currentDate = await this.currentDate();
 				const provider = await this.getWalletByProviderId(
-					userInfo?.data?.serviceProviderId
+					linkedProviders?.[0]?.serviceProviderId
 				);
+				if (!provider?.name) {
+					return [];
+				}
 				return [
 					{
 						type: 'IncomingPayment',
@@ -1368,6 +1368,29 @@ export class WalletService {
 		const docClient = new DocumentClient();
 		const params = {
 			TableName: 'UserIncoming',
+			IndexName: 'IncomingPaymentIdIndex',
+			KeyConditionExpression: `IncomingPaymentId = :incomingPaymentId`,
+			ExpressionAttributeValues: {
+				':incomingPaymentId': incomingPaymentId,
+			},
+		};
+
+		try {
+			const result = await docClient.query(params).promise();
+			return convertToCamelCase(result?.Items?.[0]);
+		} catch (error) {
+			Sentry.captureException(error);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0167',
+			};
+		}
+	}
+
+	async getTransactionByIncomingPaymentId(incomingPaymentId: string) {
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'Transactions',
 			IndexName: 'IncomingPaymentIdIndex',
 			KeyConditionExpression: `IncomingPaymentId = :incomingPaymentId`,
 			ExpressionAttributeValues: {
@@ -1522,7 +1545,8 @@ export class WalletService {
 		walletAddressId,
 		walletAsset,
 		serviceProviderId,
-		userId
+		userId,
+		senderUrl
 	) {
 		const parameterExists = await this.validatePaymentParameterId(
 			parameterId,
@@ -1538,31 +1562,71 @@ export class WalletService {
 		}
 
 		const incomingPayment = await this.dbIncomingUser
-			.scan('ServiceProviderId')
+			.query('ServiceProviderId')
 			.eq(serviceProviderId)
+			.where('SenderUrl')
+			.eq(senderUrl)
+			.where('Status')
+			.eq(true)
 			.exec();
+
+		incomingPayment.sort((a: any, b: any) => b?.createdAt - a?.createdAt);
 
 		const quoteInput = {
 			walletAddressId: walletAddressId,
 			receiver: incomingPayment?.[0]?.ReceiverId,
 			receiveAmount: {
-				value: adjustValueByCurrency(
+				value: adjustValue(
 					calcularTotalCosto(
 						parameterExists?.base,
 						parameterExists?.comision,
 						parameterExists?.cost,
 						parameterExists?.percent
 					),
-					walletAsset?.code ?? 'USD'
+					walletAsset?.scale
 				),
 				assetCode: walletAsset?.asset ?? 'USD',
 				assetScale: walletAsset?.scale ?? 2,
 			},
 		};
 
-		const quote = await this.createQuote(quoteInput);
+		const walletByUserId = await this.dbInstance
+			.scan('UserId')
+			.eq(userId)
+			.attributes([
+				'RafikiId',
+				'PostedCredits',
+				'PostedDebits',
+				'PendingCredits',
+				'PendingDebits',
+			])
+			.exec();
 
+		const userWallet = await walletByUserId?.[0];
+
+		const balance =
+			userWallet?.PostedCredits -
+			(userWallet?.PendingDebits + userWallet?.PostedDebits);
+
+		if (quoteInput?.receiveAmount?.value > balance) {
+			return {
+				action: 'error',
+				message: 'Missing funds',
+				statusCode: 'WGE0205',
+			};
+		}
+
+		const quote = await this.createQuote(quoteInput);
 		const providerWalletId = quote?.createQuote?.quote?.receiver?.split('/');
+
+		if (!providerWalletId) {
+			return {
+				action: 'error',
+				message: 'Invalid quote',
+				statusCode: 'WGE0205',
+			};
+		}
+
 		const incomingPaymentId = providerWalletId?.[4];
 		const inputOutgoing = {
 			walletAddressId: walletAddressId,
@@ -1573,22 +1637,6 @@ export class WalletService {
 				wgUser: userId,
 			},
 		};
-		await this.dbTransactions.create({
-			Type: 'IncomingPayment',
-			SenderUrl: incomingPayment?.[0]?.SenderUrl,
-			ReceiverUrl: incomingPayment?.[0]?.ReceiverUrl,
-			IncomingPaymentId: incomingPaymentId,
-			WalletAddressId: quote?.createQuote?.quote?.receiver,
-			State: 'PENDING',
-			Metadata: inputOutgoing?.metadata || {},
-			IncomingAmount: {
-				_Typename: 'Amount',
-				value: quoteInput?.receiveAmount?.value?.toString(),
-				assetCode: walletAsset?.asset ?? 'USD',
-				assetScale: walletAsset?.scale ?? 2,
-			},
-			Description: '',
-		});
 
 		const incomingState = await this.getIncomingPaymentById(
 			incomingPayment?.[0]?.IncomingPaymentId
@@ -1603,27 +1651,6 @@ export class WalletService {
 		}
 
 		const outgoing = await this.createOutgoingPayment(inputOutgoing);
-
-		await this.dbTransactions.create({
-			Type: 'OutgoingPayment',
-			SenderUrl: incomingPayment?.[0]?.SenderUrl,
-			ReceiverUrl: incomingPayment?.[0]?.ReceiverUrl,
-			OutgoingPaymentId: outgoing?.createOutgoingPayment?.payment?.id,
-			WalletAddressId:
-				outgoing?.createOutgoingPayment?.payment?.walletAddressId,
-			State: outgoing?.createOutgoingPayment?.payment?.state,
-			Metadata: inputOutgoing?.metadata || {},
-			Receiver: inputOutgoing?.quoteId,
-			ReceiveAmount: {
-				_Typename: 'Amount',
-				value: outgoing?.createOutgoingPayment?.payment?.receiveAmount?.value,
-				assetCode:
-					outgoing?.createOutgoingPayment?.payment?.receiveAmount?.assetCode,
-				assetScale:
-					outgoing?.createOutgoingPayment?.payment?.receiveAmount?.assetScale,
-			},
-			Description: '',
-		});
 
 		await this.createDepositOutgoingMutationService({
 			outgoingPaymentId: outgoing?.createOutgoingPayment?.payment?.id,
@@ -2048,5 +2075,9 @@ export class WalletService {
 		};
 
 		return linkedProvider;
+	}
+
+	async getWalletByTokenWS(token: string): Promise<Wallet> {
+		return await this.getUserByToken(token);
 	}
 }
