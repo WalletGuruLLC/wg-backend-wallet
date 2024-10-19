@@ -14,7 +14,6 @@ export class IncomingPaymentCompletedEvent implements EventWebHook {
 			await this.walletService.getTransactionByIncomingPaymentId(
 				eventWebHookDTO.data.id
 			);
-
 		const transactionParams = {
 			Key: {
 				Id: transaction.id,
@@ -50,7 +49,7 @@ export class IncomingPaymentCompletedEvent implements EventWebHook {
 				};
 				await docClient.update(params).promise();
 			}
-			await docClient.update(transactionParams);
+			await docClient.update(transactionParams).promise();
 		} catch (error) {
 			Sentry.captureException(error);
 			throw new Error(
