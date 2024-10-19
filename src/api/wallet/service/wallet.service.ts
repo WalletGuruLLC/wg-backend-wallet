@@ -1387,6 +1387,52 @@ export class WalletService {
 		}
 	}
 
+	async getTransactionByIncomingPaymentId(incomingPaymentId: string) {
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'Transactions',
+			IndexName: 'IncomingPaymentIdIndex',
+			KeyConditionExpression: `IncomingPaymentId = :incomingPaymentId`,
+			ExpressionAttributeValues: {
+				':incomingPaymentId': incomingPaymentId,
+			},
+		};
+
+		try {
+			const result = await docClient.query(params).promise();
+			return convertToCamelCase(result?.Items?.[0]);
+		} catch (error) {
+			Sentry.captureException(error);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0167',
+			};
+		}
+	}
+
+	async getTransactionByIncomingPayment(incomingPaymentId: string) {
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'UserIncoming',
+			IndexName: 'IncomingPaymentIdIndex',
+			KeyConditionExpression: `IncomingPaymentId = :incomingPaymentId`,
+			ExpressionAttributeValues: {
+				':incomingPaymentId': incomingPaymentId,
+			},
+		};
+
+		try {
+			const result = await docClient.query(params).promise();
+			return convertToCamelCase(result?.Items?.[0]);
+		} catch (error) {
+			Sentry.captureException(error);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0167',
+			};
+		}
+	}
+
 	async getWalletUserById(userId: string) {
 		const docClient = new DocumentClient();
 		const params = {
