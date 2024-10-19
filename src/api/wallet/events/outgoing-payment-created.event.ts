@@ -35,7 +35,7 @@ export class OutGoingPaymentCreatedEvent implements EventWebHook {
 		};
 
 		try {
-			if (!eventWebHookDTO?.data?.metadata?.type) {
+			if (eventWebHookDTO?.data?.metadata?.type === 'USER') {
 				await docClient.update(params).promise();
 			}
 
