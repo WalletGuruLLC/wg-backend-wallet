@@ -1,4 +1,3 @@
-import { Injectable } from '@nestjs/common';
 import { EventWebHookDTO } from '../dto/event-hook.dto';
 import { EventWebHook } from '../dto/event-webhook';
 import { DocumentClient } from 'aws-sdk/clients/dynamodb';
@@ -37,8 +36,8 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 		};
 
 		try {
-			if (userId) {
-				const userWallet = await this.walletService.getWalletByUser(userId);
+			const userWallet = await this.walletService.getWalletByUser(userId);
+			if (eventWebHookDTO?.data?.metadata?.type === 'PROVIDER') {
 				const debits =
 					(userWallet.pendingDebits || 0) +
 					parseInt(eventWebHookDTO.data.incomingAmount.value);
@@ -60,16 +59,14 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 				eventWebHookDTO?.data?.walletAddressId
 			);
 
-			const senderWallet = await this.walletService.getWalletUserById(userId);
 			const transaction = {
 				Type: 'IncomingPayment',
 				IncomingPaymentId: eventWebHookDTO.data?.id,
 				WalletAddressId: eventWebHookDTO?.data?.walletAddressId,
 				ReceiverUrl: recieverWallet?.walletAddress,
-				SenderUrl: senderWallet?.walletAddress,
-				State: eventWebHookDTO.data?.state,
-				Metadata: eventWebHookDTO.data?.metadata,
-				Receiver: eventWebHookDTO.data?.receiver,
+				SenderUrl: userWallet?.walletAddress,
+				State: 'PENDING',
+				Metadata: { ...eventWebHookDTO.data?.metadata },
 				IncomingAmount: {
 					_Typename: 'Amount',
 					value: eventWebHookDTO.data?.incomingAmount?.value,
