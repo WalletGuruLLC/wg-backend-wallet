@@ -853,15 +853,26 @@ export class WalletService {
 					incomingPayment.state !== 'COMPLETED' ||
 					incomingPayment.state !== 'EXPIRED'
 				) {
+					const updatedIncomingPayment = {
+						...incomingPayment,
+						incomingAmount: {
+							...incomingPayment.incomingAmount,
+							value: (
+								parseInt(incomingPayment?.incomingAmount?.value ?? '0') -
+								parseInt(incomingPayment?.receivedAmount?.value ?? '0')
+							).toString(),
+						},
+					};
+
 					const incomingConverted = {
-						type: incomingPayment.__typename,
-						id: incomingPayment.id,
+						type: updatedIncomingPayment.__typename,
+						id: updatedIncomingPayment.id,
 						provider: provider.name,
 						ownerUser: `${user?.firstName} ${user?.lastName}`,
-						state: incomingPayment.state,
-						incomingAmount: incomingPayment?.incomingAmount,
-						createdAt: incomingPayment.createdAt,
-						expiresAt: incomingPayment?.expiresAt,
+						state: updatedIncomingPayment.state,
+						incomingAmount: updatedIncomingPayment?.incomingAmount,
+						createdAt: updatedIncomingPayment.createdAt,
+						expiresAt: updatedIncomingPayment?.expiresAt,
 					};
 					incomingPayments.push(incomingConverted);
 				}
@@ -1321,6 +1332,9 @@ export class WalletService {
 				const provider = await this.getWalletByProviderId(
 					linkedProviders?.[0]?.serviceProviderId
 				);
+				if (!provider?.name) {
+					return [];
+				}
 				return [
 					{
 						type: 'IncomingPayment',

@@ -355,9 +355,14 @@ export class GraphqlService {
 					walletAddressId
 					expiresAt
 					incomingAmount {
-						assetScale
-						assetCode
 						value
+						assetCode
+						assetScale
+					}
+					receivedAmount {
+						value
+						assetCode
+						assetScale
 					}
 					metadata
 					createdAt
