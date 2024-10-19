@@ -22,20 +22,19 @@ export class OutGoingPaymentCreatedEvent implements EventWebHook {
 			(wallet?.pendingDebits || 0) +
 			parseInt(eventWebHookDTO.data.receiveAmount.value);
 
-		const params = {
-			Key: {
-				Id: wallet.id,
-			},
-			TableName: 'Wallets',
-			UpdateExpression: 'SET PendingDebits = :pendingDebits',
-			ExpressionAttributeValues: {
-				':pendingDebits': debits,
-			},
-			ReturnValues: 'ALL_NEW',
-		};
-
 		try {
 			if (eventWebHookDTO?.data?.metadata?.type === 'USER') {
+				const params = {
+					Key: {
+						Id: wallet.id,
+					},
+					TableName: 'Wallets',
+					UpdateExpression: 'SET PendingDebits = :pendingDebits',
+					ExpressionAttributeValues: {
+						':pendingDebits': debits,
+					},
+					ReturnValues: 'ALL_NEW',
+				};
 				await docClient.update(params).promise();
 			}
 
