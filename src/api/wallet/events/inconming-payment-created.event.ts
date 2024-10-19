@@ -66,7 +66,7 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 				ReceiverUrl: recieverWallet?.walletAddress,
 				SenderUrl: userWallet?.walletAddress,
 				State: 'PENDING',
-				Metadata: { ...eventWebHookDTO.data?.metadata },
+				Metadata: eventWebHookDTO.data?.metadata,
 				IncomingAmount: {
 					_Typename: 'Amount',
 					value: eventWebHookDTO.data?.incomingAmount?.value,
