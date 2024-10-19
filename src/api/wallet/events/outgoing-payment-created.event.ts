@@ -16,7 +16,7 @@ export class OutGoingPaymentCreatedEvent implements EventWebHook {
 		const depositOutgoingPaymentInput = {
 			outgoingPaymentId: eventWebHookDTO?.data?.id,
 			idempotencyKey: uuidv4(),
-		};
+		};	
 
 		const debits =
 			(wallet?.pendingDebits || 0) +
