@@ -15,6 +15,11 @@ export class IncomingPaymentCompletedEvent implements EventWebHook {
 			eventWebHookDTO.data.id
 		);
 
+		const transaction =
+			await this.walletService.getTransactionByIncomingPaymentId(
+				eventWebHookDTO.data.id
+			);
+
 		const params = {
 			Key: {
 				Id: userIncoming.id,
@@ -27,10 +32,23 @@ export class IncomingPaymentCompletedEvent implements EventWebHook {
 			ReturnValues: 'ALL_NEW',
 		};
 
-		try {
-			const result = await docClient.update(params).promise();
+		const transactionParams = {
+			Key: {
+				Id: transaction.id,
+			},
+			TableName: 'Transactions',
+			UpdateExpression: 'SET Status = :status',
+			ExpressionAttributeValues: {
+				':status': 'COMPLETED',
+			},
+			ReturnValues: 'ALL_NEW',
+		};
 
-			return convertToCamelCase(result);
+		try {
+			if (eventWebHookDTO?.data?.metadata?.type === 'PROVIDER') {
+				const result = await docClient.update(params).promise();
+			}
+			await docClient.update(transactionParams);
 		} catch (error) {
 			Sentry.captureException(error);
 			throw new Error(
