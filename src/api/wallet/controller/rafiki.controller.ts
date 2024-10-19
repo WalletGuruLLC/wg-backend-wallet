@@ -466,6 +466,11 @@ export class RafikiWalletController {
 				const inputOutgoing = {
 					walletAddressId: input?.walletAddressId,
 					quoteId: quote?.createQuote?.quote?.id,
+					metadata: {
+						type: 'USER',
+						wgUser: userId,
+						description: '',
+					},
 				};
 				const outgoingPayment = await this.walletService.createOutgoingPayment(
 					inputOutgoing
