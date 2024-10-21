@@ -364,7 +364,8 @@ export class WalletController {
 		description: 'Successfully returned wallet',
 	})
 	@ApiBearerAuth('JWT')
-	async findWalletByToken(@Headers('authorization') token: string, @Res() res) {
+	async findWalletByToken(@Headers() headers: MapOfStringToList, @Res() res) {
+		const token = headers?.authorization;
 		try {
 			const instanceVerifier = await this.verifyService.getVerifiedFactory();
 			await instanceVerifier.verify(token.toString().split(' ')[1]);
