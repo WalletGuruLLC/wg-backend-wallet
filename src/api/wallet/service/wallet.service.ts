@@ -1558,7 +1558,7 @@ export class WalletService {
 
 		if (!parameterExists?.id) {
 			this.authGateway.server.emit('error', {
-				message: 'Type parameter does not exist',
+				message: 'The specified type parameter does not exist',
 				statusCode: 'WGE0222',
 			});
 		}
@@ -1572,23 +1572,57 @@ export class WalletService {
 			.eq(true)
 			.exec();
 
+		if (!incomingPayment || incomingPayment.length === 0) {
+			this.authGateway.server.emit('error', {
+				message: 'You don’t have any incoming payments yet.',
+				statusCode: 'WGE0223',
+			});
+		}
+
 		incomingPayment.sort((a: any, b: any) => b?.createdAt - a?.createdAt);
+
+		let validIncomingPayment: any = null;
+
+		const sendValue = adjustValue(
+			calcularTotalCosto(
+				parameterExists?.base,
+				parameterExists?.comision,
+				parameterExists?.cost,
+				parameterExists?.percent
+			),
+			walletAsset?.scale
+		);
+
+		for (const payment of incomingPayment) {
+			const incomingPaymentValue = await this.getIncomingPayment(payment?.Id);
+			const incomingValue =
+				parseInt(incomingPaymentValue?.incomingAmount?.value ?? '0') -
+				parseInt(incomingPaymentValue?.receivedAmount?.value ?? '0');
+			if (sendValue <= incomingValue) {
+				validIncomingPayment = payment;
+				break;
+			}
+		}
+
+		if (!validIncomingPayment) {
+			this.authGateway.server.emit('error', {
+				message: 'Insufficient funds',
+				statusCode: 'WGE0220',
+			});
+		}
 
 		const quoteInput = {
 			walletAddressId: walletAddressId,
-			receiver: incomingPayment?.[0]?.ReceiverId,
+			receiver: validIncomingPayment?.ReceiverId,
 			receiveAmount: {
-				value: adjustValue(
-					calcularTotalCosto(
-						parameterExists?.base,
-						parameterExists?.comision,
-						parameterExists?.cost,
-						parameterExists?.percent
-					),
-					walletAsset?.scale
-				),
+				value: sendValue,
 				assetCode: walletAsset?.asset ?? 'USD',
 				assetScale: walletAsset?.scale ?? 2,
+			},
+			metadata: {
+				description: '',
+				type: 'PROVIDER',
+				wgUser: userId,
 			},
 		};
 
@@ -1612,7 +1646,7 @@ export class WalletService {
 
 		if (quoteInput?.receiveAmount?.value > balance) {
 			this.authGateway.server.emit('error', {
-				message: 'Missing funds',
+				message: 'Insufficient funds',
 				statusCode: 'WGE0220',
 			});
 		}
@@ -1638,7 +1672,7 @@ export class WalletService {
 		};
 
 		const incomingState = await this.getIncomingPaymentById(
-			incomingPayment?.[0]?.IncomingPaymentId
+			validIncomingPayment?.IncomingPaymentId
 		);
 
 		if (incomingState?.state == 'COMPLETED') {
