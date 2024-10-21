@@ -1619,11 +1619,6 @@ export class WalletService {
 				assetCode: walletAsset?.asset ?? 'USD',
 				assetScale: walletAsset?.scale ?? 2,
 			},
-			metadata: {
-				description: '',
-				type: 'PROVIDER',
-				wgUser: userId,
-			},
 		};
 
 		const walletByUserId = await this.dbInstance
