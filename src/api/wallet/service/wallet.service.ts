@@ -58,7 +58,7 @@ export class WalletService {
 		private configService: ConfigService,
 		private readonly graphqlService: GraphqlService,
 		private readonly sqsService: SqsService,
-		private readonly authGateway: AuthGateway
+		private authGateway: AuthGateway
 	) {
 		this.dbUserInstance = dynamoose.model<User>('Users', UserSchema);
 		this.dbIncomingUser = dynamoose.model<UserIncomingPayment>(

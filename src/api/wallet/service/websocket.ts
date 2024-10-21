@@ -7,6 +7,7 @@ import {
 	OnGatewayDisconnect,
 	OnGatewayConnection,
 } from '@nestjs/websockets';
+import { forwardRef, Inject } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { WalletService } from './wallet.service';
 import { Logger } from '@nestjs/common';
@@ -18,7 +19,10 @@ export class AuthGateway
 	@WebSocketServer() server: Server;
 	private logger: Logger = new Logger('MessageGateway');
 
-	constructor(private readonly authService: WalletService) {}
+	constructor(
+		@Inject(forwardRef(() => WalletService))
+		private readonly authService: WalletService
+	) {}
 
 	afterInit(server: any) {
 		console.log('WebSocket server initialized');
