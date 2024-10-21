@@ -7,6 +7,7 @@ import {
 	OnGatewayDisconnect,
 	OnGatewayConnection,
 } from '@nestjs/websockets';
+import { forwardRef, Inject } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { WalletService } from './wallet.service';
 import { Logger } from '@nestjs/common';
@@ -18,7 +19,10 @@ export class AuthGateway
 	@WebSocketServer() server: Server;
 	private logger: Logger = new Logger('MessageGateway');
 
-	constructor(private readonly authService: WalletService) {}
+	constructor(
+		@Inject(forwardRef(() => WalletService))
+		private readonly authService: WalletService
+	) {}
 
 	afterInit(server: any) {
 		console.log('WebSocket server initialized');
@@ -219,28 +223,17 @@ export class AuthGateway
 		const validTokenRange = await Promise.all(tokenPromises);
 
 		if (validTokenRange.includes(nonceData)) {
-			if (action == 'play') {
-				const responsePlay = await this.authService.processParameterFlow(
+			if (action == 'charge') {
+				await this.authService.processParameterFlow(
 					paymentType,
 					walletAddress?.walletDb,
 					walletAddress?.walletAsset,
 					serviceProviderId,
-					wgUserId
+					wgUserId,
+					walletAddress?.walletUrl,
+					activityId
 				);
-				if (responsePlay?.action == 'hc') {
-					client.emit('hc', {
-						message: 'Ok',
-						statusCode: 'WGS0053',
-						activityId: activityId,
-					});
-				} else {
-					client.emit('error', {
-						message: responsePlay?.message,
-						statusCode: responsePlay?.statusCode,
-					});
-					client.disconnect();
-				}
-			} else if (action == 'stop' || action == 'pause') {
+			} else if (action == 'stop' || action == 'pause' || action == 'play') {
 				client.emit('hc', {
 					message: 'Ok',
 					statusCode: 'WGS0053',

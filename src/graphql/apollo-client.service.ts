@@ -14,6 +14,17 @@ export class ApolloClientService {
 				fetch,
 			}),
 			cache: new InMemoryCache(),
+			defaultOptions: {
+				watchQuery: {
+					fetchPolicy: 'no-cache', // Ignora la caché para las consultas en tiempo real
+				},
+				query: {
+					fetchPolicy: 'no-cache', // Siempre obtiene los datos de la red
+				},
+				mutate: {
+					fetchPolicy: 'no-cache', // No utiliza caché después de una mutación
+				},
+			},
 		});
 	}
 
