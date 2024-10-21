@@ -751,7 +751,7 @@ export class WalletService {
 		return filteredAsset;
 	}
 
-	async getWalletByToken(token: string): Promise<{
+	async getWalletByToken(token: any): Promise<{
 		walletDb: Wallet;
 		walletAsset: any;
 	}> {
