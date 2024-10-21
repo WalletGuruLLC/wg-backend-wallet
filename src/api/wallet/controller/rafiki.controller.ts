@@ -462,75 +462,24 @@ export class RafikiWalletController {
 
 			setTimeout(async () => {
 				const quote = await this.walletService.createQuote(quoteInput);
-				const providerWalletId =
-					quote?.createQuote?.quote?.receiver?.split('/');
-				const incomingPaymentId = providerWalletId?.[4];
-				await this.dbTransactions.create({
-					Type: 'IncomingPayment',
-					SenderUrl: userWallet?.walletAddress,
-					ReceiverUrl: input?.walletAddressUrl,
-					IncomingPaymentId: incomingPaymentId,
-					WalletAddressId: quote?.createQuote?.quote?.receiver,
-					State: 'PENDING',
-					IncomingAmount: {
-						_Typename: 'Amount',
-						assetCode: userWalletByToken?.walletAsset?.code,
-						assetScale: userWalletByToken?.walletAsset?.scale,
-						value: adjustValue(
-							input?.amount,
-							userWalletByToken?.walletAsset?.scale
-						)?.toString(),
-					},
-					Description: '',
-					Metadata: inputReceiver?.metadata || {},
-				});
 
 				const inputOutgoing = {
 					walletAddressId: input?.walletAddressId,
 					quoteId: quote?.createQuote?.quote?.id,
+					metadata: {
+						type: 'USER',
+						wgUser: userId,
+						description: '',
+					},
 				};
 				const outgoingPayment = await this.walletService.createOutgoingPayment(
 					inputOutgoing
 				);
 
-				const transaction = {
-					Type: 'OutgoingPayment',
-					SenderUrl: userWallet?.walletAddress,
-					ReceiverUrl: input?.walletAddressUrl,
-					OutgoingPaymentId:
-						outgoingPayment?.createOutgoingPayment?.payment?.id,
-					WalletAddressId:
-						outgoingPayment?.createOutgoingPayment?.payment?.walletAddressId,
-					State: outgoingPayment?.createOutgoingPayment?.payment?.state,
-					Metadata: inputReceiver?.metadata || {},
-					Receiver: quote?.createQuote?.quote?.receiver,
-					ReceiveAmount: {
-						_Typename: 'Amount',
-						value:
-							outgoingPayment?.createOutgoingPayment?.payment?.receiveAmount
-								?.value,
-						assetCode:
-							outgoingPayment?.createOutgoingPayment?.payment?.receiveAmount
-								?.assetCode,
-						assetScale:
-							outgoingPayment?.createOutgoingPayment?.payment?.receiveAmount
-								?.assetScale,
-					},
-					Description: '',
-				};
-
-				await this.dbTransactions.create(transaction);
-
 				await this.walletService.sendMoneyMailConfirmation(
 					inputOutgoing,
 					outgoingPayment
 				);
-
-				this.authGateway.server.emit('hc', {
-					message: '',
-					statusCode: 'WGS0054',
-					data: transaction,
-				});
 
 				return res.status(200).send({
 					data: outgoingPayment,

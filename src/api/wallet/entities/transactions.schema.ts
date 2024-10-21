@@ -37,7 +37,11 @@ export const TransactionsSchema = new dynamoose.Schema(
 		},
 		Metadata: {
 			type: Object,
-			default: null,
+			schema: {
+				type: String,
+				wgUser: String,
+				description: String,
+			},
 		},
 		Receiver: {
 			type: String,
@@ -59,10 +63,6 @@ export const TransactionsSchema = new dynamoose.Schema(
 				assetCode: String,
 				assetScale: Number,
 			},
-		},
-		CreatedAt: {
-			type: Date,
-			default: () => new Date(),
 		},
 		Description: {
 			type: String,

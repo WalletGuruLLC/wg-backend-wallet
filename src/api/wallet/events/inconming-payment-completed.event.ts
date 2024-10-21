@@ -10,27 +10,46 @@ export class IncomingPaymentCompletedEvent implements EventWebHook {
 	constructor(private readonly walletService: WalletService) {}
 	async trigger(eventWebHookDTO: EventWebHookDTO, wallet): Promise<void> {
 		const docClient = new DocumentClient();
-
-		const userIncoming = await this.walletService.getUserIncomingPaymentById(
-			eventWebHookDTO.data.id
-		);
-
-		const params = {
+		const transaction =
+			await this.walletService.getTransactionByIncomingPaymentId(
+				eventWebHookDTO.data.id
+			);
+		const transactionParams = {
 			Key: {
-				Id: userIncoming.id,
+				Id: transaction.id,
 			},
-			TableName: 'UserIncoming',
-			UpdateExpression: 'SET Status = :status',
+			TableName: 'Transactions',
+			ExpressionAttributeNames: {
+				'#state': 'State',
+			},
+			UpdateExpression: 'SET #state = :state',
 			ExpressionAttributeValues: {
-				':status': false,
+				':state': 'COMPLETED',
 			},
 			ReturnValues: 'ALL_NEW',
 		};
 
 		try {
-			const result = await docClient.update(params).promise();
+			if (eventWebHookDTO?.data?.metadata?.type === 'PROVIDER') {
+				const userIncoming =
+					await this.walletService.getUserIncomingPaymentById(
+						eventWebHookDTO.data.id
+					);
 
-			return convertToCamelCase(result);
+				const params = {
+					Key: {
+						Id: userIncoming.id,
+					},
+					TableName: 'UserIncoming',
+					UpdateExpression: 'SET Status = :status',
+					ExpressionAttributeValues: {
+						':status': false,
+					},
+					ReturnValues: 'ALL_NEW',
+				};
+				await docClient.update(params).promise();
+			}
+			await docClient.update(transactionParams).promise();
 		} catch (error) {
 			Sentry.captureException(error);
 			throw new Error(
