@@ -219,29 +219,17 @@ export class AuthGateway
 		const validTokenRange = await Promise.all(tokenPromises);
 
 		if (validTokenRange.includes(nonceData)) {
-			if (action == 'play') {
-				const responsePlay = await this.authService.processParameterFlow(
+			if (action == 'charge') {
+				await this.authService.processParameterFlow(
 					paymentType,
 					walletAddress?.walletDb,
 					walletAddress?.walletAsset,
 					serviceProviderId,
 					wgUserId,
-					walletAddress?.walletUrl
+					walletAddress?.walletUrl,
+					activityId
 				);
-				if (responsePlay?.action == 'hc') {
-					client.emit('hc', {
-						message: 'Ok',
-						statusCode: 'WGS0053',
-						activityId: activityId,
-					});
-				} else {
-					client.emit('error', {
-						message: responsePlay?.message,
-						statusCode: responsePlay?.statusCode,
-					});
-					client.disconnect();
-				}
-			} else if (action == 'stop' || action == 'pause') {
+			} else if (action == 'stop' || action == 'pause' || action == 'play') {
 				client.emit('hc', {
 					message: 'Ok',
 					statusCode: 'WGS0053',

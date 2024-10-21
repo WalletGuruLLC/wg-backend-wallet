@@ -40,6 +40,7 @@ import { UserSchema } from '../entities/user.schema';
 import { adjustValue } from 'src/utils/helpers/generalAdjustValue';
 import { calcularTotalCosto } from 'src/utils/helpers/calcularTotalTransactionPlat';
 import { parseStringToBoolean } from 'src/utils/helpers/parseStringToBoolean';
+import { AuthGateway } from './websocket';
 
 @Injectable()
 export class WalletService {
@@ -56,7 +57,8 @@ export class WalletService {
 	constructor(
 		private configService: ConfigService,
 		private readonly graphqlService: GraphqlService,
-		private readonly sqsService: SqsService
+		private readonly sqsService: SqsService,
+		private readonly authGateway: AuthGateway
 	) {
 		this.dbUserInstance = dynamoose.model<User>('Users', UserSchema);
 		this.dbIncomingUser = dynamoose.model<UserIncomingPayment>(
@@ -1510,7 +1512,8 @@ export class WalletService {
 		walletAsset,
 		serviceProviderId,
 		userId,
-		senderUrl
+		senderUrl,
+		activityId
 	) {
 		const parameterExists = await this.validatePaymentParameterId(
 			parameterId,
@@ -1518,11 +1521,10 @@ export class WalletService {
 		);
 
 		if (!parameterExists?.id) {
-			return {
-				action: 'error',
+			this.authGateway.server.emit('error', {
 				message: 'Type parameter does not exist',
-				statusCode: 'WGE0203',
-			};
+				statusCode: 'WGE0222',
+			});
 		}
 
 		const incomingPayment = await this.dbIncomingUser
@@ -1573,25 +1575,22 @@ export class WalletService {
 			(userWallet?.PendingDebits + userWallet?.PostedDebits);
 
 		if (quoteInput?.receiveAmount?.value > balance) {
-			return {
-				action: 'error',
+			this.authGateway.server.emit('error', {
 				message: 'Missing funds',
-				statusCode: 'WGE0205',
-			};
+				statusCode: 'WGE0220',
+			});
 		}
 
 		const quote = await this.createQuote(quoteInput);
 		const providerWalletId = quote?.createQuote?.quote?.receiver?.split('/');
 
 		if (!providerWalletId) {
-			return {
-				action: 'error',
+			this.authGateway.server.emit('error', {
 				message: 'Invalid quote',
-				statusCode: 'WGE0205',
-			};
+				statusCode: 'WGE0221',
+			});
 		}
 
-		const incomingPaymentId = providerWalletId?.[4];
 		const inputOutgoing = {
 			walletAddressId: walletAddressId,
 			quoteId: quote?.createQuote?.quote?.id,
@@ -1607,11 +1606,10 @@ export class WalletService {
 		);
 
 		if (incomingState?.state == 'COMPLETED') {
-			return {
-				action: 'error',
+			this.authGateway.server.emit('error', {
 				message: 'Missing funds',
-				statusCode: 'WGE0205',
-			};
+				statusCode: 'WGE0220',
+			});
 		}
 
 		const outgoing = await this.createOutgoingPayment(inputOutgoing);
@@ -1621,12 +1619,11 @@ export class WalletService {
 			idempotencyKey: uuidv4(),
 		});
 
-		return {
-			action: 'hc',
-			message: 'Success create outgoing payment id',
-			statusCode: 'WGE0206',
-			data: outgoing?.createOutgoingPayment?.payment?.id,
-		};
+		this.authGateway.server.emit('hc', {
+			message: 'Ok',
+			statusCode: 'WGS0053',
+			activityId: activityId,
+		});
 	}
 
 	async completePayment(outgoingPaymentId, action) {
