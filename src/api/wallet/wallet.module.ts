@@ -28,6 +28,7 @@ import { UserWsGateway } from './service/websocket-users';
 		WebHookEventService,
 		SqsService,
 	],
+	exports: [WalletService],
 })
 export class WalletModule implements NestModule {
 	configure(consumer: MiddlewareConsumer) {
