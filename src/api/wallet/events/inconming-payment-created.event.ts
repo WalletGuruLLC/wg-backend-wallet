@@ -8,10 +8,15 @@ import { Model } from 'dynamoose/dist/Model';
 import { Transaction } from '../entities/transactions.entity';
 import { TransactionsSchema } from '../entities/transactions.schema';
 import * as dynamoose from 'dynamoose';
+import { UserWsGateway } from '../service/websocket-users';
 
 export class IncomingPaymentCreatedEvent implements EventWebHook {
 	private dbTransactions: Model<Transaction>;
-	constructor(private readonly walletService: WalletService) {
+
+	constructor(
+		private readonly walletService: WalletService,
+		private readonly userWsGateway: UserWsGateway
+	) {
 		this.dbTransactions = dynamoose.model<Transaction>(
 			'Transactions',
 			TransactionsSchema
@@ -52,7 +57,16 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 					},
 					ReturnValues: 'ALL_NEW',
 				};
-				await docClient.update(userWalletParams).promise();
+				const sender = await docClient.update(userWalletParams).promise();
+
+				const balance = {
+					pendingCredit: sender.Attributes?.PendingCredits,
+					pendingDebit: sender.Attributes?.PendingDebits,
+					postedCredit: sender.Attributes?.PostedCredits,
+					postedDebit: sender.Attributes?.PostedDebits,
+				};
+
+				this.userWsGateway.sendBalance(userWallet.userId, balance);
 			}
 
 			const recieverWallet = await this.walletService.getWalletByRafikyId(
@@ -75,11 +89,21 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 				},
 				Description: '',
 			};
+
 			await this.dbTransactions.create(transaction);
 
-			const result = await docClient.update(params).promise();
+			const receiver = await docClient.update(params).promise();
 
-			return convertToCamelCase(result);
+			const balance = {
+				pendingCredit: receiver.Attributes?.PendingCredits,
+				pendingDebit: receiver.Attributes?.PendingDebits,
+				postedCredit: receiver.Attributes?.PostedCredits,
+				postedDebit: receiver.Attributes?.PostedDebits,
+			};
+
+			this.userWsGateway.sendBalance(receiver.Attributes?.UserId, balance);
+
+			return convertToCamelCase(receiver);
 		} catch (error) {
 			Sentry.captureException(error);
 			throw new Error(
