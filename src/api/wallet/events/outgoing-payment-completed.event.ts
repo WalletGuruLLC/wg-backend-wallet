@@ -8,11 +8,15 @@ import { Model } from 'dynamoose/dist/Model';
 import { Transaction } from '../entities/transactions.entity';
 import { TransactionsSchema } from '../entities/transactions.schema';
 import * as dynamoose from 'dynamoose';
+import { UserWsGateway } from '../service/websocket-users';
 
 export class OutGoingPaymentCompletedEvent implements EventWebHook {
 	private dbTransactions: Model<Transaction>;
 
-	constructor(private readonly walletService: WalletService) {
+	constructor(
+		private readonly walletService: WalletService,
+		private readonly userWsGateway: UserWsGateway
+	) {
 		this.dbTransactions = dynamoose.model<Transaction>(
 			'Transactions',
 			TransactionsSchema
@@ -96,8 +100,29 @@ export class OutGoingPaymentCompletedEvent implements EventWebHook {
 			};
 			await this.dbTransactions.create(transaction);
 
-			await docClient.update(params).promise();
-			await docClient.update(recieverParams).promise();
+			const sender = await docClient.update(params).promise();
+			const receiver = await docClient.update(recieverParams).promise();
+
+			const senderBalance = {
+				pendingCredit: sender.Attributes?.PendingCredits,
+				pendingDebit: sender.Attributes?.PendingDebits,
+				postedCredit: sender.Attributes?.PostedCredits,
+				postedDebit: sender.Attributes?.PostedDebits,
+			};
+
+			this.userWsGateway.sendBalance(wallet.userId, senderBalance);
+
+			const receiverBalance = {
+				pendingCredit: receiver.Attributes?.PendingCredits,
+				pendingDebit: receiver.Attributes?.PendingDebits,
+				postedCredit: receiver.Attributes?.PostedCredits,
+				postedDebit: receiver.Attributes?.PostedDebits,
+			};
+
+			this.userWsGateway.sendBalance(
+				receiver.Attributes?.UserId,
+				receiverBalance
+			);
 		} catch (error) {
 			Sentry.captureException(error);
 			throw new Error(

@@ -8,10 +8,10 @@ import { OutGoingPaymentCreatedEvent } from 'src/api/wallet/events/outgoing-paym
 export const hookEventMap = {
 	[WebhookEventType.OutgoingPaymentCreated]: walletService =>
 		new OutGoingPaymentCreatedEvent(walletService),
-	[WebhookEventType.OutgoingPaymentCompleted]: walletService =>
-		new OutGoingPaymentCompletedEvent(walletService),
-	[WebhookEventType.IncomingPaymentCreated]: walletService =>
-		new IncomingPaymentCreatedEvent(walletService),
+	[WebhookEventType.OutgoingPaymentCompleted]: (walletService, userWsGateway) =>
+		new OutGoingPaymentCompletedEvent(walletService, userWsGateway),
+	[WebhookEventType.IncomingPaymentCreated]: (walletService, userWsGateway) =>
+		new IncomingPaymentCreatedEvent(walletService, userWsGateway),
 	[WebhookEventType.IncomingPaymentExpired]: walletService =>
 		new IncomingPaymentExpiredEvent(walletService),
 	[WebhookEventType.IncomingPaymentCompleted]: walletService =>
