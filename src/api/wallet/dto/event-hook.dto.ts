@@ -8,6 +8,8 @@ export class MetadataWebHookDTO {
 	description: string;
 	type: string;
 	wgUser: string;
+	activityId?: string;
+	contentName?: string;
 }
 
 interface WebHookData {
