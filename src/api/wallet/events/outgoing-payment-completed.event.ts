@@ -101,7 +101,7 @@ export class OutGoingPaymentCompletedEvent implements EventWebHook {
 			const transactionValue = await this.dbTransactions.create(transaction);
 
 			this.userWsGateway.sendTransaction(
-				recieverWallet?.userId || recieverWallet?.providerId,
+				userWallet?.userId || userWallet?.providerId,
 				transactionValue
 			);
 
