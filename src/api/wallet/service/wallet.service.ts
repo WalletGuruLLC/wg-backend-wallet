@@ -795,25 +795,82 @@ export class WalletService {
 			.scan(outgoingParams)
 			.promise();
 
-		const sortedArray = dynamoOutgoingPayments.Items.sort(
-			(a: any, b: any) =>
-				new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-		);
+		if (dynamoOutgoingPayments?.Items?.length > 0) {
+			const sortedArray = dynamoOutgoingPayments?.Items?.sort(
+				(a: any, b: any) =>
+					new Date(b?.createdAt).getTime() - new Date(a?.createdAt).getTime()
+			);
 
-		if (dynamoOutgoingPayments.Items.length > 0) {
-			const incomingSorted = sortedArray.filter(
-				item => item.Type === 'IncomingPayment'
+			const transactionsWithNames: any = await Promise.all(
+				sortedArray.map(async transaction => {
+					const senderWallet = await this.getWalletByAddress(
+						transaction?.SenderUrl
+					);
+					const receiverWallet = await this.getWalletByAddress(
+						transaction?.ReceiverUrl
+					);
+
+					let senderName = 'Unknown';
+					let receiverName = 'Unknown';
+
+					if (senderWallet?.userId) {
+						const senderWalletInfo = await this.getUserInfoById(
+							senderWallet?.userId
+						);
+						if (senderWalletInfo) {
+							senderName = `${senderWalletInfo?.firstName} ${senderWalletInfo?.lastName}`;
+						}
+					}
+
+					if (receiverWallet?.userId) {
+						const receiverWalletInfo = await this.getUserInfoById(
+							receiverWallet?.userId
+						);
+						if (receiverWalletInfo) {
+							receiverName = `${receiverWalletInfo?.firstName} ${receiverWalletInfo?.lastName}`;
+						}
+					}
+
+					if (senderName === 'Unknown' && senderWallet?.providerId) {
+						const senderProviderInfo = await this.getProviderById(
+							senderWallet?.providerId
+						);
+						if (senderProviderInfo) {
+							senderName = senderProviderInfo?.name;
+						}
+					}
+
+					if (receiverName === 'Unknown' && receiverWallet?.providerId) {
+						const receiverProviderInfo = await this.getProviderById(
+							receiverWallet?.providerId
+						);
+						if (receiverProviderInfo) {
+							receiverName = receiverProviderInfo?.name;
+						}
+					}
+
+					return {
+						...transaction,
+						senderName,
+						receiverName,
+					};
+				})
 			);
-			const outgoingSorted = sortedArray.filter(
-				item => item.Type === 'OutgoingPayment'
+
+			const incomingSorted = transactionsWithNames?.filter(
+				item => item?.Type === 'IncomingPayment'
 			);
+			const outgoingSorted = transactionsWithNames?.filter(
+				item => item?.Type === 'OutgoingPayment'
+			);
+
+			const combinedSorted = [...incomingSorted, ...outgoingSorted];
 
 			if (search === 'credit') {
 				return convertToCamelCase(incomingSorted);
 			} else if (search === 'debit') {
 				return convertToCamelCase(outgoingSorted);
 			} else {
-				const combinedSorted = [...incomingSorted, ...outgoingSorted];
 				return convertToCamelCase(combinedSorted);
 			}
 		} else {
@@ -852,7 +909,7 @@ export class WalletService {
 				);
 
 				if (
-					incomingPayment.state !== 'COMPLETED' ||
+					incomingPayment.state !== 'COMPLETED' &&
 					incomingPayment.state !== 'EXPIRED'
 				) {
 					const updatedIncomingPayment = {
