@@ -969,7 +969,7 @@ export class WalletService {
 			if (input.incomingAmount > balance) {
 				return {
 					statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-					customCode: 'WGE0137',
+					customCode: 'WGE0224',
 				};
 			}
 
