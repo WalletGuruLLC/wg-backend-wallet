@@ -1726,6 +1726,7 @@ export class WalletService {
 					walletAddressId: walletAddressId,
 					quoteId: quote?.createQuote?.quote?.id,
 					metadata: {
+						activityId: activityId,
 						description: '',
 						type: 'PROVIDER',
 						wgUser: userId,
