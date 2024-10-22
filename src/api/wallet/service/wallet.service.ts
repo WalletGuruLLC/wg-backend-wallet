@@ -831,7 +831,7 @@ export class WalletService {
 			userInfo
 		);
 
-		if (userIncomingPayment?.[0]?.state === 'BLANK') {
+		if (userIncomingPayment?.[0]?.state == 'BLANK') {
 			return userIncomingPayment;
 		}
 
