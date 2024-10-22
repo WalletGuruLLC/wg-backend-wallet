@@ -1555,7 +1555,7 @@ export class WalletService {
 
 		if (!parameterExists?.id) {
 			this.authGateway.server.emit('error', {
-				message: 'Type parameter does not exist',
+				message: 'The specified type parameter does not exist',
 				statusCode: 'WGE0222',
 			});
 		}
@@ -1569,94 +1569,132 @@ export class WalletService {
 			.eq(true)
 			.exec();
 
+		if (!incomingPayment || incomingPayment.length === 0) {
+			this.authGateway.server.emit('error', {
+				message: 'You don’t have any incoming payments yet.',
+				statusCode: 'WGE0223',
+			});
+		}
+
 		incomingPayment.sort((a: any, b: any) => b?.createdAt - a?.createdAt);
 
-		const quoteInput = {
-			walletAddressId: walletAddressId,
-			receiver: incomingPayment?.[0]?.ReceiverId,
-			receiveAmount: {
-				value: adjustValue(
-					calcularTotalCosto(
-						parameterExists?.base,
-						parameterExists?.comision,
-						parameterExists?.cost,
-						parameterExists?.percent
-					),
-					walletAsset?.scale
-				),
-				assetCode: walletAsset?.asset ?? 'USD',
-				assetScale: walletAsset?.scale ?? 2,
-			},
-		};
+		let validIncomingPayment: any = null;
 
-		const walletByUserId = await this.dbInstance
-			.scan('UserId')
-			.eq(userId)
-			.attributes([
-				'RafikiId',
-				'PostedCredits',
-				'PostedDebits',
-				'PendingCredits',
-				'PendingDebits',
-			])
-			.exec();
-
-		const userWallet = await walletByUserId?.[0];
-
-		const balance =
-			userWallet?.PostedCredits -
-			(userWallet?.PendingDebits + userWallet?.PostedDebits);
-
-		if (quoteInput?.receiveAmount?.value > balance) {
-			this.authGateway.server.emit('error', {
-				message: 'Missing funds',
-				statusCode: 'WGE0220',
-			});
-		}
-
-		const quote = await this.createQuote(quoteInput);
-		const providerWalletId = quote?.createQuote?.quote?.receiver?.split('/');
-
-		if (!providerWalletId) {
-			this.authGateway.server.emit('error', {
-				message: 'Invalid quote',
-				statusCode: 'WGE0221',
-			});
-		}
-
-		const inputOutgoing = {
-			walletAddressId: walletAddressId,
-			quoteId: quote?.createQuote?.quote?.id,
-			metadata: {
-				description: '',
-				type: 'PROVIDER',
-				wgUser: userId,
-			},
-		};
-
-		const incomingState = await this.getIncomingPaymentById(
-			incomingPayment?.[0]?.IncomingPaymentId
+		const sendValue = adjustValue(
+			calcularTotalCosto(
+				parameterExists?.base,
+				parameterExists?.comision,
+				parameterExists?.cost,
+				parameterExists?.percent
+			),
+			walletAsset?.scale
 		);
 
-		if (incomingState?.state == 'COMPLETED') {
+		for (let i = 0; i < incomingPayment.length; i++) {
+			const payment = incomingPayment?.[i];
+			const incomingPaymentValue = await this.getIncomingPayment(
+				payment?.IncomingPaymentId
+			);
+
+			const incomingValue =
+				parseInt(incomingPaymentValue?.incomingAmount?.value ?? '0') -
+				parseInt(incomingPaymentValue?.receivedAmount?.value ?? '0');
+
+			if (sendValue <= incomingValue) {
+				validIncomingPayment = payment;
+				break;
+			}
+		}
+
+		if (!validIncomingPayment) {
 			this.authGateway.server.emit('error', {
-				message: 'Missing funds',
+				message: 'Insufficient funds',
 				statusCode: 'WGE0220',
 			});
 		}
 
-		const outgoing = await this.createOutgoingPayment(inputOutgoing);
+		if (validIncomingPayment) {
+			const quoteInput = {
+				walletAddressId: walletAddressId,
+				receiver: validIncomingPayment?.ReceiverId,
+				receiveAmount: {
+					value: sendValue,
+					assetCode: walletAsset?.asset ?? 'USD',
+					assetScale: walletAsset?.scale ?? 2,
+				},
+			};
 
-		await this.createDepositOutgoingMutationService({
-			outgoingPaymentId: outgoing?.createOutgoingPayment?.payment?.id,
-			idempotencyKey: uuidv4(),
-		});
+			const walletByUserId = await this.dbInstance
+				.scan('UserId')
+				.eq(userId)
+				.attributes([
+					'RafikiId',
+					'PostedCredits',
+					'PostedDebits',
+					'PendingCredits',
+					'PendingDebits',
+				])
+				.exec();
 
-		this.authGateway.server.emit('hc', {
-			message: 'Ok',
-			statusCode: 'WGS0053',
-			activityId: activityId,
-		});
+			const userWallet = await walletByUserId?.[0];
+
+			const balance =
+				userWallet?.PostedCredits -
+				(userWallet?.PendingDebits + userWallet?.PostedDebits);
+
+			if (quoteInput?.receiveAmount?.value > balance) {
+				this.authGateway.server.emit('error', {
+					message: 'Insufficient funds',
+					statusCode: 'WGE0220',
+				});
+			}
+
+			const quote = await this.createQuote(quoteInput);
+			const providerWalletId = quote?.createQuote?.quote?.receiver?.split('/');
+
+			if (!providerWalletId) {
+				this.authGateway.server.emit('error', {
+					message: 'Invalid quote',
+					statusCode: 'WGE0221',
+				});
+			}
+
+			if (providerWalletId) {
+				const inputOutgoing = {
+					walletAddressId: walletAddressId,
+					quoteId: quote?.createQuote?.quote?.id,
+					metadata: {
+						description: '',
+						type: 'PROVIDER',
+						wgUser: userId,
+					},
+				};
+
+				const incomingState = await this.getIncomingPaymentById(
+					validIncomingPayment?.IncomingPaymentId
+				);
+
+				if (incomingState?.state == 'COMPLETED') {
+					this.authGateway.server.emit('error', {
+						message: 'Missing funds',
+						statusCode: 'WGE0220',
+					});
+				}
+
+				const outgoing = await this.createOutgoingPayment(inputOutgoing);
+
+				await this.createDepositOutgoingMutationService({
+					outgoingPaymentId: outgoing?.createOutgoingPayment?.payment?.id,
+					idempotencyKey: uuidv4(),
+				});
+
+				this.authGateway.server.emit('hc', {
+					message: 'Ok',
+					statusCode: 'WGS0053',
+					activityId: activityId,
+				});
+			}
+		}
 	}
 
 	async completePayment(outgoingPaymentId, action) {
