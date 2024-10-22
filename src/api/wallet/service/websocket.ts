@@ -165,6 +165,7 @@ export class AuthGateway
 		const activityId = parsedData.activityId?.toString();
 		const paymentType = parsedData.paymentType?.toString();
 		const wgUserId = parsedData.wgUserId?.toString();
+		const contentName = parsedData.contentName?.toString();
 		const objectSecret = await this.authService.getServiceProviderWihtPublicKey(
 			publicKeyData
 		);
@@ -231,7 +232,8 @@ export class AuthGateway
 					serviceProviderId,
 					wgUserId,
 					walletAddress?.walletUrl,
-					activityId
+					activityId,
+					contentName
 				);
 			} else if (action == 'stop' || action == 'pause' || action == 'play') {
 				client.emit('hc', {
