@@ -1059,10 +1059,7 @@ export class WalletService {
 				};
 
 				if (!receivedAmount) {
-					const incomingCancelResponse = await this.cancelIncomingPayment(
-						incomingPaymentId
-					);
-					return incomingCancelResponse;
+					await this.cancelIncomingPayment(incomingPaymentId);
 				}
 
 				const wallet = await docClient.update(params).promise();
