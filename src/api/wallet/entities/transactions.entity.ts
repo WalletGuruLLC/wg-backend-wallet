@@ -4,6 +4,8 @@ export interface Metadata {
 	type: string;
 	wgUser: string;
 	description: string;
+	activityId?: string;
+	contentName?: string;
 }
 
 export interface Amount {

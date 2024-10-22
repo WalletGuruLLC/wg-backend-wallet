@@ -98,15 +98,63 @@ export class OutGoingPaymentCompletedEvent implements EventWebHook {
 				},
 				Description: '',
 			};
-			await this.dbTransactions.create(transaction);
+			const transactionValue = await this.dbTransactions.create(transaction);
+
+			const senderWallet = await this.walletService.getWalletByAddress(
+				transaction?.SenderUrl
+			);
+			const receiverWallet = await this.walletService.getWalletByAddress(
+				transaction?.ReceiverUrl
+			);
+
+			let senderName = 'Unknown';
+			let receiverName = 'Unknown';
+
+			if (senderWallet?.userId) {
+				const senderWalletInfo = await this.walletService.getUserInfoById(
+					senderWallet?.userId
+				);
+				if (senderWalletInfo) {
+					senderName = `${senderWalletInfo?.firstName} ${senderWalletInfo?.lastName}`;
+				}
+			}
+
+			if (receiverWallet?.userId) {
+				const receiverWalletInfo = await this.walletService.getUserInfoById(
+					receiverWallet?.userId
+				);
+				if (receiverWalletInfo) {
+					receiverName = `${receiverWalletInfo?.firstName} ${receiverWalletInfo?.lastName}`;
+				}
+			}
+
+			if (senderName === 'Unknown' && senderWallet?.providerId) {
+				const senderProviderInfo = await this.walletService.getProviderById(
+					senderWallet?.providerId
+				);
+				if (senderProviderInfo) {
+					senderName = senderProviderInfo?.name;
+				}
+			}
+
+			if (receiverName === 'Unknown' && receiverWallet?.providerId) {
+				const receiverProviderInfo = await this.walletService.getProviderById(
+					receiverWallet?.providerId
+				);
+				if (receiverProviderInfo) {
+					receiverName = receiverProviderInfo?.name;
+				}
+			}
+
+			const transactionFormated = {
+				...transactionValue,
+				senderName,
+				receiverName,
+			};
 
 			this.userWsGateway.sendTransaction(
-				recieverWallet?.userId || recieverWallet?.providerId,
-				transaction
-			);
-			this.userWsGateway.sendTransaction(
 				userWallet?.userId || userWallet?.providerId,
-				transaction
+				transactionFormated
 			);
 
 			const sender = await docClient.update(params).promise();

@@ -1608,7 +1608,8 @@ export class WalletService {
 		serviceProviderId,
 		userId,
 		senderUrl,
-		activityId
+		activityId,
+		contentName
 	) {
 		const parameterExists = await this.validatePaymentParameterId(
 			parameterId,
@@ -1726,6 +1727,8 @@ export class WalletService {
 					walletAddressId: walletAddressId,
 					quoteId: quote?.createQuote?.quote?.id,
 					metadata: {
+						activityId: activityId || '',
+						contentName: contentName || 'Thieves Of The Sea - Origin',
 						description: '',
 						type: 'PROVIDER',
 						wgUser: userId,
