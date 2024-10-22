@@ -866,12 +866,17 @@ export class WalletService {
 
 			const combinedSorted = [...incomingSorted, ...outgoingSorted];
 
+			const combinedSortedCreated = combinedSorted?.sort(
+				(a: any, b: any) =>
+					new Date(b?.createdAt).getTime() - new Date(a?.createdAt).getTime()
+			);
+
 			if (search === 'credit') {
 				return convertToCamelCase(incomingSorted);
 			} else if (search === 'debit') {
 				return convertToCamelCase(outgoingSorted);
 			} else {
-				return convertToCamelCase(combinedSorted);
+				return convertToCamelCase(combinedSortedCreated);
 			}
 		} else {
 			return [];

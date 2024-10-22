@@ -92,6 +92,15 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 
 			await this.dbTransactions.create(transaction);
 
+			this.userWsGateway.sendTransaction(
+				recieverWallet?.userId || recieverWallet?.providerId,
+				transaction
+			);
+			this.userWsGateway.sendTransaction(
+				userWallet?.userId || userWallet?.providerId,
+				transaction
+			);
+
 			const receiver = await docClient.update(params).promise();
 
 			const balance = {

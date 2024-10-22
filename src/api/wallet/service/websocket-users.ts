@@ -44,6 +44,14 @@ export class UserWsGateway
 		}
 	}
 
+	sendTransaction(wgUserId: string, transaction: any) {
+		for (const c of this.wsClients) {
+			if (c.wgUserId === wgUserId) {
+				c.client.emit('transacctions', transaction);
+			}
+		}
+	}
+
 	async handleConnection(client: Socket, ...args: any[]) {
 		const headers = client.handshake.headers;
 		const body = client.data.body || {};
