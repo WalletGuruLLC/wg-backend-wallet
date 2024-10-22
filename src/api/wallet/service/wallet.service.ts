@@ -1593,11 +1593,16 @@ export class WalletService {
 			walletAsset?.scale
 		);
 
-		for (const payment of incomingPayment) {
-			const incomingPaymentValue = await this.getIncomingPayment(payment?.Id);
+		for (let i = 0; i < incomingPayment.length; i++) {
+			const payment = incomingPayment?.[i];
+			const incomingPaymentValue = await this.getIncomingPayment(
+				payment?.IncomingPaymentId
+			);
+
 			const incomingValue =
 				parseInt(incomingPaymentValue?.incomingAmount?.value ?? '0') -
 				parseInt(incomingPaymentValue?.receivedAmount?.value ?? '0');
+
 			if (sendValue <= incomingValue) {
 				validIncomingPayment = payment;
 				break;
@@ -1611,84 +1616,88 @@ export class WalletService {
 			});
 		}
 
-		const quoteInput = {
-			walletAddressId: walletAddressId,
-			receiver: validIncomingPayment?.ReceiverId,
-			receiveAmount: {
-				value: sendValue,
-				assetCode: walletAsset?.asset ?? 'USD',
-				assetScale: walletAsset?.scale ?? 2,
-			},
-		};
+		if (validIncomingPayment) {
+			const quoteInput = {
+				walletAddressId: walletAddressId,
+				receiver: validIncomingPayment?.ReceiverId,
+				receiveAmount: {
+					value: sendValue,
+					assetCode: walletAsset?.asset ?? 'USD',
+					assetScale: walletAsset?.scale ?? 2,
+				},
+			};
 
-		const walletByUserId = await this.dbInstance
-			.scan('UserId')
-			.eq(userId)
-			.attributes([
-				'RafikiId',
-				'PostedCredits',
-				'PostedDebits',
-				'PendingCredits',
-				'PendingDebits',
-			])
-			.exec();
+			const walletByUserId = await this.dbInstance
+				.scan('UserId')
+				.eq(userId)
+				.attributes([
+					'RafikiId',
+					'PostedCredits',
+					'PostedDebits',
+					'PendingCredits',
+					'PendingDebits',
+				])
+				.exec();
 
-		const userWallet = await walletByUserId?.[0];
+			const userWallet = await walletByUserId?.[0];
 
-		const balance =
-			userWallet?.PostedCredits -
-			(userWallet?.PendingDebits + userWallet?.PostedDebits);
+			const balance =
+				userWallet?.PostedCredits -
+				(userWallet?.PendingDebits + userWallet?.PostedDebits);
 
-		if (quoteInput?.receiveAmount?.value > balance) {
-			this.authGateway.server.emit('error', {
-				message: 'Insufficient funds',
-				statusCode: 'WGE0220',
-			});
+			if (quoteInput?.receiveAmount?.value > balance) {
+				this.authGateway.server.emit('error', {
+					message: 'Insufficient funds',
+					statusCode: 'WGE0220',
+				});
+			}
+
+			const quote = await this.createQuote(quoteInput);
+			const providerWalletId = quote?.createQuote?.quote?.receiver?.split('/');
+
+			if (!providerWalletId) {
+				this.authGateway.server.emit('error', {
+					message: 'Invalid quote',
+					statusCode: 'WGE0221',
+				});
+			}
+
+			if (providerWalletId) {
+				const inputOutgoing = {
+					walletAddressId: walletAddressId,
+					quoteId: quote?.createQuote?.quote?.id,
+					metadata: {
+						description: '',
+						type: 'PROVIDER',
+						wgUser: userId,
+					},
+				};
+
+				const incomingState = await this.getIncomingPaymentById(
+					validIncomingPayment?.IncomingPaymentId
+				);
+
+				if (incomingState?.state == 'COMPLETED') {
+					this.authGateway.server.emit('error', {
+						message: 'Missing funds',
+						statusCode: 'WGE0220',
+					});
+				}
+
+				const outgoing = await this.createOutgoingPayment(inputOutgoing);
+
+				await this.createDepositOutgoingMutationService({
+					outgoingPaymentId: outgoing?.createOutgoingPayment?.payment?.id,
+					idempotencyKey: uuidv4(),
+				});
+
+				this.authGateway.server.emit('hc', {
+					message: 'Ok',
+					statusCode: 'WGS0053',
+					activityId: activityId,
+				});
+			}
 		}
-
-		const quote = await this.createQuote(quoteInput);
-		const providerWalletId = quote?.createQuote?.quote?.receiver?.split('/');
-
-		if (!providerWalletId) {
-			this.authGateway.server.emit('error', {
-				message: 'Invalid quote',
-				statusCode: 'WGE0221',
-			});
-		}
-
-		const inputOutgoing = {
-			walletAddressId: walletAddressId,
-			quoteId: quote?.createQuote?.quote?.id,
-			metadata: {
-				description: '',
-				type: 'PROVIDER',
-				wgUser: userId,
-			},
-		};
-
-		const incomingState = await this.getIncomingPaymentById(
-			validIncomingPayment?.IncomingPaymentId
-		);
-
-		if (incomingState?.state == 'COMPLETED') {
-			this.authGateway.server.emit('error', {
-				message: 'Missing funds',
-				statusCode: 'WGE0220',
-			});
-		}
-
-		const outgoing = await this.createOutgoingPayment(inputOutgoing);
-
-		await this.createDepositOutgoingMutationService({
-			outgoingPaymentId: outgoing?.createOutgoingPayment?.payment?.id,
-			idempotencyKey: uuidv4(),
-		});
-
-		this.authGateway.server.emit('hc', {
-			message: 'Ok',
-			statusCode: 'WGS0053',
-			activityId: activityId,
-		});
 	}
 
 	async completePayment(outgoingPaymentId, action) {
