@@ -1727,7 +1727,7 @@ export class WalletService {
 					walletAddressId: walletAddressId,
 					quoteId: quote?.createQuote?.quote?.id,
 					metadata: {
-						activityId: activityId,
+						activityId: activityId || '',
 						contentName: contentName || 'Thieves Of The Sea - Origin',
 						description: '',
 						type: 'PROVIDER',

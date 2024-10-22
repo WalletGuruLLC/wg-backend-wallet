@@ -41,6 +41,8 @@ export const TransactionsSchema = new dynamoose.Schema(
 				type: String,
 				wgUser: String,
 				description: String,
+				activityId: String,
+				contentName: String,
 			},
 		},
 		Receiver: {
