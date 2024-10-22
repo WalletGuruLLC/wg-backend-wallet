@@ -801,10 +801,40 @@ export class WalletService {
 					new Date(b?.createdAt).getTime() - new Date(a?.createdAt).getTime()
 			);
 
-			const incomingSorted = sortedArray.filter(
+			const transactionsWithNames: any = await Promise.all(
+				sortedArray.map(async transaction => {
+					const senderWallet = await this.getWalletByAddress(
+						transaction?.SenderUrl
+					);
+					const receiverWallet = await this.getWalletByAddress(
+						transaction?.ReceiverUrl
+					);
+
+					if (senderWallet?.userId && receiverWallet?.userId) {
+						const senderWalletInfo = await this.getUserInfoById(
+							senderWallet?.userId
+						);
+						const receiverWalletInfo = await this.getUserInfoById(
+							receiverWallet?.userId
+						);
+
+						return {
+							...transaction,
+							senderName:
+								`${senderWalletInfo?.firstName} ${senderWalletInfo?.lastName}` ||
+								'Unknown',
+							receiverName:
+								`${receiverWalletInfo?.firstName} ${receiverWalletInfo?.lastName}` ||
+								'Unknown',
+						};
+					}
+				})
+			);
+
+			const incomingSorted = transactionsWithNames?.filter(
 				item => item?.Type === 'IncomingPayment'
 			);
-			const outgoingSorted = sortedArray.filter(
+			const outgoingSorted = transactionsWithNames?.filter(
 				item => item?.Type === 'OutgoingPayment'
 			);
 
