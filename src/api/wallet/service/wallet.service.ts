@@ -810,24 +810,50 @@ export class WalletService {
 						transaction?.ReceiverUrl
 					);
 
-					if (senderWallet?.userId && receiverWallet?.userId) {
+					let senderName = 'Unknown';
+					let receiverName = 'Unknown';
+
+					if (senderWallet?.userId) {
 						const senderWalletInfo = await this.getUserInfoById(
 							senderWallet?.userId
 						);
+						if (senderWalletInfo) {
+							senderName = `${senderWalletInfo?.firstName} ${senderWalletInfo?.lastName}`;
+						}
+					}
+
+					if (receiverWallet?.userId) {
 						const receiverWalletInfo = await this.getUserInfoById(
 							receiverWallet?.userId
 						);
-
-						return {
-							...transaction,
-							senderName:
-								`${senderWalletInfo?.firstName} ${senderWalletInfo?.lastName}` ||
-								'Unknown',
-							receiverName:
-								`${receiverWalletInfo?.firstName} ${receiverWalletInfo?.lastName}` ||
-								'Unknown',
-						};
+						if (receiverWalletInfo) {
+							receiverName = `${receiverWalletInfo?.firstName} ${receiverWalletInfo?.lastName}`;
+						}
 					}
+
+					if (senderName === 'Unknown' && senderWallet?.providerId) {
+						const senderProviderInfo = await this.getProviderById(
+							senderWallet?.providerId
+						);
+						if (senderProviderInfo) {
+							senderName = senderProviderInfo?.name;
+						}
+					}
+
+					if (receiverName === 'Unknown' && receiverWallet?.providerId) {
+						const receiverProviderInfo = await this.getProviderById(
+							receiverWallet?.providerId
+						);
+						if (receiverProviderInfo) {
+							receiverName = receiverProviderInfo?.name;
+						}
+					}
+
+					return {
+						...transaction,
+						senderName,
+						receiverName,
+					};
 				})
 			);
 
