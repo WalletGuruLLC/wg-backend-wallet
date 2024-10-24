@@ -45,9 +45,13 @@ export class WalletController {
 		private readonly verifyService: VerifyService
 	) {}
 
-	@ApiOperation({ summary: 'Obtener si existe una wallet address' })
+	@ApiOperation({ summary: 'Checks if a wallet address exists' })
 	@ApiQuery({ name: 'address', required: false, type: String })
 	@ApiBearerAuth('JWT')
+	@ApiOkResponse({ description: 'Wallet address successfully verified.' })
+	@ApiResponse({ status: 206, description: 'Incomplete parameters.' })
+	@ApiResponse({ status: 401, description: 'Unauthorized access.' })
+	@ApiResponse({ status: 500, description: 'Server error.' })
 	@Get('/exist')
 	async getWalletAddressExist(
 		@Query('address') address: string,
@@ -91,10 +95,9 @@ export class WalletController {
 
 	//CONTROLLER TO ADD A WALLET
 	@Post('/')
-	@ApiCreatedResponse({
-		description: 'The Add Wallet',
-	})
-	@ApiForbiddenResponse({ description: 'Forbidden.' })
+	@ApiOperation({ summary: 'Create a new wallet' })
+	@ApiCreatedResponse({ description: 'Wallet successfully created.' })
+	@ApiForbiddenResponse({ description: 'Forbidden access.' })
 	@ApiBearerAuth('JWT')
 	async create(
 		@Body() createWalletDto: CreateWalletDto,
@@ -131,10 +134,11 @@ export class WalletController {
 
 	// CONTROLLER TO UPDATE THE SELECTED WALLET
 	@Put('/:id')
-	@ApiOkResponse({
-		description: 'The record has been successfully updated.',
-	})
-	@ApiForbiddenResponse({ description: 'Forbidden.' })
+	@ApiOperation({ summary: 'Update an existing wallet' })
+	@ApiParam({ name: 'id', description: 'Wallet ID', type: String })
+	@ApiOkResponse({ description: 'Wallet successfully updated.' })
+	@ApiForbiddenResponse({ description: 'Forbidden access.' })
+	@ApiResponse({ status: 404, description: 'Wallet not found.' })
 	@ApiBearerAuth('JWT')
 	async update(
 		@Param('id') id: string,
@@ -225,10 +229,13 @@ export class WalletController {
 
 	// CONTROLLER TO GET ALL ROUTES
 	@Get()
+	@ApiOperation({ summary: 'Retrieve all wallets' })
 	@ApiOkResponse({
-		description: 'Successfully returned wallets',
+		description: 'Wallets successfully retrieved.',
+		type: [GetWalletDto],
 	})
 	@ApiBearerAuth('JWT')
+	@ApiResponse({ status: 500, description: 'Server error.' })
 	async findAll(
 		@Query() getWalletDto: GetWalletDto,
 		@Headers() headers: MapOfStringToList,
@@ -267,16 +274,14 @@ export class WalletController {
 
 	// CONTROLLER TO UPDATE TOGGLE ACTIVATE/INACTIVATE WALLETS
 	@Patch(':id/toggle')
-	@ApiOperation({ summary: 'Toggle the active status of a wallet' })
-	@ApiParam({ name: 'id', description: 'ID of the wallet', type: String })
+	@ApiOperation({ summary: 'Toggle the activation state of a wallet' })
+	@ApiParam({ name: 'id', description: 'Wallet ID', type: String })
 	@ApiResponse({
 		status: 200,
-		description: 'Wallet status toggled successfully.',
+		description: 'Wallet state successfully toggled.',
 	})
-	@ApiResponse({
-		status: 404,
-		description: 'Wallet not found.',
-	})
+	@ApiResponse({ status: 404, description: 'Wallet not found.' })
+	@ApiResponse({ status: 500, description: 'Server error.' })
 	async toggle(@Param('id') id: string, @Res() res) {
 		try {
 			const wallet = await this.walletService.toggle(id);
@@ -317,13 +322,11 @@ export class WalletController {
 	}
 
 	// CONTROLLER GET ONE WALLET BY ID
-	@ApiOperation({ summary: 'Listar una wallet por ID' })
-	@ApiParam({ name: 'walletID', description: 'ID del wallet', type: String })
-	@ApiResponse({
-		status: 200,
-		description: 'Wallet obtenida con éxito.',
-	})
-	@ApiResponse({ status: 404, description: 'Wallet not found' })
+	@ApiOperation({ summary: 'Retrieve a wallet by ID' })
+	@ApiParam({ name: 'walletID', description: 'Wallet ID', type: String })
+	@ApiResponse({ status: 200, description: 'Wallet successfully retrieved.' })
+	@ApiResponse({ status: 404, description: 'Wallet not found.' })
+	@ApiResponse({ status: 500, description: 'Server error.' })
 	@Get('/:id')
 	async listAccessLevels(@Res() res, @Param('id') walletID: string) {
 		try {
@@ -360,10 +363,11 @@ export class WalletController {
 
 	// CONTROLLER TO GET ALL ROUTES
 	@Get('wallet/token')
-	@ApiOkResponse({
-		description: 'Successfully returned wallet',
-	})
+	@ApiOperation({ summary: 'Retrieve a wallet using a token' })
 	@ApiBearerAuth('JWT')
+	@ApiOkResponse({ description: 'Wallet successfully retrieved.' })
+	@ApiResponse({ status: 401, description: 'Unauthorized access.' })
+	@ApiResponse({ status: 500, description: 'Server error.' })
 	async findWalletByToken(@Headers() headers: MapOfStringToList, @Res() res) {
 		const token = headers?.authorization;
 		try {
