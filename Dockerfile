@@ -51,7 +51,6 @@ RUN npm run build
 FROM base as final
 
 # Use production node environment by default.
-ARG NODE_ENV
 ARG AWS_REGION
 ARG AWS_ACCESS_KEY_ID
 ARG AWS_SECRET_ACCESS_KEY
