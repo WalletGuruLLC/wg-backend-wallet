@@ -748,7 +748,7 @@ export class WalletService {
 		return filteredAsset;
 	}
 
-	async getWalletByToken(token: string): Promise<{
+	async getWalletByToken(token: any): Promise<{
 		walletDb: Wallet;
 		walletAsset: any;
 	}> {
@@ -792,17 +792,80 @@ export class WalletService {
 			.scan(outgoingParams)
 			.promise();
 
-		const sortedArray = dynamoOutgoingPayments.Items.sort(
-			(a: any, b: any) =>
-				new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-		);
-
-		if (dynamoOutgoingPayments.Items.length > 0) {
-			const incomingSorted = sortedArray.filter(
-				item => item.Type === 'IncomingPayment'
+		if (dynamoOutgoingPayments?.Items?.length > 0) {
+			const sortedArray = dynamoOutgoingPayments?.Items?.sort(
+				(a: any, b: any) =>
+					new Date(b?.createdAt).getTime() - new Date(a?.createdAt).getTime()
 			);
-			const outgoingSorted = sortedArray.filter(
-				item => item.Type === 'OutgoingPayment'
+
+			const transactionsWithNames: any = await Promise.all(
+				sortedArray.map(async transaction => {
+					const senderWallet = await this.getWalletByAddress(
+						transaction?.SenderUrl
+					);
+					const receiverWallet = await this.getWalletByAddress(
+						transaction?.ReceiverUrl
+					);
+
+					let senderName = 'Unknown';
+					let receiverName = 'Unknown';
+
+					if (senderWallet?.userId) {
+						const senderWalletInfo = await this.getUserInfoById(
+							senderWallet?.userId
+						);
+						if (senderWalletInfo) {
+							senderName = `${senderWalletInfo?.firstName} ${senderWalletInfo?.lastName}`;
+						}
+					}
+
+					if (receiverWallet?.userId) {
+						const receiverWalletInfo = await this.getUserInfoById(
+							receiverWallet?.userId
+						);
+						if (receiverWalletInfo) {
+							receiverName = `${receiverWalletInfo?.firstName} ${receiverWalletInfo?.lastName}`;
+						}
+					}
+
+					if (senderName === 'Unknown' && senderWallet?.providerId) {
+						const senderProviderInfo = await this.getProviderById(
+							senderWallet?.providerId
+						);
+						if (senderProviderInfo) {
+							senderName = senderProviderInfo?.name;
+						}
+					}
+
+					if (receiverName === 'Unknown' && receiverWallet?.providerId) {
+						const receiverProviderInfo = await this.getProviderById(
+							receiverWallet?.providerId
+						);
+						if (receiverProviderInfo) {
+							receiverName = receiverProviderInfo?.name;
+						}
+					}
+
+					return {
+						...transaction,
+						senderName,
+						receiverName,
+					};
+				})
+			);
+
+			const incomingSorted = transactionsWithNames?.filter(
+				item => item?.Type === 'IncomingPayment'
+			);
+			const outgoingSorted = transactionsWithNames?.filter(
+				item => item?.Type === 'OutgoingPayment'
+			);
+
+			const combinedSorted = [...incomingSorted, ...outgoingSorted];
+
+			const combinedSortedCreated = combinedSorted?.sort(
+				(a: any, b: any) =>
+					new Date(b?.createdAt).getTime() - new Date(a?.createdAt).getTime()
 			);
 
 			if (search === 'credit') {
@@ -810,8 +873,7 @@ export class WalletService {
 			} else if (search === 'debit') {
 				return convertToCamelCase(outgoingSorted);
 			} else {
-				const combinedSorted = [...incomingSorted, ...outgoingSorted];
-				return convertToCamelCase(combinedSorted);
+				return convertToCamelCase(combinedSortedCreated);
 			}
 		} else {
 			return [];
@@ -849,7 +911,7 @@ export class WalletService {
 				);
 
 				if (
-					incomingPayment.state !== 'COMPLETED' ||
+					incomingPayment.state !== 'COMPLETED' &&
 					incomingPayment.state !== 'EXPIRED'
 				) {
 					const updatedIncomingPayment = {
@@ -966,7 +1028,7 @@ export class WalletService {
 			if (input.incomingAmount > balance) {
 				return {
 					statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-					customCode: 'WGE0137',
+					customCode: 'WGE0224',
 				};
 			}
 
@@ -1056,10 +1118,7 @@ export class WalletService {
 				};
 
 				if (!receivedAmount) {
-					const incomingCancelResponse = await this.cancelIncomingPayment(
-						incomingPaymentId
-					);
-					return incomingCancelResponse;
+					await this.cancelIncomingPayment(incomingPaymentId);
 				}
 
 				const wallet = await docClient.update(params).promise();
@@ -1546,7 +1605,8 @@ export class WalletService {
 		serviceProviderId,
 		userId,
 		senderUrl,
-		activityId
+		activityId,
+		contentName
 	) {
 		const parameterExists = await this.validatePaymentParameterId(
 			parameterId,
@@ -1555,7 +1615,7 @@ export class WalletService {
 
 		if (!parameterExists?.id) {
 			this.authGateway.server.emit('error', {
-				message: 'Type parameter does not exist',
+				message: 'The specified type parameter does not exist',
 				statusCode: 'WGE0222',
 			});
 		}
@@ -1569,94 +1629,134 @@ export class WalletService {
 			.eq(true)
 			.exec();
 
+		if (!incomingPayment || incomingPayment.length === 0) {
+			this.authGateway.server.emit('error', {
+				message: 'You don’t have any incoming payments yet.',
+				statusCode: 'WGE0223',
+			});
+		}
+
 		incomingPayment.sort((a: any, b: any) => b?.createdAt - a?.createdAt);
 
-		const quoteInput = {
-			walletAddressId: walletAddressId,
-			receiver: incomingPayment?.[0]?.ReceiverId,
-			receiveAmount: {
-				value: adjustValue(
-					calcularTotalCosto(
-						parameterExists?.base,
-						parameterExists?.comision,
-						parameterExists?.cost,
-						parameterExists?.percent
-					),
-					walletAsset?.scale
-				),
-				assetCode: walletAsset?.asset ?? 'USD',
-				assetScale: walletAsset?.scale ?? 2,
-			},
-		};
+		let validIncomingPayment: any = null;
 
-		const walletByUserId = await this.dbInstance
-			.scan('UserId')
-			.eq(userId)
-			.attributes([
-				'RafikiId',
-				'PostedCredits',
-				'PostedDebits',
-				'PendingCredits',
-				'PendingDebits',
-			])
-			.exec();
-
-		const userWallet = await walletByUserId?.[0];
-
-		const balance =
-			userWallet?.PostedCredits -
-			(userWallet?.PendingDebits + userWallet?.PostedDebits);
-
-		if (quoteInput?.receiveAmount?.value > balance) {
-			this.authGateway.server.emit('error', {
-				message: 'Missing funds',
-				statusCode: 'WGE0220',
-			});
-		}
-
-		const quote = await this.createQuote(quoteInput);
-		const providerWalletId = quote?.createQuote?.quote?.receiver?.split('/');
-
-		if (!providerWalletId) {
-			this.authGateway.server.emit('error', {
-				message: 'Invalid quote',
-				statusCode: 'WGE0221',
-			});
-		}
-
-		const inputOutgoing = {
-			walletAddressId: walletAddressId,
-			quoteId: quote?.createQuote?.quote?.id,
-			metadata: {
-				description: '',
-				type: 'PROVIDER',
-				wgUser: userId,
-			},
-		};
-
-		const incomingState = await this.getIncomingPaymentById(
-			incomingPayment?.[0]?.IncomingPaymentId
+		const sendValue = adjustValue(
+			calcularTotalCosto(
+				parameterExists?.base,
+				parameterExists?.comision,
+				parameterExists?.cost,
+				parameterExists?.percent
+			),
+			walletAsset?.scale
 		);
 
-		if (incomingState?.state == 'COMPLETED') {
+		for (let i = 0; i < incomingPayment.length; i++) {
+			const payment = incomingPayment?.[i];
+			const incomingPaymentValue = await this.getIncomingPayment(
+				payment?.IncomingPaymentId
+			);
+
+			const incomingValue =
+				parseInt(incomingPaymentValue?.incomingAmount?.value ?? '0') -
+				parseInt(incomingPaymentValue?.receivedAmount?.value ?? '0');
+
+			if (sendValue <= incomingValue) {
+				validIncomingPayment = payment;
+				break;
+			}
+		}
+
+		if (!validIncomingPayment) {
 			this.authGateway.server.emit('error', {
-				message: 'Missing funds',
+				message: 'Insufficient funds',
 				statusCode: 'WGE0220',
 			});
 		}
 
-		const outgoing = await this.createOutgoingPayment(inputOutgoing);
+		if (validIncomingPayment) {
+			const quoteInput = {
+				walletAddressId: walletAddressId,
+				receiver: validIncomingPayment?.ReceiverId,
+				receiveAmount: {
+					value: sendValue,
+					assetCode: walletAsset?.asset ?? 'USD',
+					assetScale: walletAsset?.scale ?? 2,
+				},
+			};
 
-		await this.createDepositOutgoingMutationService({
-			outgoingPaymentId: outgoing?.createOutgoingPayment?.payment?.id,
-			idempotencyKey: uuidv4(),
-		});
+			const walletByUserId = await this.dbInstance
+				.scan('UserId')
+				.eq(userId)
+				.attributes([
+					'RafikiId',
+					'PostedCredits',
+					'PostedDebits',
+					'PendingCredits',
+					'PendingDebits',
+				])
+				.exec();
 
-		this.authGateway.server.emit('hc', {
-			message: 'Ok',
-			statusCode: 'WGS0053',
-			activityId: activityId,
-		});
+			const userWallet = await walletByUserId?.[0];
+
+			const balance =
+				userWallet?.PostedCredits -
+				(userWallet?.PendingDebits + userWallet?.PostedDebits);
+
+			if (quoteInput?.receiveAmount?.value > balance) {
+				this.authGateway.server.emit('error', {
+					message: 'Insufficient funds',
+					statusCode: 'WGE0220',
+				});
+			}
+
+			const quote = await this.createQuote(quoteInput);
+			const providerWalletId = quote?.createQuote?.quote?.receiver?.split('/');
+
+			if (!providerWalletId) {
+				this.authGateway.server.emit('error', {
+					message: 'Invalid quote',
+					statusCode: 'WGE0221',
+				});
+			}
+
+			if (providerWalletId) {
+				const inputOutgoing = {
+					walletAddressId: walletAddressId,
+					quoteId: quote?.createQuote?.quote?.id,
+					metadata: {
+						activityId: activityId || '',
+						contentName: contentName || 'Thieves Of The Sea - Origin',
+						description: '',
+						type: 'PROVIDER',
+						wgUser: userId,
+					},
+				};
+
+				const incomingState = await this.getIncomingPaymentById(
+					validIncomingPayment?.IncomingPaymentId
+				);
+
+				if (incomingState?.state == 'COMPLETED') {
+					this.authGateway.server.emit('error', {
+						message: 'Missing funds',
+						statusCode: 'WGE0220',
+					});
+				}
+
+				const outgoing = await this.createOutgoingPayment(inputOutgoing);
+
+				await this.createDepositOutgoingMutationService({
+					outgoingPaymentId: outgoing?.createOutgoingPayment?.payment?.id,
+					idempotencyKey: uuidv4(),
+				});
+
+				this.authGateway.server.emit('hc', {
+					message: 'Ok',
+					statusCode: 'WGS0053',
+					activityId: activityId,
+				});
+			}
+		}
 	}
 
 	async completePayment(outgoingPaymentId, action) {
