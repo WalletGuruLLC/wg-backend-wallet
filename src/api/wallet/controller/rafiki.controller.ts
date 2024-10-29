@@ -21,6 +21,7 @@ import {
 	ApiBody,
 	ApiQuery,
 	ApiOkResponse,
+	ApiCreatedResponse,
 } from '@nestjs/swagger';
 
 import { WalletService } from '../service/wallet.service';
@@ -69,7 +70,7 @@ export class RafikiWalletController {
 		private readonly userWsGateway: UserWsGateway,
 		private configService: ConfigService
 	) {
-		this.AUTH_MICRO_URL = this.configService.get<string>('AUTH_URL');
+		this.AUTH_MICRO_URL = process.env.AUTH_URL;
 		this.dbTransactions = dynamoose.model<Transaction>(
 			'Transactions',
 			TransactionsSchema
@@ -110,8 +111,6 @@ export class RafikiWalletController {
 				{
 					statusCode: HttpStatus.UNAUTHORIZED,
 					customCode: 'WGE0021',
-					customMessage: errorCodes.WGE0021?.description,
-					customMessageEs: errorCodes.WGE0021?.descriptionEs,
 				},
 				HttpStatus.UNAUTHORIZED
 			);
@@ -202,8 +201,6 @@ export class RafikiWalletController {
 				{
 					statusCode: HttpStatus.UNAUTHORIZED,
 					customCode: 'WGE0021',
-					customMessage: errorCodes.WGE0021?.description,
-					customMessageEs: errorCodes.WGE0021?.descriptionEs,
 				},
 				HttpStatus.UNAUTHORIZED
 			);
@@ -260,15 +257,11 @@ export class RafikiWalletController {
 	}
 
 	@Get('assets')
-	@ApiOperation({ summary: 'List all rafiki assets' })
-	@ApiResponse({
-		status: 200,
-		description: successCodes.WGS0081?.description,
-	})
-	@ApiResponse({
-		status: 500,
-		description: errorCodes.WGE0083?.description,
-	})
+	@ApiOperation({ summary: 'Retrieve all Rafiki assets' })
+	@ApiBearerAuth('JWT')
+	@ApiOkResponse({ description: 'Assets successfully retrieved.' })
+	@ApiResponse({ status: 401, description: 'Unauthorized access.' })
+	@ApiResponse({ status: 500, description: 'Server error.' })
 	async getRafikiAssets(@Headers() headers: MapOfStringToList) {
 		let token;
 		try {
@@ -281,8 +274,6 @@ export class RafikiWalletController {
 				{
 					statusCode: HttpStatus.UNAUTHORIZED,
 					customCode: 'WGE0021',
-					customMessage: errorCodes.WGE0021?.description,
-					customMessageEs: errorCodes.WGE0021?.descriptionEs,
 				},
 				HttpStatus.UNAUTHORIZED
 			);
@@ -293,8 +284,6 @@ export class RafikiWalletController {
 			return {
 				statusCode: HttpStatus.OK,
 				customCode: 'WGS0081',
-				customMessage: successCodes.WGS0081?.description,
-				customMessageEs: successCodes.WGS0081?.descriptionEs,
 				data: { rafikiAssets },
 			};
 		} catch (error) {
@@ -307,8 +296,6 @@ export class RafikiWalletController {
 					{
 						statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
 						customCode: 'WGE0083',
-						customMessage: errorCodes.WGE0083?.description,
-						customMessageEs: errorCodes.WGE0083?.descriptionEs,
 					},
 					HttpStatus.INTERNAL_SERVER_ERROR
 				);
@@ -320,6 +307,11 @@ export class RafikiWalletController {
 	@Get('list-transactions')
 	@ApiQuery({ name: 'search', required: false, type: String })
 	@ApiOperation({ summary: 'List all user transactions' })
+	@ApiBearerAuth('JWT')
+	@ApiOkResponse({ description: 'Transactions successfully retrieved.' })
+	@ApiResponse({ status: 206, description: 'Incomplete parameters.' })
+	@ApiResponse({ status: 401, description: 'Unauthorized access.' })
+	@ApiResponse({ status: 500, description: 'Server error.' })
 	async listTransactions(
 		@Headers() headers: MapOfStringToList,
 		@Res() res,
@@ -336,8 +328,6 @@ export class RafikiWalletController {
 				{
 					statusCode: HttpStatus.UNAUTHORIZED,
 					customCode: 'WGE0021',
-					customMessage: errorCodes.WGE0021?.description,
-					customMessageEs: errorCodes.WGE0021?.descriptionEs,
 				},
 				HttpStatus.UNAUTHORIZED
 			);
@@ -363,12 +353,12 @@ export class RafikiWalletController {
 	}
 
 	@Post('transaction')
-	@ApiOperation({ summary: 'Create a transaction' })
-	@ApiResponse({
-		status: 201,
-		description: 'transaction created successfully.',
-	})
-	@ApiResponse({ status: 400, description: 'Bad Request' })
+	@ApiOperation({ summary: 'Create a new transaction' })
+	@ApiBearerAuth('JWT')
+	@ApiCreatedResponse({ description: 'Transaction successfully created.' })
+	@ApiResponse({ status: 400, description: 'Bad request.' })
+	@ApiResponse({ status: 401, description: 'Unauthorized access.' })
+	@ApiResponse({ status: 500, description: 'Server error.' })
 	async createTransaction(
 		@Headers() headers: MapOfStringToList,
 		@Body() input: ReceiverInputDTO,
@@ -387,8 +377,6 @@ export class RafikiWalletController {
 					{
 						statusCode: HttpStatus.UNAUTHORIZED,
 						customCode: 'WGE0021',
-						customMessage: errorCodes.WGE0021?.description,
-						customMessageEs: errorCodes.WGE0021?.descriptionEs,
 					},
 					HttpStatus.UNAUTHORIZED
 				);
@@ -496,12 +484,12 @@ export class RafikiWalletController {
 	}
 
 	@Post('service-provider-link')
-	@ApiOperation({ summary: 'Create a transaction to link service provider' })
-	@ApiResponse({
-		status: 201,
-		description: 'transaction created successfully.',
-	})
-	@ApiResponse({ status: 400, description: 'Bad Request' })
+	@ApiOperation({ summary: 'Create a transaction to link a service provider' })
+	@ApiBearerAuth('JWT')
+	@ApiCreatedResponse({ description: 'Service provider successfully linked.' })
+	@ApiResponse({ status: 400, description: 'Bad request.' })
+	@ApiResponse({ status: 401, description: 'Unauthorized access.' })
+	@ApiResponse({ status: 500, description: 'Server error.' })
 	async linkTransactionProvider(
 		@Headers() headers: MapOfStringToList,
 		@Body() input: LinkInputDTO,
@@ -520,8 +508,6 @@ export class RafikiWalletController {
 					{
 						statusCode: HttpStatus.UNAUTHORIZED,
 						customCode: 'WGE0021',
-						customMessage: errorCodes.WGE0021?.description,
-						customMessageEs: errorCodes.WGE0021?.descriptionEs,
 					},
 					HttpStatus.UNAUTHORIZED
 				);
@@ -597,12 +583,12 @@ export class RafikiWalletController {
 	}
 
 	@Get('linked-providers')
-	@ApiOperation({ summary: 'Get linked service providers' })
-	@ApiResponse({
-		status: 201,
-		description: 'Linked providrs retrieved successfully.',
-	})
-	@ApiResponse({ status: 400, description: 'Bad Request' })
+	@ApiOperation({ summary: 'Retrieve linked service providers' })
+	@ApiBearerAuth('JWT')
+	@ApiOkResponse({ description: 'Service providers successfully retrieved.' })
+	@ApiResponse({ status: 400, description: 'Bad request.' })
+	@ApiResponse({ status: 401, description: 'Unauthorized access.' })
+	@ApiResponse({ status: 500, description: 'Server error.' })
 	async getLinkedProvidersUserById(
 		@Headers() headers: MapOfStringToList,
 		@Req() req,
@@ -620,8 +606,6 @@ export class RafikiWalletController {
 					{
 						statusCode: HttpStatus.UNAUTHORIZED,
 						customCode: 'WGE0021',
-						customMessage: errorCodes.WGE0021?.description,
-						customMessageEs: errorCodes.WGE0021?.descriptionEs,
 					},
 					HttpStatus.UNAUTHORIZED
 				);
@@ -708,16 +692,12 @@ export class RafikiWalletController {
 	// }
 
 	@Get('exchange-rates')
-	@ApiOperation({ summary: 'List all exchange rates' })
-	@ApiResponse({
-		status: 200,
-		description: successCodes.WGS0081?.description,
-	})
-	@ApiResponse({
-		status: 500,
-		description: errorCodes.WGE0083?.description,
-	})
+	@ApiOperation({ summary: 'Retrieve all exchange rates' })
 	@ApiQuery({ name: 'search', required: false, type: String })
+	@ApiBearerAuth('JWT')
+	@ApiOkResponse({ description: 'Exchange rates successfully retrieved.' })
+	@ApiResponse({ status: 401, description: 'Unauthorized access.' })
+	@ApiResponse({ status: 500, description: 'Server error.' })
 	async getExchangeRates(
 		@Headers() headers: MapOfStringToList,
 		@Res() res,
@@ -772,8 +752,10 @@ export class RafikiWalletController {
 
 	@Post('create-deposit')
 	@ApiOperation({ summary: 'Create a deposit' })
-	@ApiResponse({ status: 201, description: 'deposit created successfully.' })
+	@ApiBearerAuth('JWT')
+	@ApiOkResponse({ description: 'Deposit created successfully.' })
 	@ApiResponse({ status: 400, description: 'Bad Request' })
+	@ApiResponse({ status: 500, description: 'Server error.' })
 	async createDeposit(@Body() input: DepositDTO, @Req() req, @Res() res) {
 		try {
 			const deposit = await this.walletService.createDeposit(input);
@@ -802,13 +784,11 @@ export class RafikiWalletController {
 	}
 
 	@Get(':id/asset')
-	@ApiOperation({ summary: 'Get wallet address by rafikyId' })
-	@ApiResponse({
-		status: 200,
-	})
-	@ApiResponse({
-		status: 500,
-	})
+	@ApiOperation({ summary: 'Get wallet address by Rafiki ID' })
+	@ApiBearerAuth('JWT')
+	@ApiOkResponse({ description: 'Wallet address retrieved successfully.' })
+	@ApiResponse({ status: 401, description: 'Unauthorized access.' })
+	@ApiResponse({ status: 500, description: 'Server error.' })
 	async getAssetByRafikyId(
 		@Param('id') id: string,
 		@Headers() headers: MapOfStringToList,
@@ -847,12 +827,12 @@ export class RafikiWalletController {
 	}
 
 	@Post('create/incoming-payment')
-	@ApiOperation({ summary: 'Create a Incoming Payment' })
-	@ApiResponse({
-		status: 201,
-		description: 'InconmingPayment created successfully.',
-	})
+	@ApiOperation({ summary: 'Create an Incoming Payment' })
+	@ApiBearerAuth('JWT')
+	@ApiOkResponse({ description: 'Incoming Payment created successfully.' })
 	@ApiResponse({ status: 400, description: 'Bad Request' })
+	@ApiResponse({ status: 401, description: 'Unauthorized access.' })
+	@ApiResponse({ status: 500, description: 'Server error.' })
 	async createIncomingPayment(
 		@Body() input: CreatePaymentDTO,
 		@Req() req,
@@ -940,12 +920,14 @@ export class RafikiWalletController {
 	}
 
 	@Post('action/outgoing-payment')
-	@ApiOperation({ summary: 'Action outgoing payment' })
-	@ApiResponse({
-		status: 201,
-		description: 'Action outgoing payment created successfully.',
+	@ApiOperation({ summary: 'Execute an outgoing payment action' })
+	@ApiBearerAuth('JWT')
+	@ApiOkResponse({
+		description: 'Outgoing payment action successfully executed.',
 	})
 	@ApiResponse({ status: 400, description: 'Bad Request' })
+	@ApiResponse({ status: 401, description: 'Unauthorized access.' })
+	@ApiResponse({ status: 500, description: 'Server error.' })
 	async actionOutgoingPayment(
 		@Body() input: ActionOugoingPaymentDto,
 		@Req() req,
@@ -1007,7 +989,11 @@ export class RafikiWalletController {
 
 	@Get('list-incoming-payments')
 	@ApiQuery({ name: 'status', required: false, type: Boolean })
-	@ApiOperation({ summary: 'List all user incoming payments' })
+	@ApiOperation({ summary: 'List all incoming payments' })
+	@ApiBearerAuth('JWT')
+	@ApiOkResponse({ description: 'Incoming payments retrieved successfully.' })
+	@ApiResponse({ status: 401, description: 'Unauthorized access.' })
+	@ApiResponse({ status: 500, description: 'Server error.' })
 	async listIncomingPayments(
 		@Headers() headers: MapOfStringToList,
 		@Res() res,
@@ -1024,8 +1010,6 @@ export class RafikiWalletController {
 				{
 					statusCode: HttpStatus.UNAUTHORIZED,
 					customCode: 'WGE0021',
-					customMessage: errorCodes.WGE0021?.description,
-					customMessageEs: errorCodes.WGE0021?.descriptionEs,
 				},
 				HttpStatus.UNAUTHORIZED
 			);
@@ -1070,9 +1054,12 @@ export class RafikiWalletController {
 	}
 
 	@Patch(':id/cancel-incoming')
-	@ApiOkResponse({
-		description: 'Incoming Payment has been cancelled.',
-	})
+	@ApiOperation({ summary: 'Cancel an incoming payment by ID' })
+	@ApiBearerAuth('JWT')
+	@ApiOkResponse({ description: 'Incoming payment cancelled successfully.' })
+	@ApiResponse({ status: 401, description: 'Unauthorized access.' })
+	@ApiResponse({ status: 404, description: 'Incoming payment not found.' })
+	@ApiResponse({ status: 500, description: 'Server error.' })
 	async cancelIncoming(
 		@Param('id') id: string,
 		@Headers() headers: MapOfStringToList,
@@ -1119,12 +1106,12 @@ export class RafikiWalletController {
 	}
 
 	@Get('test')
-	@ApiOperation({ summary: 'Get linked service providers' })
-	@ApiResponse({
-		status: 201,
-		description: 'Linked providrs retrieved successfully.',
-	})
+	@ApiOperation({ summary: 'Test WebSocket for a user by userId' })
+	@ApiOkResponse({ description: 'WebSocket test message sent successfully.' })
 	@ApiResponse({ status: 400, description: 'Bad Request' })
+	@ApiResponse({ status: 401, description: 'Unauthorized access.' })
+	@ApiResponse({ status: 404, description: 'User not found.' })
+	@ApiResponse({ status: 500, description: 'Server error.' })
 	async testWsUser(
 		@Headers() headers: MapOfStringToList,
 		@Req() req,
