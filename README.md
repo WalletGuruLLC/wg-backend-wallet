@@ -27,5 +27,4 @@ Create a .env file in the root of the project following the content of .env.exam
 
 - `AWS_KEY_ID`: Key ID of the AWS account
 - `AWS_SECRET_ACCESS_KEY`: Secret key of the AWS account
-- `AWS_REGION`: Region of the AWS account
 - `SECRET_NAME`: Name of the secret in AWS Secrets Manager
