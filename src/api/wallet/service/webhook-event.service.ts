@@ -6,9 +6,14 @@ import { hookEventMap } from 'src/utils/hookEventMap';
 import { EventWebHook } from '../dto/event-webhook';
 import { EventWebHookDTO } from '../dto/event-hook.dto';
 import { WalletService } from './wallet.service';
+import { UserWsGateway } from './websocket-users';
+
 @Injectable()
 export class WebHookEventService {
-	constructor(private readonly walletService: WalletService) {}
+	constructor(
+		private readonly walletService: WalletService,
+		private readonly userWsGateway: UserWsGateway
+	) {}
 
 	async executeEvent(eventWebHookDTO: EventWebHookDTO) {
 		try {
@@ -19,7 +24,8 @@ export class WebHookEventService {
 					eventWebHookDTO.data.walletAddressId
 				);
 				const eventAction = hookEventMap[eventWebHookDTO.type](
-					this.walletService
+					this.walletService,
+					this.userWsGateway
 				);
 
 				await eventAction.trigger(eventWebHookDTO, wallet);

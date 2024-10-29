@@ -25,6 +25,7 @@
 	},
 	"dependencies": {
 		"@apollo/client": "^3.11.4",
+		"@aws-sdk/client-secrets-manager": "^3.679.0",
 		"@nestjs/apollo": "^12.2.0",
 		"@nestjs/cli": "^10.4.4",
 		"@nestjs/common": "^10.4.4",
