@@ -767,7 +767,18 @@ export class WalletService {
 		};
 	}
 
-	async listTransactions(token: string, search: string) {
+	async listTransactions(
+		token: string,
+		search: string,
+		filters?: {
+			type?: string;
+			dateRange?: { start: string; end: string };
+			state?: string;
+			providerIds?: string[];
+			activityId?: string;
+			transactionType?: string[];
+		}
+	) {
 		if (!search) {
 			search = 'all';
 		}
@@ -791,6 +802,7 @@ export class WalletService {
 				':TypeOutgoing': 'OutgoingPayment',
 			},
 		};
+
 		const dynamoOutgoingPayments = await docClient
 			.scan(outgoingParams)
 			.promise();
@@ -857,27 +869,93 @@ export class WalletService {
 				})
 			);
 
-			const incomingSorted = transactionsWithNames?.filter(
-				item => item?.Type === 'IncomingPayment'
-			);
-			const outgoingSorted = transactionsWithNames?.filter(
-				item => item?.Type === 'OutgoingPayment'
-			);
+			let validWallets = [];
+			if (filters?.providerIds?.length) {
+				const providerWalletsPromises = filters.providerIds.map(
+					async providerId => {
+						const provider = await this.getWalletAddressByProviderId(
+							providerId
+						);
+						return provider?.walletAddress;
+					}
+				);
 
-			const combinedSorted = [...incomingSorted, ...outgoingSorted];
-
-			const combinedSortedCreated = combinedSorted?.sort(
-				(a: any, b: any) =>
-					new Date(b?.createdAt).getTime() - new Date(a?.createdAt).getTime()
-			);
-
-			if (search === 'credit') {
-				return convertToCamelCase(incomingSorted);
-			} else if (search === 'debit') {
-				return convertToCamelCase(outgoingSorted);
-			} else {
-				return convertToCamelCase(combinedSortedCreated);
+				const providerWallets = await Promise.all(providerWalletsPromises);
+				validWallets = providerWallets.filter(
+					walletAddress => walletAddress != null
+				);
 			}
+
+			const filteredTransactions = transactionsWithNames.filter(transaction => {
+				const matchesActivityId = filters?.activityId
+					? transaction.Metadata?.activityId === filters.activityId
+					: true;
+				const matchesType = filters?.type
+					? transaction.Type === filters.type
+					: true;
+				const matchesState = filters?.state
+					? transaction.State === filters.state
+					: true;
+
+				const matchesDateRange = filters?.dateRange
+					? new Date(transaction.createdAt) >=
+							new Date(filters.dateRange.start) &&
+					  new Date(transaction.createdAt) <= new Date(filters.dateRange.end)
+					: true;
+
+				const matchesProviderId =
+					validWallets.length > 0
+						? validWallets.some(
+								walletAddress => walletAddress === transaction.ReceiverUrl
+						  ) && transaction.Metadata?.type === 'PROVIDER'
+						: true;
+
+				return (
+					matchesActivityId &&
+					matchesType &&
+					matchesState &&
+					matchesDateRange &&
+					matchesProviderId
+				);
+			});
+
+			const isIncoming = filters?.transactionType?.includes('incoming');
+			const isOutgoing = filters?.transactionType?.includes('outgoing');
+
+			let sortedTransactions;
+
+			if (isIncoming && isOutgoing) {
+				sortedTransactions = convertToCamelCase(filteredTransactions);
+			} else if (isIncoming) {
+				sortedTransactions = convertToCamelCase(
+					filteredTransactions.filter(t => t.Type === 'IncomingPayment')
+				);
+			} else if (isOutgoing) {
+				sortedTransactions = convertToCamelCase(
+					filteredTransactions.filter(t => t.Type === 'OutgoingPayment')
+				);
+			}
+
+			if (filters?.transactionType) {
+				return sortedTransactions;
+			}
+
+			const incomingSorted = filteredTransactions.filter(
+				item => item.Type === 'IncomingPayment'
+			);
+			const outgoingSorted = filteredTransactions.filter(
+				item => item.Type === 'OutgoingPayment'
+			);
+			const combinedSorted = [...incomingSorted, ...outgoingSorted].sort(
+				(a: any, b: any) =>
+					new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+			);
+
+			return search === 'credit'
+				? convertToCamelCase(incomingSorted)
+				: search === 'debit'
+				? convertToCamelCase(outgoingSorted)
+				: convertToCamelCase(combinedSorted);
 		} else {
 			return [];
 		}
@@ -1506,6 +1584,25 @@ export class WalletService {
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
 				customCode: 'WGE0137',
 			};
+		}
+	}
+
+	async getWalletAddressByProviderId(providerId: string) {
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'Wallets',
+			IndexName: 'ProviderIdIndex',
+			KeyConditionExpression: `ProviderId  = :providerId`,
+			ExpressionAttributeValues: {
+				':providerId': providerId,
+			},
+		};
+
+		try {
+			const result = await docClient.query(params).promise();
+			return convertToCamelCase(result.Items?.[0]);
+		} catch (error) {
+			return {};
 		}
 	}
 
