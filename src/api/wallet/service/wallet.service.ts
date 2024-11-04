@@ -1812,6 +1812,11 @@ export class WalletService {
 				userWallet?.PostedCredits -
 				(userWallet?.PendingDebits + userWallet?.PostedDebits);
 
+			console.log(
+				'quoteInput?.receiveAmount?.value',
+				quoteInput?.receiveAmount?.value,
+				balance
+			);
 			if (quoteInput?.receiveAmount?.value > balance) {
 				this.authGateway.server.emit('error', {
 					message: 'Insufficient funds',
@@ -1894,7 +1899,7 @@ export class WalletService {
 						const quote = await this.createQuote(quoteInput);
 
 						const inputOutgoing = {
-							walletAddressId: sendValueWalletGuru,
+							walletAddressId: walletAddressId,
 							quoteId: quote?.createQuote?.quote?.id,
 							metadata: {
 								activityId: activityId || '',
@@ -1904,7 +1909,15 @@ export class WalletService {
 								wgUser: userId,
 							},
 						};
-						await this.createOutgoingPayment(inputOutgoing);
+						const outgoingValue = await this.createOutgoingPayment(
+							inputOutgoing
+						);
+
+						await this.createDepositOutgoingMutationService({
+							outgoingPaymentId:
+								outgoingValue?.createOutgoingPayment?.payment?.id,
+							idempotencyKey: uuidv4(),
+						});
 					}, 500);
 				}
 
