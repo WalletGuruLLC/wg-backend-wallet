@@ -41,6 +41,7 @@ import { adjustValue } from 'src/utils/helpers/generalAdjustValue';
 import { calcularTotalCosto } from 'src/utils/helpers/calcularTotalTransactionPlat';
 import { parseStringToBoolean } from 'src/utils/helpers/parseStringToBoolean';
 import { AuthGateway } from './websocket';
+import { calcularTotalCostoWalletGuru } from 'src/utils/helpers/calcularCostoWalletGuru';
 
 @Injectable()
 export class WalletService {
@@ -53,6 +54,7 @@ export class WalletService {
 	private dbUserIncoming: Model<UserIncomingPayment>;
 	private readonly AUTH_MICRO_URL: string;
 	private readonly DOMAIN_WALLET_URL: string;
+	private readonly WALLET_WG_URL: string;
 
 	constructor(
 		private configService: ConfigService,
@@ -82,6 +84,7 @@ export class WalletService {
 		this.dbRates = dynamoose.model<Rates>('Rates', RatesSchema);
 		this.AUTH_MICRO_URL = process.env.AUTH_URL;
 		this.DOMAIN_WALLET_URL = process.env.DOMAIN_WALLET_URL;
+		this.WALLET_WG_URL = process.env.WALLET_WG_URL;
 	}
 
 	async createIncoming(createIncomingUserDto: CreateIncomingUserDto) {
@@ -1747,6 +1750,16 @@ export class WalletService {
 			walletAsset?.scale
 		);
 
+		const sendValueWalletGuru = adjustValue(
+			calcularTotalCostoWalletGuru(
+				parameterExists?.base,
+				parameterExists?.comision,
+				parameterExists?.cost,
+				parameterExists?.percent
+			),
+			walletAsset?.scale
+		);
+
 		for (let i = 0; i < incomingPayment.length; i++) {
 			const payment = incomingPayment?.[i];
 			const incomingPaymentValue = await this.getIncomingPayment(
@@ -1846,6 +1859,62 @@ export class WalletService {
 					outgoingPaymentId: outgoing?.createOutgoingPayment?.payment?.id,
 					idempotencyKey: uuidv4(),
 				});
+
+				// Send fee wg
+
+				if (this.WALLET_WG_URL) {
+					const inputReceiver = {
+						metadata: {
+							activityId: activityId || '',
+							contentName: contentName || 'Thieves Of The Sea - Origin',
+							description: '',
+							type: 'PROVIDER',
+							wgUser: userId,
+						},
+						incomingAmount: {
+							value: sendValueWalletGuru,
+							assetCode: walletAsset?.asset ?? 'USD',
+							assetScale: walletAsset?.scale ?? 2,
+						},
+						walletAddressUrl: this.WALLET_WG_URL,
+					};
+
+					const receiver = await this.createReceiver(inputReceiver);
+					const quoteInput = {
+						walletAddressId: walletAddressId,
+						receiver: receiver?.createReceiver?.receiver?.id,
+						receiveAmount: {
+							assetCode: walletAsset?.asset ?? 'USD',
+							assetScale: walletAsset?.scale ?? 2,
+							value: sendValueWalletGuru,
+						},
+					};
+
+					setTimeout(async () => {
+						const quote = await this.createQuote(quoteInput);
+
+						const inputOutgoing = {
+							walletAddressId: walletAddressId,
+							quoteId: quote?.createQuote?.quote?.id,
+							metadata: {
+								activityId: activityId || '',
+								contentName: contentName || 'Thieves Of The Sea - Origin',
+								description: '',
+								type: 'PROVIDER',
+								wgUser: userId,
+							},
+						};
+						const outgoingValue = await this.createOutgoingPayment(
+							inputOutgoing
+						);
+
+						await this.createDepositOutgoingMutationService({
+							outgoingPaymentId:
+								outgoingValue?.createOutgoingPayment?.payment?.id,
+							idempotencyKey: uuidv4(),
+						});
+					}, 500);
+				}
 
 				this.authGateway.server.emit('hc', {
 					message: 'Ok',
