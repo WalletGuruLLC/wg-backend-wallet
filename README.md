@@ -44,4 +44,5 @@ Create a .env file in the root of the project following the content of .env.exam
 - `BACKEND_API_SIGNATURE_VERSION`: Version of rafiki transaction
 - `BACKEND_API_SIGNATURE_SECRET`: Secret of rafiki transactions
 - `SQS_QUEUE_URL`: Url of AWS SQS Service
+- `WALLET_WG_URL`: Wallet guru address url
 
