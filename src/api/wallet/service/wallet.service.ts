@@ -1812,11 +1812,6 @@ export class WalletService {
 				userWallet?.PostedCredits -
 				(userWallet?.PendingDebits + userWallet?.PostedDebits);
 
-			console.log(
-				'quoteInput?.receiveAmount?.value',
-				quoteInput?.receiveAmount?.value,
-				balance
-			);
 			if (quoteInput?.receiveAmount?.value > balance) {
 				this.authGateway.server.emit('error', {
 					message: 'Insufficient funds',
