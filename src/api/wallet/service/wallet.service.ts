@@ -82,12 +82,9 @@ export class WalletService {
 			TransactionsSchema
 		);
 		this.dbRates = dynamoose.model<Rates>('Rates', RatesSchema);
-		this.AUTH_MICRO_URL = this.configService.get<string>('AUTH_URL');
-		this.DOMAIN_WALLET_URL = this.configService.get<string>(
-			'DOMAIN_WALLET_URL',
-			'https://cloud-nine-wallet-backend/accounts'
-		);
-		this.WALLET_WG_URL = this.configService.get<string>('WALLET_WG_URL');
+		this.AUTH_MICRO_URL = process.env.AUTH_URL;
+		this.DOMAIN_WALLET_URL = process.env.DOMAIN_WALLET_URL;
+		this.WALLET_WG_URL = process.env.WALLET_WG_URL;
 	}
 
 	async createIncoming(createIncomingUserDto: CreateIncomingUserDto) {

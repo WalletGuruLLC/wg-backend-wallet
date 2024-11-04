@@ -70,7 +70,7 @@ export class RafikiWalletController {
 		private readonly userWsGateway: UserWsGateway,
 		private configService: ConfigService
 	) {
-		this.AUTH_MICRO_URL = this.configService.get<string>('AUTH_URL');
+		this.AUTH_MICRO_URL = process.env.AUTH_URL;
 		this.dbTransactions = dynamoose.model<Transaction>(
 			'Transactions',
 			TransactionsSchema
