@@ -1907,14 +1907,7 @@ export class WalletService {
 								wgUser: userId,
 							},
 						};
-						const outgoingPayment = await this.createOutgoingPayment(
-							inputOutgoing
-						);
-
-						await this.sendMoneyMailConfirmation(
-							inputOutgoing,
-							outgoingPayment
-						);
+						await this.createOutgoingPayment(inputOutgoing);
 					}, 500);
 				}
 
