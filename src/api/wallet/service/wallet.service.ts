@@ -41,6 +41,7 @@ import { adjustValue } from 'src/utils/helpers/generalAdjustValue';
 import { calcularTotalCosto } from 'src/utils/helpers/calcularTotalTransactionPlat';
 import { parseStringToBoolean } from 'src/utils/helpers/parseStringToBoolean';
 import { AuthGateway } from './websocket';
+import { calcularTotalCostoWalletGuru } from 'src/utils/helpers/calcularCostoWalletGuru';
 
 @Injectable()
 export class WalletService {
@@ -53,6 +54,7 @@ export class WalletService {
 	private dbUserIncoming: Model<UserIncomingPayment>;
 	private readonly AUTH_MICRO_URL: string;
 	private readonly DOMAIN_WALLET_URL: string;
+	private readonly WALLET_WG_URL: string;
 
 	constructor(
 		private configService: ConfigService,
@@ -82,6 +84,7 @@ export class WalletService {
 		this.dbRates = dynamoose.model<Rates>('Rates', RatesSchema);
 		this.AUTH_MICRO_URL = process.env.AUTH_URL;
 		this.DOMAIN_WALLET_URL = process.env.DOMAIN_WALLET_URL;
+		this.WALLET_WG_URL = process.env.WALLET_WG_URL;
 	}
 
 	async createIncoming(createIncomingUserDto: CreateIncomingUserDto) {
@@ -185,6 +188,28 @@ export class WalletService {
 			if (providerId) {
 				camelCaseWallet.providerId = createdWallet.ProviderId;
 			}
+
+			if (userId) {
+				const docClient = new DocumentClient();
+
+				const userParams = {
+					TableName: 'Users',
+					Key: {
+						Id: userId,
+					},
+					UpdateExpression: 'SET #State = :state',
+					ExpressionAttributeNames: {
+						'#State': 'State',
+					},
+					ExpressionAttributeValues: {
+						':state': 4,
+					},
+					ReturnValues: 'ALL_NEW',
+				};
+
+				await docClient.update(userParams).promise();
+			}
+
 			return camelCaseWallet;
 		} catch (error) {
 			Sentry.captureException(error);
@@ -764,7 +789,18 @@ export class WalletService {
 		};
 	}
 
-	async listTransactions(token: string, search: string) {
+	async listTransactions(
+		token: string,
+		search: string,
+		filters?: {
+			type?: string;
+			dateRange?: { start: string; end: string };
+			state?: string;
+			providerIds?: string[];
+			activityId?: string;
+			transactionType?: string[];
+		}
+	) {
 		if (!search) {
 			search = 'all';
 		}
@@ -788,6 +824,7 @@ export class WalletService {
 				':TypeOutgoing': 'OutgoingPayment',
 			},
 		};
+
 		const dynamoOutgoingPayments = await docClient
 			.scan(outgoingParams)
 			.promise();
@@ -854,27 +891,93 @@ export class WalletService {
 				})
 			);
 
-			const incomingSorted = transactionsWithNames?.filter(
-				item => item?.Type === 'IncomingPayment'
-			);
-			const outgoingSorted = transactionsWithNames?.filter(
-				item => item?.Type === 'OutgoingPayment'
-			);
+			let validWallets = [];
+			if (filters?.providerIds?.length) {
+				const providerWalletsPromises = filters.providerIds.map(
+					async providerId => {
+						const provider = await this.getWalletAddressByProviderId(
+							providerId
+						);
+						return provider?.walletAddress;
+					}
+				);
 
-			const combinedSorted = [...incomingSorted, ...outgoingSorted];
-
-			const combinedSortedCreated = combinedSorted?.sort(
-				(a: any, b: any) =>
-					new Date(b?.createdAt).getTime() - new Date(a?.createdAt).getTime()
-			);
-
-			if (search === 'credit') {
-				return convertToCamelCase(incomingSorted);
-			} else if (search === 'debit') {
-				return convertToCamelCase(outgoingSorted);
-			} else {
-				return convertToCamelCase(combinedSortedCreated);
+				const providerWallets = await Promise.all(providerWalletsPromises);
+				validWallets = providerWallets.filter(
+					walletAddress => walletAddress != null
+				);
 			}
+
+			const filteredTransactions = transactionsWithNames.filter(transaction => {
+				const matchesActivityId = filters?.activityId
+					? transaction.Metadata?.activityId === filters.activityId
+					: true;
+				const matchesType = filters?.type
+					? transaction.Type === filters.type
+					: true;
+				const matchesState = filters?.state
+					? transaction.State === filters.state
+					: true;
+
+				const matchesDateRange = filters?.dateRange
+					? new Date(transaction.createdAt) >=
+							new Date(filters.dateRange.start) &&
+					  new Date(transaction.createdAt) <= new Date(filters.dateRange.end)
+					: true;
+
+				const matchesProviderId =
+					validWallets.length > 0
+						? validWallets.some(
+								walletAddress => walletAddress === transaction.ReceiverUrl
+						  ) && transaction.Metadata?.type === 'PROVIDER'
+						: true;
+
+				return (
+					matchesActivityId &&
+					matchesType &&
+					matchesState &&
+					matchesDateRange &&
+					matchesProviderId
+				);
+			});
+
+			const isIncoming = filters?.transactionType?.includes('incoming');
+			const isOutgoing = filters?.transactionType?.includes('outgoing');
+
+			let sortedTransactions;
+
+			if (isIncoming && isOutgoing) {
+				sortedTransactions = convertToCamelCase(filteredTransactions);
+			} else if (isIncoming) {
+				sortedTransactions = convertToCamelCase(
+					filteredTransactions.filter(t => t.Type === 'IncomingPayment')
+				);
+			} else if (isOutgoing) {
+				sortedTransactions = convertToCamelCase(
+					filteredTransactions.filter(t => t.Type === 'OutgoingPayment')
+				);
+			}
+
+			if (filters?.transactionType) {
+				return sortedTransactions;
+			}
+
+			const incomingSorted = filteredTransactions.filter(
+				item => item.Type === 'IncomingPayment'
+			);
+			const outgoingSorted = filteredTransactions.filter(
+				item => item.Type === 'OutgoingPayment'
+			);
+			const combinedSorted = [...incomingSorted, ...outgoingSorted].sort(
+				(a: any, b: any) =>
+					new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+			);
+
+			return search === 'credit'
+				? convertToCamelCase(incomingSorted)
+				: search === 'debit'
+				? convertToCamelCase(outgoingSorted)
+				: convertToCamelCase(combinedSorted);
 		} else {
 			return [];
 		}
@@ -1506,6 +1609,25 @@ export class WalletService {
 		}
 	}
 
+	async getWalletAddressByProviderId(providerId: string) {
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'Wallets',
+			IndexName: 'ProviderIdIndex',
+			KeyConditionExpression: `ProviderId  = :providerId`,
+			ExpressionAttributeValues: {
+				':providerId': providerId,
+			},
+		};
+
+		try {
+			const result = await docClient.query(params).promise();
+			return convertToCamelCase(result.Items?.[0]);
+		} catch (error) {
+			return {};
+		}
+	}
+
 	async getIncomingPaymentById(incomingPaymentId: string) {
 		try {
 			const incomingPayment = await this.graphqlService.getIncomingPayment(
@@ -1650,6 +1772,16 @@ export class WalletService {
 			walletAsset?.scale
 		);
 
+		const sendValueWalletGuru = adjustValue(
+			calcularTotalCostoWalletGuru(
+				parameterExists?.base,
+				parameterExists?.comision,
+				parameterExists?.cost,
+				parameterExists?.percent
+			),
+			walletAsset?.scale
+		);
+
 		for (let i = 0; i < incomingPayment.length; i++) {
 			const payment = incomingPayment?.[i];
 			const incomingPaymentValue = await this.getIncomingPayment(
@@ -1745,10 +1877,75 @@ export class WalletService {
 
 				const outgoing = await this.createOutgoingPayment(inputOutgoing);
 
-				await this.createDepositOutgoingMutationService({
-					outgoingPaymentId: outgoing?.createOutgoingPayment?.payment?.id,
-					idempotencyKey: uuidv4(),
-				});
+				const docClient = new DocumentClient();
+				const params = {
+					TableName: 'Users',
+					Key: { Id: userId },
+				};
+				const userDynamo = await docClient.get(params).promise();
+
+				if (userDynamo?.Item?.Grant == 1) {
+					await this.createDepositOutgoingMutationService({
+						outgoingPaymentId: outgoing?.createOutgoingPayment?.payment?.id,
+						idempotencyKey: uuidv4(),
+					});
+				}
+
+				// Send fee wg
+
+				if (this.WALLET_WG_URL) {
+					const inputReceiver = {
+						metadata: {
+							activityId: activityId || '',
+							contentName: contentName || 'Thieves Of The Sea - Origin',
+							description: '',
+							type: 'PROVIDER',
+							wgUser: userId,
+						},
+						incomingAmount: {
+							value: sendValueWalletGuru,
+							assetCode: walletAsset?.asset ?? 'USD',
+							assetScale: walletAsset?.scale ?? 2,
+						},
+						walletAddressUrl: this.WALLET_WG_URL,
+					};
+
+					const receiver = await this.createReceiver(inputReceiver);
+					const quoteInput = {
+						walletAddressId: walletAddressId,
+						receiver: receiver?.createReceiver?.receiver?.id,
+						receiveAmount: {
+							assetCode: walletAsset?.asset ?? 'USD',
+							assetScale: walletAsset?.scale ?? 2,
+							value: sendValueWalletGuru,
+						},
+					};
+
+					setTimeout(async () => {
+						const quote = await this.createQuote(quoteInput);
+
+						const inputOutgoing = {
+							walletAddressId: walletAddressId,
+							quoteId: quote?.createQuote?.quote?.id,
+							metadata: {
+								activityId: activityId || '',
+								contentName: contentName || 'Thieves Of The Sea - Origin',
+								description: '',
+								type: 'PROVIDER',
+								wgUser: userId,
+							},
+						};
+						const outgoingValue = await this.createOutgoingPayment(
+							inputOutgoing
+						);
+
+						await this.createDepositOutgoingMutationService({
+							outgoingPaymentId:
+								outgoingValue?.createOutgoingPayment?.payment?.id,
+							idempotencyKey: uuidv4(),
+						});
+					}, 500);
+				}
 
 				this.authGateway.server.emit('hc', {
 					message: 'Ok',
