@@ -42,6 +42,7 @@ import { calcularTotalCosto } from 'src/utils/helpers/calcularTotalTransactionPl
 import { parseStringToBoolean } from 'src/utils/helpers/parseStringToBoolean';
 import { AuthGateway } from './websocket';
 import { calcularTotalCostoWalletGuru } from 'src/utils/helpers/calcularCostoWalletGuru';
+import { Parser } from 'json2csv';
 
 @Injectable()
 export class WalletService {
@@ -805,6 +806,9 @@ export class WalletService {
 			search = 'all';
 		}
 
+
+	
+
 		const walletDb = await this.getUserByToken(token);
 		const WalletAddress = walletDb.WalletAddress;
 		const docClient = new DocumentClient();
@@ -901,6 +905,8 @@ export class WalletService {
 						return provider?.walletAddress;
 					}
 				);
+
+				
 
 				const providerWallets = await Promise.all(providerWalletsPromises);
 				validWallets = providerWallets.filter(
@@ -1050,6 +1056,13 @@ export class WalletService {
 
 		return convertToCamelCase(incomingSorted);
 	}
+
+	async generateCsv(data: any[]): Promise<string> {
+		const fields = Object.keys(data[0]);
+		const json2csvParser = new Parser({ fields, delimiter: ';' }); // Especifica el delimitador
+		const csv = json2csvParser.parse(data);
+		return csv;
+	  }
 
 	async getUserByToken(token: string) {
 		let userInfo = await axios.get(
