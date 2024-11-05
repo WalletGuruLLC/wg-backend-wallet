@@ -193,11 +193,14 @@ export class WalletService {
 				const docClient = new DocumentClient();
 
 				const userParams = {
+					TableName: 'Users',
 					Key: {
 						Id: userId,
 					},
-					TableName: 'Users',
-					UpdateExpression: 'SET State = :state',
+					UpdateExpression: 'SET #State = :state',
+					ExpressionAttributeNames: {
+						'#State': 'State',
+					},
 					ExpressionAttributeValues: {
 						':state': 4,
 					},
@@ -1881,7 +1884,7 @@ export class WalletService {
 				};
 				const userDynamo = await docClient.get(params).promise();
 
-				if (userDynamo.Item.Grant == 1) {
+				if (userDynamo?.Item?.Grant == 1) {
 					await this.createDepositOutgoingMutationService({
 						outgoingPaymentId: outgoing?.createOutgoingPayment?.payment?.id,
 						idempotencyKey: uuidv4(),
