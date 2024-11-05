@@ -310,7 +310,7 @@ export class RafikiWalletController {
 	@ApiQuery({ name: 'startDate', required: false, type: String })
 	@ApiQuery({ name: 'endDate', required: false, type: String })
 	@ApiQuery({ name: 'state', required: false, type: String })
-	@ApiQuery({ name: 'providerIds', required: false, type: Array<string> })
+	@ApiQuery({ name: 'providerIds', required: false, type: [String] })
 	@ApiQuery({ name: 'activityId', required: false, type: String })
 	@ApiOperation({ summary: 'List all user transactions' })
 	@ApiBearerAuth('JWT')
@@ -326,7 +326,7 @@ export class RafikiWalletController {
 		@Query('startDate') startDate?: string,
 		@Query('endDate') endDate?: string,
 		@Query('state') state?: string,
-		@Query('providerIds') providerIds?: [string],
+		@Query('providerIds') providerIds?: string | string[],
 		@Query('activityId') activityId?: string
 	) {
 		let token;
@@ -356,12 +356,26 @@ export class RafikiWalletController {
 			);
 			userInfo = userInfo.data;
 			const userType = userInfo?.data?.type;
+			let parsedProviderIds: string[] = [];
+			if (typeof providerIds === 'string') {
+				try {
+					parsedProviderIds = JSON.parse(providerIds);
+					if (!Array.isArray(parsedProviderIds)) {
+						parsedProviderIds = providerIds?.split(',');
+					}
+				} catch {
+					parsedProviderIds = providerIds?.split(',');
+				}
+			} else if (Array.isArray(providerIds)) {
+				parsedProviderIds = providerIds;
+			}
+
 			const filters = {
 				type,
 				dateRange:
 					startDate && endDate ? { start: startDate, end: endDate } : undefined,
 				state,
-				providerIds,
+				providerIds: parsedProviderIds,
 				activityId,
 				transactionType: undefined,
 			};
@@ -369,7 +383,7 @@ export class RafikiWalletController {
 			if (userType === 'WALLET') {
 				filters.transactionType = ['outgoing'];
 			} else if (userType === 'PROVIDER') {
-				filters.providerIds = providerIds;
+				filters.providerIds = parsedProviderIds;
 				filters.transactionType = ['incoming', 'outgoing'];
 			} else if (userType === 'PLATFORM') {
 				filters.transactionType = ['incoming', 'outgoing'];

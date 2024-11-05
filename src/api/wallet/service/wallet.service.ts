@@ -188,6 +188,25 @@ export class WalletService {
 			if (providerId) {
 				camelCaseWallet.providerId = createdWallet.ProviderId;
 			}
+
+			if (userId) {
+				const docClient = new DocumentClient();
+
+				const userParams = {
+					Key: {
+						Id: userId,
+					},
+					TableName: 'Users',
+					UpdateExpression: 'SET State = :state',
+					ExpressionAttributeValues: {
+						':state': 4,
+					},
+					ReturnValues: 'ALL_NEW',
+				};
+
+				await docClient.update(userParams).promise();
+			}
+
 			return camelCaseWallet;
 		} catch (error) {
 			Sentry.captureException(error);
@@ -1855,10 +1874,19 @@ export class WalletService {
 
 				const outgoing = await this.createOutgoingPayment(inputOutgoing);
 
-				await this.createDepositOutgoingMutationService({
-					outgoingPaymentId: outgoing?.createOutgoingPayment?.payment?.id,
-					idempotencyKey: uuidv4(),
-				});
+				const docClient = new DocumentClient();
+				const params = {
+					TableName: 'Users',
+					Key: { Id: userId },
+				};
+				const userDynamo = await docClient.get(params).promise();
+
+				if (userDynamo.Item.Grant == 1) {
+					await this.createDepositOutgoingMutationService({
+						outgoingPaymentId: outgoing?.createOutgoingPayment?.payment?.id,
+						idempotencyKey: uuidv4(),
+					});
+				}
 
 				// Send fee wg
 
