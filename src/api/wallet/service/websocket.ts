@@ -242,12 +242,6 @@ export class AuthGateway
 					statusCode: 'WGS0053',
 					activityId: activityId,
 				});
-			} else if (action == 'unlink') {
-				await this.authService.unlinkServiceProvider(
-					wgUserId,
-					walletAddress?.walletUrl,
-					sessionIdData
-				);
 			}
 		} else {
 			client.disconnect();
@@ -256,6 +250,73 @@ export class AuthGateway
 			);
 		}
 		// return { event: 'response', data: 'Stop processed.' };
+	}
+
+	@SubscribeMessage('unlink')
+	async handleUnlink(client: Socket, data: any): Promise<WsResponse<string>> {
+		const headers = client.handshake.headers;
+		const parsedData = data;
+		const publicKeyData =
+			parsedData['x-public-key']?.toString() ||
+			headers['public-key']?.toString();
+		const nonceData =
+			parsedData['x-nonce']?.toString() || headers['nonce']?.toString();
+		const wgUserId = parsedData.wgUserId?.toString();
+		const sessionIdData = parsedData.sessionId?.toString();
+		const walletAddress = await this.authService.findWalletByUserId(wgUserId);
+		if (!publicKeyData) {
+			client.emit('error', {
+				message: 'Public key missing!',
+				statusCode: 'WGE0151',
+				sessionId: '',
+			});
+			client.disconnect();
+			this.logger.error(`Client ${client.id} failed to provide public key.`);
+			return;
+		}
+
+		if (!nonceData) {
+			client.emit('error', {
+				message: 'You need send auth',
+				statusCode: 'WGE0151',
+				sessionId: '',
+			});
+			client.disconnect();
+			this.logger.error(
+				`Client ${client.id} failed to authenticate. in activity`
+			);
+		}
+		const data_aux = { ...parsedData };
+		delete data_aux['x-nonce'];
+		delete data_aux['x-public-key'];
+		delete data_aux['x-timestamp'];
+		const timestamp = Math.floor(new Date().getTime() / 1000);
+		const tokenPromises = [];
+
+		for (let i = -5; i <= 5; i++) {
+			tokenPromises.push(
+				this.authService.generateToken(
+					data_aux,
+					`${timestamp + i}`,
+					publicKeyData
+				)
+			);
+		}
+
+		const validTokenRange = await Promise.all(tokenPromises);
+
+		if (validTokenRange.includes(nonceData)) {
+			await this.authService.unlinkServiceProvider(
+				wgUserId,
+				walletAddress?.walletUrl,
+				sessionIdData
+			);
+		} else {
+			client.disconnect();
+			this.logger.error(
+				`Client ${client.id} failed to authenticate. in activity`
+			);
+		}
 	}
 
 	@SubscribeMessage('get-payment-parameters') async getPaymentParameters(
