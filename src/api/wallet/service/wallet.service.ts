@@ -803,11 +803,9 @@ export class WalletService {
 		if (!search) {
 			search = 'all';
 		}
-
 		const walletDb = await this.getUserByToken(token);
 		const WalletAddress = walletDb.WalletAddress;
 		const docClient = new DocumentClient();
-
 		const outgoingParams: DocumentClient.ScanInput = {
 			TableName: 'Transactions',
 			FilterExpression:
@@ -889,7 +887,6 @@ export class WalletService {
 					};
 				})
 			);
-
 			let validWallets = [];
 			if (filters?.providerIds?.length) {
 				const providerWalletsPromises = filters.providerIds.map(
@@ -900,13 +897,11 @@ export class WalletService {
 						return provider?.walletAddress;
 					}
 				);
-
 				const providerWallets = await Promise.all(providerWalletsPromises);
 				validWallets = providerWallets.filter(
 					walletAddress => walletAddress != null
 				);
 			}
-
 			const filteredTransactions = transactionsWithNames.filter(transaction => {
 				const matchesActivityId = filters?.activityId
 					? transaction.Metadata?.activityId === filters.activityId

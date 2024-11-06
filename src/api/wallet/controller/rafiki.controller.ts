@@ -378,7 +378,6 @@ export class RafikiWalletController {
 				activityId,
 				transactionType: undefined,
 			};
-
 			if (userType === 'WALLET') {
 				filters.transactionType = ['outgoing'];
 			} else if (userType === 'PROVIDER') {
@@ -387,14 +386,10 @@ export class RafikiWalletController {
 			} else if (userType === 'PLATFORM') {
 				filters.transactionType = ['incoming', 'outgoing'];
 			} else {
-				throw new HttpException(
-					{
-						statusCode: HttpStatus.UNAUTHORIZED,
-						customCode: 'WGE0022',
-						message: 'User type not recognized',
-					},
-					HttpStatus.UNAUTHORIZED
-				);
+				return res.status(HttpStatus.UNAUTHORIZED).send({
+					statusCode: HttpStatus.UNAUTHORIZED,
+					customCode: 'WGE0022',
+				});
 			}
 
 			const transactions = await this.walletService.listTransactions(
@@ -402,7 +397,6 @@ export class RafikiWalletController {
 				search,
 				filters
 			);
-
 			return res.status(HttpStatus.OK).send({
 				statusCode: HttpStatus.OK,
 				customCode: 'WGS0138',
@@ -600,11 +594,9 @@ export class RafikiWalletController {
 					customCode: 'WGE0074',
 				});
 			}
-
 			const userWalletByToken = convertToCamelCase(
 				await this.walletService.getWalletByToken(token)
 			);
-
 			if (userWalletByToken?.walletDb?.userId !== userWallet?.userId) {
 				return res.status(HttpStatus.UNAUTHORIZED).send({
 					statusCode: HttpStatus.UNAUTHORIZED,
