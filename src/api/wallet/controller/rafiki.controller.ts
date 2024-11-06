@@ -41,6 +41,7 @@ import {
 	GeneralReceiverInputDTO,
 	LinkInputDTO,
 	ReceiverInputDTO,
+	UnLinkInputDTO,
 } from '../dto/payments-rafiki.dto';
 import { isValidStringLength } from 'src/utils/helpers/isValidStringLength';
 import { v4 as uuidv4 } from 'uuid';
@@ -917,7 +918,7 @@ export class RafikiWalletController {
 	@ApiResponse({ status: 500, description: 'Server error.' })
 	async unlinkTransactionProvider(
 		@Headers() headers: MapOfStringToList,
-		@Body() input: LinkInputDTO,
+		@Body() input: UnLinkInputDTO,
 		@Req() req,
 		@Res() res
 	) {
@@ -949,28 +950,6 @@ export class RafikiWalletController {
 			userInfo = userInfo.data;
 
 			const userId = userInfo?.data?.id;
-
-			const userWallet = await this.walletService.getWalletByRafikyId(
-				input.walletAddressId
-			);
-
-			if (!userWallet) {
-				return res.status(HttpStatus.NOT_FOUND).send({
-					statusCode: HttpStatus.NOT_FOUND,
-					customCode: 'WGE0074',
-				});
-			}
-
-			const userWalletByToken = convertToCamelCase(
-				await this.walletService.getWalletByToken(token)
-			);
-
-			if (userWalletByToken?.walletDb?.userId !== userWallet?.userId) {
-				return res.status(HttpStatus.UNAUTHORIZED).send({
-					statusCode: HttpStatus.UNAUTHORIZED,
-					customCode: 'WGE0021',
-				});
-			}
 
 			const linkProvider =
 				await this.walletService.unlinkServiceProviderBySessionId(

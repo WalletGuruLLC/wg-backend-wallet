@@ -54,6 +54,12 @@ export class LinkInputDTO {
 	sessionId?: string;
 }
 
+export class UnLinkInputDTO {
+	@IsString()
+	@IsOptional()
+	sessionId?: string;
+}
+
 export class GeneralReceiverInputDTO {
 	@ValidateNested()
 	@Type(() => MetadataDTO)
