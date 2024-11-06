@@ -2321,8 +2321,9 @@ export class WalletService {
 		const users = await docClient.scan(scanParams).promise();
 		const usersToUpdate = users?.Items ?? [];
 
-		for (const user of usersToUpdate) {
-			const linkedProviders = user?.linkedServiceProviders ?? [];
+		for (let i = 0; i < usersToUpdate?.length; i++) {
+			const user = usersToUpdate[i];
+			const linkedProviders = user?.LinkedServiceProviders ?? [];
 
 			const updatedProviders = linkedProviders.filter(
 				provider => provider?.sessionId !== sessionId
@@ -2331,7 +2332,7 @@ export class WalletService {
 			if (updatedProviders?.length !== linkedProviders?.length) {
 				const updateParams = {
 					TableName: 'Users',
-					Key: { Id: user.Id },
+					Key: { Id: user?.Id },
 					UpdateExpression: 'SET LinkedServiceProviders = :updatedProviders',
 					ExpressionAttributeValues: {
 						':updatedProviders': updatedProviders,
