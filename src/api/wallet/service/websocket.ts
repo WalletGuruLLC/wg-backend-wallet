@@ -81,7 +81,7 @@ export class AuthGateway
 	@SubscribeMessage('link')
 	async handleLogin(client: Socket, data: any): Promise<WsResponse<string>> {
 		const headers = client.handshake.headers;
-		const parsedData = JSON.parse(data);
+		const parsedData = data;
 		const publicKeyData =
 			parsedData['x-public-key']?.toString() ||
 			headers['public-key']?.toString();
@@ -155,7 +155,7 @@ export class AuthGateway
 	@SubscribeMessage('activity')
 	async handlePlay(client: Socket, data: any): Promise<WsResponse<string>> {
 		const headers = client.handshake.headers;
-		const parsedData = JSON.parse(data);
+		const parsedData = data;
 		const publicKeyData =
 			parsedData['x-public-key']?.toString() ||
 			headers['public-key']?.toString();
@@ -166,6 +166,7 @@ export class AuthGateway
 		const paymentType = parsedData.paymentType?.toString();
 		const wgUserId = parsedData.wgUserId?.toString();
 		const contentName = parsedData.contentName?.toString();
+		const sessionIdData = parsedData.sessionId?.toString();
 		const objectSecret = await this.authService.getServiceProviderWihtPublicKey(
 			publicKeyData
 		);
@@ -241,6 +242,12 @@ export class AuthGateway
 					statusCode: 'WGS0053',
 					activityId: activityId,
 				});
+			} else if (action == 'unlink') {
+				await this.authService.unlinkServiceProvider(
+					wgUserId,
+					walletAddress?.walletUrl,
+					sessionIdData
+				);
 			}
 		} else {
 			client.disconnect();
@@ -256,7 +263,7 @@ export class AuthGateway
 		data: any
 	): Promise<WsResponse<string>> {
 		const headers = client.handshake.headers;
-		const parsedData = JSON.parse(data);
+		const parsedData = data;
 		const publicKeyData =
 			parsedData['x-public-key']?.toString() ||
 			headers['public-key']?.toString();

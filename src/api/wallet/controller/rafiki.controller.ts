@@ -707,6 +707,107 @@ export class RafikiWalletController {
 		}
 	}
 
+	@Post('service-provider-unlink')
+	@ApiOperation({ summary: 'Unlink a service provider by session id' })
+	@ApiBearerAuth('JWT')
+	@ApiCreatedResponse({
+		description: 'Service provider successfully unlinked.',
+	})
+	@ApiResponse({ status: 400, description: 'Bad request.' })
+	@ApiResponse({ status: 401, description: 'Unauthorized access.' })
+	@ApiResponse({ status: 500, description: 'Server error.' })
+	async unlinkTransactionProvider(
+		@Headers() headers: MapOfStringToList,
+		@Body() input: LinkInputDTO,
+		@Req() req,
+		@Res() res
+	) {
+		try {
+			let token;
+			try {
+				token = headers.authorization ?? '';
+				const instanceVerifier = await this.verifyService.getVerifiedFactory();
+				await instanceVerifier.verify(token.toString().split(' ')[1]);
+			} catch (error) {
+				Sentry.captureException(error);
+				throw new HttpException(
+					{
+						statusCode: HttpStatus.UNAUTHORIZED,
+						customCode: 'WGE0021',
+					},
+					HttpStatus.UNAUTHORIZED
+				);
+			}
+
+			let userInfo = await axios.get(
+				this.AUTH_MICRO_URL + '/api/v1/users/current-user',
+				{
+					headers: {
+						Authorization: token,
+					},
+				}
+			);
+			userInfo = userInfo.data;
+
+			const userId = userInfo?.data?.id;
+
+			const userWallet = await this.walletService.getWalletByRafikyId(
+				input.walletAddressId
+			);
+
+			if (!userWallet) {
+				return res.status(HttpStatus.NOT_FOUND).send({
+					statusCode: HttpStatus.NOT_FOUND,
+					customCode: 'WGE0074',
+				});
+			}
+
+			const userWalletByToken = convertToCamelCase(
+				await this.walletService.getWalletByToken(token)
+			);
+
+			if (userWalletByToken?.walletDb?.userId !== userWallet?.userId) {
+				return res.status(HttpStatus.UNAUTHORIZED).send({
+					statusCode: HttpStatus.UNAUTHORIZED,
+					customCode: 'WGE0021',
+				});
+			}
+
+			const linkProvider = await this.walletService.unlinkServiceProvider(
+				userId,
+				input?.walletAddressUrl,
+				input?.sessionId
+			);
+
+			if (linkProvider?.customCode) {
+				return res.status(HttpStatus.NOT_FOUND).send({
+					statusCode: HttpStatus.NOT_FOUND,
+					customCode: linkProvider?.customCode,
+				});
+			}
+
+			this.authGateway.server.emit('hc', {
+				message: 'Account unlinked',
+				statusCode: 'WGS0051',
+				sessionId: input?.sessionId,
+				wgUserId: userId,
+			});
+
+			return res.status(200).send({
+				data: {
+					linkedProvider: linkProvider,
+				},
+				customCode: 'WGE0150',
+			});
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0151',
+			});
+		}
+	}
+
 	// @Post('receiver')
 	// @ApiOperation({ summary: 'Create a receiver' })
 	// @ApiResponse({ status: 201, description: 'Receiver created successfully.' })
