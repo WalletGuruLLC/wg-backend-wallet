@@ -53,6 +53,7 @@
 		"class-validator": "^0.13.2",
 		"cross-fetch": "^4.0.0",
 		"dynamoose": "^2.8.6",
+		"fast-csv": "^5.0.2",
 		"graphql": "^16.9.0",
 		"husky": "^8.0.0",
 		"json-canonicalize": "^1.0.6",

@@ -32,7 +32,6 @@ import { SqsService } from '../sqs/sqs.service';
 import { UserIncomingPayment } from '../entities/user-incoming.entity';
 import { UserIncomingSchema } from '../entities/user-incoming.schema';
 import { CreatePaymentDTO } from '../dto/create-payment-rafiki.dto';
-import { adjustValueByCurrency } from 'src/utils/helpers/adjustValueCurrecy';
 import { Transaction, TransactionType } from '../entities/transactions.entity';
 import { TransactionsSchema } from '../entities/transactions.schema';
 import { User } from '../entities/user.entity';
@@ -42,6 +41,8 @@ import { calcularTotalCosto } from 'src/utils/helpers/calcularTotalTransactionPl
 import { parseStringToBoolean } from 'src/utils/helpers/parseStringToBoolean';
 import { AuthGateway } from './websocket';
 import { calcularTotalCostoWalletGuru } from 'src/utils/helpers/calcularCostoWalletGuru';
+import * as fastCsv from 'fast-csv';
+import { flattenObject } from 'src/utils/helpers/flattenObject';
 
 @Injectable()
 export class WalletService {
@@ -804,11 +805,9 @@ export class WalletService {
 		if (!search) {
 			search = 'all';
 		}
-
 		const walletDb = await this.getUserByToken(token);
 		const WalletAddress = walletDb.WalletAddress;
 		const docClient = new DocumentClient();
-
 		const outgoingParams: DocumentClient.ScanInput = {
 			TableName: 'Transactions',
 			FilterExpression:
@@ -890,7 +889,6 @@ export class WalletService {
 					};
 				})
 			);
-
 			let validWallets = [];
 			if (filters?.providerIds?.length) {
 				const providerWalletsPromises = filters.providerIds.map(
@@ -901,13 +899,11 @@ export class WalletService {
 						return provider?.walletAddress;
 					}
 				);
-
 				const providerWallets = await Promise.all(providerWalletsPromises);
 				validWallets = providerWallets.filter(
 					walletAddress => walletAddress != null
 				);
 			}
-
 			const filteredTransactions = transactionsWithNames.filter(transaction => {
 				const matchesActivityId = filters?.activityId
 					? transaction.Metadata?.activityId === filters.activityId
@@ -1049,6 +1045,28 @@ export class WalletService {
 		);
 
 		return convertToCamelCase(incomingSorted);
+	}
+
+	async generateCsv(res, transactions: any[]) {
+		const now = new Date();
+		const year = now.getFullYear();
+		const month = String(now.getMonth() + 1).padStart(2, '0'); // Mes con 2 dígitos
+		const day = String(now.getDate()).padStart(2, '0');
+
+		const filename = `${year}-${month}-${day}.csv`;
+
+		res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+		res.setHeader('Content-Type', 'text/csv');
+
+		const csvStream = fastCsv.format({ headers: true, delimiter: ';' });
+		csvStream.pipe(res);
+
+		transactions.forEach(transaction => {
+			const flatTransaction = flattenObject(transaction);
+			csvStream.write(flatTransaction);
+		});
+
+		csvStream.end();
 	}
 
 	async getUserByToken(token: string) {
@@ -2304,6 +2322,50 @@ export class WalletService {
 			Sentry.captureException(error);
 			throw new Error(`Error fetching user by userId: ${error.message}`);
 		}
+	}
+
+	async unlinkServiceProviderBySessionId(sessionId: string): Promise<any> {
+		const docClient = new DocumentClient();
+
+		const scanParams = {
+			TableName: 'Users',
+			FilterExpression:
+				'contains(LinkedServiceProviders.sessionId, :sessionId)',
+			ExpressionAttributeValues: {
+				':sessionId': sessionId,
+			},
+		};
+
+		const users = await docClient.scan(scanParams).promise();
+		const usersToUpdate = users?.Items ?? [];
+
+		for (let i = 0; i < usersToUpdate?.length; i++) {
+			const user = usersToUpdate[i];
+			const linkedProviders = user?.LinkedServiceProviders ?? [];
+
+			const updatedProviders = linkedProviders.filter(
+				provider => provider?.sessionId !== sessionId
+			);
+
+			if (updatedProviders?.length !== linkedProviders?.length) {
+				const updateParams = {
+					TableName: 'Users',
+					Key: { Id: user?.Id },
+					UpdateExpression: 'SET LinkedServiceProviders = :updatedProviders',
+					ExpressionAttributeValues: {
+						':updatedProviders': updatedProviders,
+					},
+					ReturnValues: 'ALL_NEW',
+				};
+
+				await docClient.update(updateParams).promise();
+			}
+		}
+
+		return {
+			statusCode: HttpStatus.OK,
+			message: 'Service provider unlinked successfully.',
+		};
 	}
 
 	async updateListServiceProviders(
