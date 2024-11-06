@@ -907,7 +907,7 @@ export class WalletService {
 					}
 				);
 
-				
+
 
 				const providerWallets = await Promise.all(providerWalletsPromises);
 				validWallets = providerWallets.filter(
@@ -1064,7 +1064,7 @@ export class WalletService {
 		const month = String(now.getMonth() + 1).padStart(2, '0'); // Mes con 2 dígitos
 		const day = String(now.getDate()).padStart(2, '0');
 
-		const filename = `transacciones_${year}-${month}-${day}.csv`;
+		const filename = `${year}-${month}-${day}.csv`;
 
 		res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 		res.setHeader('Content-Type', 'text/csv');
