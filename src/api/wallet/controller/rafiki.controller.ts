@@ -380,7 +380,7 @@ export class RafikiWalletController {
 				transactionType: undefined,
 			};
 
-			
+
 
 			if (userType === 'WALLET') {
 				filters.transactionType = ['outgoing'];
@@ -421,14 +421,13 @@ export class RafikiWalletController {
 		}
 	}
 
-
-	@Get('download-provider')
+	@Get('download-transactions-provider')
 	@ApiQuery({ name: 'search', required: false, type: String })
 	@ApiQuery({ name: 'type', required: false, type: String })
 	@ApiQuery({ name: 'startDate', required: false, type: String })
 	@ApiQuery({ name: 'endDate', required: false, type: String })
 	@ApiQuery({ name: 'state', required: false, type: String })
-	@ApiQuery({ name: 'providerIds', required: false, type: Array<string> })
+	@ApiQuery({ name: 'providerIds', required: false, type: [String] })
 	@ApiQuery({ name: 'activityId', required: false, type: String })
 	@ApiOperation({ summary: 'Download all provider transactions' })
 	@ApiBearerAuth('JWT')
@@ -444,7 +443,7 @@ export class RafikiWalletController {
 		@Query('startDate') startDate?: string,
 		@Query('endDate') endDate?: string,
 		@Query('state') state?: string,
-		@Query('providerIds') providerIds?: [string],
+		@Query('providerIds') providerIds?: string | string[]
 	) {
 		let token;
 		try {
@@ -473,17 +472,31 @@ export class RafikiWalletController {
 			);
 			userInfo = userInfo.data;
 			const userType = userInfo?.data?.type;
+
+			let parsedProviderIds: string[] = [];
+			if (typeof providerIds === 'string') {
+				try {
+					parsedProviderIds = JSON.parse(providerIds);
+					if (!Array.isArray(parsedProviderIds)) {
+						parsedProviderIds = providerIds?.split(',');
+					}
+				} catch {
+					parsedProviderIds = providerIds?.split(',');
+				}
+			} else if (Array.isArray(providerIds)) {
+				parsedProviderIds = providerIds;
+			}
+
 			const filters = {
 				type,
 				dateRange:
 					startDate && endDate ? { start: startDate, end: endDate } : undefined,
 				state,
-				providerIds,
+				providerIds: parsedProviderIds,
 				transactionType: undefined,
 			};
 
-			  if (userType === 'PROVIDER') {
-				filters.providerIds = providerIds;
+			if (userType === 'PROVIDER') {
 				filters.transactionType = ['incoming', 'outgoing'];
 			} else {
 				throw new HttpException(
@@ -501,22 +514,7 @@ export class RafikiWalletController {
 				search,
 				filters
 			);
-
-			const csv = await this.walletService.generateCsv(transactions);
-
-			const currentDate = new Date().toISOString().split('T')[0].replace(/-/g, '');
-
-		
-			const fileName = `${currentDate}.csv`;
-
-			res.header('Content-Type', 'text/csv');
-            res.header('Content-Disposition', `attachment; filename="${fileName}"`);
-
-			return res.status(HttpStatus.OK).send({
-				statusCode: HttpStatus.OK,
-				customCode: 'WGS0138',
-				data: csv
-			});
+			await this.walletService.generateCsv(res, transactions);
 		} catch (error) {
 			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({

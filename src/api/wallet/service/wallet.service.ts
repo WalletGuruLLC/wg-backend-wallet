@@ -42,7 +42,8 @@ import { calcularTotalCosto } from 'src/utils/helpers/calcularTotalTransactionPl
 import { parseStringToBoolean } from 'src/utils/helpers/parseStringToBoolean';
 import { AuthGateway } from './websocket';
 import { calcularTotalCostoWalletGuru } from 'src/utils/helpers/calcularCostoWalletGuru';
-import { Parser } from 'json2csv';
+import * as fastCsv from 'fast-csv';
+import { flattenObject } from 'src/utils/helpers/flattenObject';
 
 @Injectable()
 export class WalletService {
@@ -807,7 +808,7 @@ export class WalletService {
 		}
 
 
-	
+
 
 		const walletDb = await this.getUserByToken(token);
 		const WalletAddress = walletDb.WalletAddress;
@@ -1057,12 +1058,27 @@ export class WalletService {
 		return convertToCamelCase(incomingSorted);
 	}
 
-	async generateCsv(data: any[]): Promise<string> {
-		const fields = Object.keys(data[0]);
-		const json2csvParser = new Parser({ fields, delimiter: ';' }); // Especifica el delimitador
-		const csv = json2csvParser.parse(data);
-		return csv;
-	  }
+	async generateCsv(res, transactions: any[]) {
+		const now = new Date();
+		const year = now.getFullYear();
+		const month = String(now.getMonth() + 1).padStart(2, '0'); // Mes con 2 dígitos
+		const day = String(now.getDate()).padStart(2, '0');
+
+		const filename = `transacciones_${year}-${month}-${day}.csv`;
+
+		res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+		res.setHeader('Content-Type', 'text/csv');
+
+		const csvStream = fastCsv.format({ headers: true, delimiter: ';' });
+		csvStream.pipe(res);
+
+		transactions.forEach(transaction => {
+			const flatTransaction = flattenObject(transaction);
+			csvStream.write(flatTransaction);
+		});
+
+		csvStream.end();
+	}
 
 	async getUserByToken(token: string) {
 		let userInfo = await axios.get(
