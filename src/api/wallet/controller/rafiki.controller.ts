@@ -26,7 +26,6 @@ import {
 
 import { WalletService } from '../service/wallet.service';
 import { VerifyService } from '../../../verify/verify.service';
-import { errorCodes, successCodes } from 'src/utils/constants';
 
 import * as Sentry from '@sentry/nestjs';
 import { MapOfStringToList } from 'aws-sdk/clients/apigateway';

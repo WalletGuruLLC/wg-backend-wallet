@@ -32,7 +32,6 @@ import { SqsService } from '../sqs/sqs.service';
 import { UserIncomingPayment } from '../entities/user-incoming.entity';
 import { UserIncomingSchema } from '../entities/user-incoming.schema';
 import { CreatePaymentDTO } from '../dto/create-payment-rafiki.dto';
-import { adjustValueByCurrency } from 'src/utils/helpers/adjustValueCurrecy';
 import { Transaction, TransactionType } from '../entities/transactions.entity';
 import { TransactionsSchema } from '../entities/transactions.schema';
 import { User } from '../entities/user.entity';
