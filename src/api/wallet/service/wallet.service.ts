@@ -2306,52 +2306,46 @@ export class WalletService {
 		}
 	}
 
-	async unlinkServiceProvider(
-		id: string,
-		address: string,
-		sessionId: string
-	): Promise<any> {
+	async unlinkServiceProviderBySessionId(sessionId: string): Promise<any> {
 		const docClient = new DocumentClient();
-		const user = await this.getUserInfoById(id);
 
-		if (!user) {
-			return {
-				statusCode: HttpStatus.NOT_FOUND,
-				customCode: 'WGE0074',
-			};
-		}
-
-		const linkedProviders: any[] = user?.linkedServiceProviders ?? [];
-
-		const providerIndex = linkedProviders?.findIndex(
-			provider =>
-				provider?.sessionId === sessionId && provider?.walletUrl === address
-		);
-
-		if (providerIndex === -1) {
-			return {
-				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-				customCode: 'WGE0211',
-			};
-		}
-
-		linkedProviders.splice(providerIndex, 1);
-
-		const updateParams = {
+		const scanParams = {
 			TableName: 'Users',
-			Key: { Id: id },
-			UpdateExpression: 'SET LinkedServiceProviders = :linkedProviders',
+			FilterExpression:
+				'contains(LinkedServiceProviders.sessionId, :sessionId)',
 			ExpressionAttributeValues: {
-				':linkedProviders': linkedProviders,
+				':sessionId': sessionId,
 			},
-			ReturnValues: 'ALL_NEW',
 		};
 
-		await docClient.update(updateParams).promise();
+		const users = await docClient.scan(scanParams).promise();
+		const usersToUpdate = users?.Items ?? [];
+
+		for (const user of usersToUpdate) {
+			const linkedProviders = user?.linkedServiceProviders ?? [];
+
+			const updatedProviders = linkedProviders.filter(
+				provider => provider?.sessionId !== sessionId
+			);
+
+			if (updatedProviders?.length !== linkedProviders?.length) {
+				const updateParams = {
+					TableName: 'Users',
+					Key: { Id: user.Id },
+					UpdateExpression: 'SET LinkedServiceProviders = :updatedProviders',
+					ExpressionAttributeValues: {
+						':updatedProviders': updatedProviders,
+					},
+					ReturnValues: 'ALL_NEW',
+				};
+
+				await docClient.update(updateParams).promise();
+			}
+		}
 
 		return {
 			statusCode: HttpStatus.OK,
-			message: 'Service provider unlinked successfully',
+			message: 'Service provider unlinked successfully.',
 		};
 	}
 

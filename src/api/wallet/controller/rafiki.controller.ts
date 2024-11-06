@@ -773,11 +773,10 @@ export class RafikiWalletController {
 				});
 			}
 
-			const linkProvider = await this.walletService.unlinkServiceProvider(
-				userId,
-				input?.walletAddressUrl,
-				input?.sessionId
-			);
+			const linkProvider =
+				await this.walletService.unlinkServiceProviderBySessionId(
+					input?.sessionId
+				);
 
 			if (linkProvider?.customCode) {
 				return res.status(HttpStatus.NOT_FOUND).send({

@@ -260,9 +260,7 @@ export class AuthGateway
 			headers['public-key']?.toString();
 		const nonceData =
 			parsedData['x-nonce']?.toString() || headers['nonce']?.toString();
-		const wgUserId = parsedData.wgUserId?.toString();
 		const sessionIdData = parsedData.sessionId?.toString();
-		const walletAddress = await this.authService.findWalletByUserId(wgUserId);
 		if (!publicKeyData) {
 			client.emit('error', {
 				message: 'Public key missing!',
@@ -305,11 +303,7 @@ export class AuthGateway
 		const validTokenRange = await Promise.all(tokenPromises);
 
 		if (validTokenRange.includes(nonceData)) {
-			await this.authService.unlinkServiceProvider(
-				wgUserId,
-				walletAddress?.walletUrl,
-				sessionIdData
-			);
+			await this.authService.unlinkServiceProviderBySessionId(sessionIdData);
 		} else {
 			client.disconnect();
 			this.logger.error(
