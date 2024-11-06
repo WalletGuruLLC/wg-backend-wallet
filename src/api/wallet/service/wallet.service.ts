@@ -1746,7 +1746,7 @@ export class WalletService {
 		userId,
 		senderUrl,
 		activityId,
-		contentName
+		itemName
 	) {
 		const parameterExists = await this.validatePaymentParameterId(
 			parameterId,
@@ -1875,7 +1875,7 @@ export class WalletService {
 					quoteId: quote?.createQuote?.quote?.id,
 					metadata: {
 						activityId: activityId || '',
-						contentName: contentName || 'Thieves Of The Sea - Origin',
+						contentName: itemName || '---',
 						description: '',
 						type: 'PROVIDER',
 						wgUser: userId,
@@ -1915,7 +1915,7 @@ export class WalletService {
 					const inputReceiver = {
 						metadata: {
 							activityId: activityId || '',
-							contentName: contentName || 'Thieves Of The Sea - Origin',
+							contentName: itemName || '---',
 							description: '',
 							type: 'PROVIDER',
 							wgUser: userId,
@@ -1947,7 +1947,7 @@ export class WalletService {
 							quoteId: quote?.createQuote?.quote?.id,
 							metadata: {
 								activityId: activityId || '',
-								contentName: contentName || 'Thieves Of The Sea - Origin',
+								contentName: itemName || '---',
 								description: '',
 								type: 'PROVIDER',
 								wgUser: userId,
