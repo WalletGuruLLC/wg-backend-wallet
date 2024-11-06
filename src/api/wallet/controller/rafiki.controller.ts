@@ -26,7 +26,6 @@ import {
 
 import { WalletService } from '../service/wallet.service';
 import { VerifyService } from '../../../verify/verify.service';
-import { errorCodes, successCodes } from 'src/utils/constants';
 
 import * as Sentry from '@sentry/nestjs';
 import { MapOfStringToList } from 'aws-sdk/clients/apigateway';
@@ -42,6 +41,7 @@ import {
 	GeneralReceiverInputDTO,
 	LinkInputDTO,
 	ReceiverInputDTO,
+	UnLinkInputDTO,
 } from '../dto/payments-rafiki.dto';
 import { isValidStringLength } from 'src/utils/helpers/isValidStringLength';
 import { v4 as uuidv4 } from 'uuid';
@@ -379,9 +379,6 @@ export class RafikiWalletController {
 				activityId,
 				transactionType: undefined,
 			};
-
-
-
 			if (userType === 'WALLET') {
 				filters.transactionType = ['outgoing'];
 			} else if (userType === 'PROVIDER') {
@@ -389,16 +386,11 @@ export class RafikiWalletController {
 				filters.transactionType = ['incoming', 'outgoing'];
 			} else if (userType === 'PLATFORM') {
 				filters.transactionType = ['incoming', 'outgoing'];
-
 			} else {
-				throw new HttpException(
-					{
-						statusCode: HttpStatus.UNAUTHORIZED,
-						customCode: 'WGE0022',
-						message: 'User type not recognized',
-					},
-					HttpStatus.UNAUTHORIZED
-				);
+				return res.status(HttpStatus.UNAUTHORIZED).send({
+					statusCode: HttpStatus.UNAUTHORIZED,
+					customCode: 'WGE0022',
+				});
 			}
 
 			const transactions = await this.walletService.listTransactions(
@@ -406,7 +398,6 @@ export class RafikiWalletController {
 				search,
 				filters
 			);
-
 			return res.status(HttpStatus.OK).send({
 				statusCode: HttpStatus.OK,
 				customCode: 'WGS0138',
@@ -598,7 +589,7 @@ export class RafikiWalletController {
 				state,
 				providerIds: parsedProviderIds,
 				transactionType: undefined,
-				activityId
+				activityId,
 			};
 
 			if (userType === 'PLATFORM') {
@@ -812,11 +803,9 @@ export class RafikiWalletController {
 					customCode: 'WGE0074',
 				});
 			}
-
 			const userWalletByToken = convertToCamelCase(
 				await this.walletService.getWalletByToken(token)
 			);
-
 			if (userWalletByToken?.walletDb?.userId !== userWallet?.userId) {
 				return res.status(HttpStatus.UNAUTHORIZED).send({
 					statusCode: HttpStatus.UNAUTHORIZED,
@@ -906,6 +895,84 @@ export class RafikiWalletController {
 			return res.status(200).send({
 				data: {
 					linkedProviders: linkedProviders,
+				},
+				customCode: 'WGE0150',
+			});
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0151',
+			});
+		}
+	}
+
+	@Post('service-provider-unlink')
+	@ApiOperation({ summary: 'Unlink a service provider by session id' })
+	@ApiBearerAuth('JWT')
+	@ApiCreatedResponse({
+		description: 'Service provider successfully unlinked.',
+	})
+	@ApiResponse({ status: 400, description: 'Bad request.' })
+	@ApiResponse({ status: 401, description: 'Unauthorized access.' })
+	@ApiResponse({ status: 500, description: 'Server error.' })
+	async unlinkTransactionProvider(
+		@Headers() headers: MapOfStringToList,
+		@Body() input: UnLinkInputDTO,
+		@Req() req,
+		@Res() res
+	) {
+		try {
+			let token;
+			try {
+				token = headers.authorization ?? '';
+				const instanceVerifier = await this.verifyService.getVerifiedFactory();
+				await instanceVerifier.verify(token.toString().split(' ')[1]);
+			} catch (error) {
+				Sentry.captureException(error);
+				throw new HttpException(
+					{
+						statusCode: HttpStatus.UNAUTHORIZED,
+						customCode: 'WGE0021',
+					},
+					HttpStatus.UNAUTHORIZED
+				);
+			}
+
+			let userInfo = await axios.get(
+				this.AUTH_MICRO_URL + '/api/v1/users/current-user',
+				{
+					headers: {
+						Authorization: token,
+					},
+				}
+			);
+			userInfo = userInfo.data;
+
+			const userId = userInfo?.data?.id;
+
+			const linkProvider =
+				await this.walletService.unlinkServiceProviderBySessionId(
+					input?.sessionId
+				);
+
+			if (linkProvider?.customCode) {
+				return res.status(HttpStatus.NOT_FOUND).send({
+					statusCode: HttpStatus.NOT_FOUND,
+					customCode: linkProvider?.customCode,
+				});
+			}
+
+			this.authGateway.server.emit('hc', {
+				message: 'Account unlinked',
+				statusCode: 'WGS0051',
+				sessionId: input?.sessionId,
+				wgUserId: userId,
+			});
+
+			return res.status(200).send({
+				data: {
+					linkedProvider: linkProvider,
 				},
 				customCode: 'WGE0150',
 			});
