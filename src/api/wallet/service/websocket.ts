@@ -166,7 +166,6 @@ export class AuthGateway
 		const paymentType = parsedData.paymentType?.toString();
 		const wgUserId = parsedData.wgUserId?.toString();
 		const contentName = parsedData.contentName?.toString();
-		const sessionIdData = parsedData.sessionId?.toString();
 		const objectSecret = await this.authService.getServiceProviderWihtPublicKey(
 			publicKeyData
 		);
