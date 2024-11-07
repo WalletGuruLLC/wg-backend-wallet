@@ -11,6 +11,8 @@ import { forwardRef, Inject } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { WalletService } from './wallet.service';
 import { Logger } from '@nestjs/common';
+import { DocumentClient } from 'aws-sdk/clients/dynamodb';
+const docClient = new DocumentClient();
 
 @WebSocketGateway({ cors: true, namespace: 'service-provider-ws' })
 export class AuthGateway
@@ -26,6 +28,24 @@ export class AuthGateway
 
 	afterInit(server: any) {
 		console.log('WebSocket server initialized');
+	}
+
+	async logToDatabase(eventType: string, data: any) {
+		const params = {
+			TableName: 'WebSocketEvents',
+			Item: {
+				eventType,
+				timestamp: new Date().toISOString(),
+				...data,
+			},
+		};
+
+		try {
+			await docClient.put(params).promise();
+			this.logger.log(`Event logged: ${eventType}`);
+		} catch (error) {
+			this.logger.error(`Failed to log event: ${error.message}`);
+		}
 	}
 
 	async handleConnection(client: Socket, ...args: any[]) {
@@ -44,6 +64,7 @@ export class AuthGateway
 				sessionId: '',
 			});
 			client.disconnect();
+			await this.logToDatabase('authenticationFailed', { ClientId: client.id });
 			this.logger.error(`Client ${client.id} failed to provide public key.`);
 			return;
 		}
@@ -62,6 +83,10 @@ export class AuthGateway
 				statusCode: 'WGS0050',
 				sessionId: '',
 			});
+			await this.logToDatabase('connectionSuccess', {
+				ClientId: client.id,
+				PublicKey: publicKeyData,
+			});
 			this.logger.log(`Client ${client.id} authenticated successfully.`);
 		} else {
 			client.emit('error', {
@@ -70,11 +95,16 @@ export class AuthGateway
 				sessionId: '',
 			});
 			client.disconnect();
+			await this.logToDatabase('authenticationFailed', {
+				ClientId: client.id,
+				PublicKey: publicKeyData,
+			});
 			this.logger.error(`Client ${client.id} failed to authenticate.`);
 		}
 	}
 
 	handleDisconnect(client: Socket) {
+		this.logToDatabase('disconnect', { ClientId: client.id });
 		this.logger.log(`Client disconnected: ${client.id}`);
 	}
 
@@ -96,6 +126,13 @@ export class AuthGateway
 				sessionId: '',
 			});
 			client.disconnect();
+			await this.logToDatabase('linkFailed', {
+				ClientId: client.id,
+				MissingData: true,
+				SessionId: sessionIdData,
+				Action: 'link',
+				SubscribeMessage: 'link',
+			});
 			this.logger.error(`Client ${client.id} failed to provide public key.`);
 			return;
 		}
@@ -107,6 +144,13 @@ export class AuthGateway
 				sessionId: '',
 			});
 			client.disconnect();
+			await this.logToDatabase('linkFailed', {
+				ClientId: client.id,
+				MissingData: true,
+				SessionId: sessionIdData,
+				Action: 'link',
+				SubscribeMessage: 'link',
+			});
 			this.logger.error(`Client ${client.id} failed to authenticate.`);
 		}
 		if (!sessionIdData) {
@@ -116,6 +160,13 @@ export class AuthGateway
 				sessionId: '',
 			});
 			client.disconnect();
+			await this.logToDatabase('linkFailed', {
+				ClientId: client.id,
+				MissingData: true,
+				SessionId: sessionIdData,
+				Action: 'link',
+				SubscribeMessage: 'link',
+			});
 			this.logger.error(`Client ${client.id} failed to authenticate.`);
 		}
 		const timestamp = Math.floor(new Date().getTime() / 1000);
@@ -146,8 +197,20 @@ export class AuthGateway
 				statusCode: 'WGS0053',
 				sessionId: sessionIdData,
 			});
+			await this.logToDatabase('linkSuccess', {
+				ClientId: client.id,
+				SessionId: sessionIdData,
+				Action: 'link',
+				SubscribeMessage: 'link',
+			});
 		} else {
 			client.disconnect();
+			await this.logToDatabase('linkFailed', {
+				ClientId: client.id,
+				SessionId: sessionIdData,
+				Action: 'link',
+				SubscribeMessage: 'link',
+			});
 			this.logger.error(`Client ${client.id} failed to authenticate.`);
 		}
 	}
@@ -165,7 +228,7 @@ export class AuthGateway
 		const activityId = parsedData.activityId?.toString();
 		const paymentType = parsedData.paymentType?.toString();
 		const wgUserId = parsedData.wgUserId?.toString();
-		const itemName = parsedData.itemName?.toString();
+		const contentName = parsedData.contentName?.toString();
 		const objectSecret = await this.authService.getServiceProviderWihtPublicKey(
 			publicKeyData
 		);
@@ -178,6 +241,13 @@ export class AuthGateway
 				sessionId: '',
 			});
 			client.disconnect();
+			await this.logToDatabase('activityFailed', {
+				MissingData: true,
+				ClientId: client.id,
+				ActivityId: activityId,
+				Action: action,
+				SubscribeMessage: 'activity',
+			});
 			this.logger.error(`Client ${client.id} failed to provide public key.`);
 			return;
 		}
@@ -189,6 +259,13 @@ export class AuthGateway
 				sessionId: '',
 			});
 			client.disconnect();
+			await this.logToDatabase('activityFailed', {
+				MissingData: true,
+				ClientId: client.id,
+				ActivityId: activityId,
+				Action: action,
+				SubscribeMessage: 'activity',
+			});
 			this.logger.error(
 				`Client ${client.id} failed to authenticate. in activity`
 			);
@@ -200,6 +277,13 @@ export class AuthGateway
 				sessionId: '',
 			});
 			client.disconnect();
+			await this.logToDatabase('activityFailed', {
+				MissingData: true,
+				ClientId: client.id,
+				ActivityId: activityId,
+				Action: action,
+				SubscribeMessage: 'activity',
+			});
 			this.logger.error(
 				`Client ${client.id} failed to authenticate. in activity`
 			);
@@ -233,13 +317,29 @@ export class AuthGateway
 					wgUserId,
 					walletAddress?.walletUrl,
 					activityId,
-					itemName
+					contentName
 				);
+				await this.logToDatabase('activityCharge', {
+					ClientId: client.id,
+					ActivityId: activityId,
+					Action: action,
+					WgUserId: wgUserId,
+					ItemName: contentName,
+					SubscribeMessage: 'activity',
+				});
 			} else if (action == 'stop' || action == 'pause' || action == 'play') {
 				client.emit('hc', {
 					message: 'Ok',
 					statusCode: 'WGS0053',
 					activityId: activityId,
+				});
+				await this.logToDatabase('activityAction', {
+					ClientId: client.id,
+					ActivityId: activityId,
+					Action: action,
+					WgUserId: wgUserId,
+					ItemName: contentName,
+					SubscribeMessage: 'activity',
 				});
 			}
 		} else {
@@ -247,6 +347,13 @@ export class AuthGateway
 			this.logger.error(
 				`Client ${client.id} failed to authenticate. in activity`
 			);
+			await this.logToDatabase('activityFailed', {
+				MissingData: true,
+				ClientId: client.id,
+				ActivityId: activityId,
+				Action: action,
+				SubscribeMessage: 'activity',
+			});
 		}
 		// return { event: 'response', data: 'Stop processed.' };
 	}
@@ -268,6 +375,13 @@ export class AuthGateway
 				sessionId: '',
 			});
 			client.disconnect();
+			await this.logToDatabase('unlinkFailed', {
+				ClientId: client.id,
+				MissingData: true,
+				SessionId: sessionIdData,
+				Action: 'link',
+				SubscribeMessage: 'link',
+			});
 			this.logger.error(`Client ${client.id} failed to provide public key.`);
 			return;
 		}
@@ -279,6 +393,13 @@ export class AuthGateway
 				sessionId: '',
 			});
 			client.disconnect();
+			await this.logToDatabase('unlinkFailed', {
+				ClientId: client.id,
+				MissingData: true,
+				SessionId: sessionIdData,
+				Action: 'link',
+				SubscribeMessage: 'link',
+			});
 			this.logger.error(
 				`Client ${client.id} failed to authenticate. in activity`
 			);
@@ -304,8 +425,21 @@ export class AuthGateway
 
 		if (validTokenRange.includes(nonceData)) {
 			await this.authService.unlinkServiceProviderBySessionId(sessionIdData);
+			await this.logToDatabase('unlinkSuccess', {
+				ClientId: client.id,
+				SessionId: sessionIdData,
+				Action: 'link',
+				SubscribeMessage: 'link',
+			});
 		} else {
 			client.disconnect();
+			await this.logToDatabase('unlinkFailed', {
+				ClientId: client.id,
+				MissingData: true,
+				SessionId: sessionIdData,
+				Action: 'link',
+				SubscribeMessage: 'link',
+			});
 			this.logger.error(
 				`Client ${client.id} failed to authenticate. in activity`
 			);
@@ -324,6 +458,12 @@ export class AuthGateway
 		const paymentParameters = await this.authService.getPaymentParameters(
 			publicKeyData
 		);
+		await this.logToDatabase('getPaymentParameters', {
+			ClientId: client.id,
+			PublicKey: publicKeyData,
+			Action: 'get-payment-parameters',
+			SubscribeMessage: 'get-payment-parameters',
+		});
 		return { event: 'get-payment-parameters', data: paymentParameters };
 	}
 }
