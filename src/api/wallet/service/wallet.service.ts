@@ -808,7 +808,7 @@ export class WalletService {
 			search = 'all';
 		}
 		const walletDb = await this.getUserByToken(token);
-		const WalletAddress = walletDb.WalletAddress;
+		const WalletAddress = walletDb?.WalletAddress;
 		const docClient = new DocumentClient();
 		const filterExpression =
 			type == 'PLATFORM'
@@ -839,7 +839,7 @@ export class WalletService {
 		if (dynamoOutgoingPayments?.Items?.length > 0) {
 			const sortedArray = dynamoOutgoingPayments?.Items?.sort(
 				(a: any, b: any) =>
-					new Date(b?.createdAt).getTime() - new Date(a?.createdAt).getTime()
+					new Date(b?.createdAt)?.getTime() - new Date(a?.createdAt)?.getTime()
 			);
 
 			const transactionsWithNames: any = await Promise.all(
@@ -899,7 +899,7 @@ export class WalletService {
 			);
 			let validWallets = [];
 			if (filters?.providerIds?.length) {
-				const providerWalletsPromises = filters.providerIds.map(
+				const providerWalletsPromises = filters?.providerIds?.map(
 					async providerId => {
 						const provider = await this.getWalletAddressByProviderId(
 							providerId
@@ -914,32 +914,33 @@ export class WalletService {
 			}
 			const filteredTransactions = transactionsWithNames.filter(transaction => {
 				const matchesActivityId = filters?.activityId
-					? transaction.Metadata?.activityId === filters.activityId
+					? transaction?.Metadata?.activityId === filters.activityId
 					: true;
 				const matchesType = filters?.type
-					? transaction.Type === filters.type
+					? transaction?.Type === filters?.type
 					: true;
 				const matchesState = filters?.state
-					? transaction.State === filters.state
+					? transaction?.State === filters?.state
 					: true;
 
 				const matchesDateRange = filters?.dateRange
-					? new Date(transaction.createdAt) >=
-							new Date(filters.dateRange.start) &&
-					  new Date(transaction.createdAt) <= new Date(filters.dateRange.end)
+					? new Date(transaction?.createdAt) >=
+							new Date(filters?.dateRange?.start) &&
+					  new Date(transaction?.createdAt) <=
+							new Date(filters?.dateRange?.end)
 					: true;
 
 				const matchesProviderId =
 					validWallets.length > 0
 						? validWallets.some(
-								walletAddress => walletAddress === transaction.ReceiverUrl
-						  ) && transaction.Metadata?.type === 'PROVIDER'
+								walletAddress => walletAddress === transaction?.ReceiverUrl
+						  ) && transaction?.Metadata?.type === 'PROVIDER'
 						: true;
 
 				const matchesWalletAddress =
 					type !== 'WALLET' && filters?.walletAddress
-						? transaction.ReceiverUrl == filters?.walletAddress ||
-						  transaction.SenderUrl == filters?.walletAddress
+						? transaction?.ReceiverUrl == filters?.walletAddress ||
+						  transaction?.SenderUrl == filters?.walletAddress
 						: true;
 
 				return (
@@ -961,11 +962,11 @@ export class WalletService {
 				sortedTransactions = convertToCamelCase(filteredTransactions);
 			} else if (isIncoming) {
 				sortedTransactions = convertToCamelCase(
-					filteredTransactions.filter(t => t.Type === 'IncomingPayment')
+					filteredTransactions.filter(t => t?.Type === 'IncomingPayment')
 				);
 			} else if (isOutgoing) {
 				sortedTransactions = convertToCamelCase(
-					filteredTransactions.filter(t => t.Type === 'OutgoingPayment')
+					filteredTransactions.filter(t => t?.Type === 'OutgoingPayment')
 				);
 			}
 
@@ -974,14 +975,14 @@ export class WalletService {
 			}
 
 			const incomingSorted = filteredTransactions.filter(
-				item => item.Type === 'IncomingPayment'
+				item => item?.Type === 'IncomingPayment'
 			);
 			const outgoingSorted = filteredTransactions.filter(
-				item => item.Type === 'OutgoingPayment'
+				item => item?.Type === 'OutgoingPayment'
 			);
 			const combinedSorted = [...incomingSorted, ...outgoingSorted].sort(
 				(a: any, b: any) =>
-					new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+					new Date(b?.createdAt).getTime() - new Date(a?.createdAt).getTime()
 			);
 
 			return search === 'credit'
