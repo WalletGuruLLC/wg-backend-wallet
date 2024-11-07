@@ -396,7 +396,8 @@ export class RafikiWalletController {
 			const transactions = await this.walletService.listTransactions(
 				token,
 				search,
-				filters
+				filters,
+				userType
 			);
 			return res.status(HttpStatus.OK).send({
 				statusCode: HttpStatus.OK,
