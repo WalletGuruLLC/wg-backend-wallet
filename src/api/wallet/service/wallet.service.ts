@@ -811,7 +811,7 @@ export class WalletService {
 		const WalletAddress = walletDb.WalletAddress;
 		const docClient = new DocumentClient();
 		const filterExpression =
-			type !== 'WALLET'
+			type == 'PLATFORM'
 				? '#Type = :TypeIncoming OR #Type = :TypeOutgoing'
 				: '(#ReceiverUrl = :WalletAddress AND #Type = :TypeIncoming) OR (#SenderUrl = :WalletAddress AND #Type = :TypeOutgoing)';
 
@@ -820,7 +820,7 @@ export class WalletService {
 			FilterExpression: filterExpression,
 			ExpressionAttributeNames: {
 				'#Type': 'Type',
-				...(type == 'WALLET' && {
+				...(type !== 'PLATFORM' && {
 					'#SenderUrl': 'SenderUrl',
 					'#ReceiverUrl': 'ReceiverUrl',
 				}),
@@ -828,7 +828,7 @@ export class WalletService {
 			ExpressionAttributeValues: {
 				':TypeIncoming': 'IncomingPayment',
 				':TypeOutgoing': 'OutgoingPayment',
-				...(type == 'WALLET' && { ':WalletAddress': WalletAddress }),
+				...(type !== 'PLATFORM' && { ':WalletAddress': WalletAddress }),
 			},
 		};
 
