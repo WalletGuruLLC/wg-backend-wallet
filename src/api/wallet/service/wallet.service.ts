@@ -800,7 +800,8 @@ export class WalletService {
 			providerIds?: string[];
 			activityId?: string;
 			transactionType?: string[];
-		}
+		},
+		type?: string
 	) {
 		if (!search) {
 			search = 'all';
@@ -808,19 +809,25 @@ export class WalletService {
 		const walletDb = await this.getUserByToken(token);
 		const WalletAddress = walletDb.WalletAddress;
 		const docClient = new DocumentClient();
+		const filterExpression =
+			type == 'PLATFORM'
+				? '#Type = :TypeIncoming OR #Type = :TypeOutgoing'
+				: '(#ReceiverUrl = :WalletAddress AND #Type = :TypeIncoming) OR (#SenderUrl = :WalletAddress AND #Type = :TypeOutgoing)';
+
 		const outgoingParams: DocumentClient.ScanInput = {
 			TableName: 'Transactions',
-			FilterExpression:
-				'(#ReceiverUrl = :WalletAddress AND #Type = :TypeIncoming) OR (#SenderUrl = :WalletAddress AND #Type = :TypeOutgoing)',
+			FilterExpression: filterExpression,
 			ExpressionAttributeNames: {
-				'#SenderUrl': 'SenderUrl',
-				'#ReceiverUrl': 'ReceiverUrl',
 				'#Type': 'Type',
+				...(type !== 'PLATFORM' && {
+					'#SenderUrl': 'SenderUrl',
+					'#ReceiverUrl': 'ReceiverUrl',
+				}),
 			},
 			ExpressionAttributeValues: {
-				':WalletAddress': WalletAddress,
 				':TypeIncoming': 'IncomingPayment',
 				':TypeOutgoing': 'OutgoingPayment',
+				...(type !== 'PLATFORM' && { ':WalletAddress': WalletAddress }),
 			},
 		};
 
