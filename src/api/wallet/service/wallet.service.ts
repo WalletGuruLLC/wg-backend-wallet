@@ -808,10 +808,10 @@ export class WalletService {
 			search = 'all';
 		}
 		const walletDb = await this.getUserByToken(token);
-		const WalletAddress = filters?.walletAddress || walletDb.WalletAddress;
+		const WalletAddress = walletDb.WalletAddress;
 		const docClient = new DocumentClient();
 		const filterExpression =
-			type == 'PLATFORM'
+			type !== 'WALLET'
 				? '#Type = :TypeIncoming OR #Type = :TypeOutgoing'
 				: '(#ReceiverUrl = :WalletAddress AND #Type = :TypeIncoming) OR (#SenderUrl = :WalletAddress AND #Type = :TypeOutgoing)';
 
@@ -820,7 +820,7 @@ export class WalletService {
 			FilterExpression: filterExpression,
 			ExpressionAttributeNames: {
 				'#Type': 'Type',
-				...(type !== 'PLATFORM' && {
+				...(type == 'WALLET' && {
 					'#SenderUrl': 'SenderUrl',
 					'#ReceiverUrl': 'ReceiverUrl',
 				}),
@@ -828,7 +828,7 @@ export class WalletService {
 			ExpressionAttributeValues: {
 				':TypeIncoming': 'IncomingPayment',
 				':TypeOutgoing': 'OutgoingPayment',
-				...(type !== 'PLATFORM' && { ':WalletAddress': WalletAddress }),
+				...(type == 'WALLET' && { ':WalletAddress': WalletAddress }),
 			},
 		};
 
@@ -936,12 +936,19 @@ export class WalletService {
 						  ) && transaction.Metadata?.type === 'PROVIDER'
 						: true;
 
+				const matchesWalletAddress =
+					type !== 'WALLET' && filters?.walletAddress
+						? transaction.ReceiverUrl == filters?.walletAddress ||
+						  transaction.SenderUrl == filters?.walletAddress
+						: true;
+
 				return (
 					matchesActivityId &&
 					matchesType &&
 					matchesState &&
 					matchesDateRange &&
-					matchesProviderId
+					matchesProviderId &&
+					matchesWalletAddress
 				);
 			});
 
