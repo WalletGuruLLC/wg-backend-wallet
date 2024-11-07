@@ -800,6 +800,7 @@ export class WalletService {
 			providerIds?: string[];
 			activityId?: string;
 			transactionType?: string[];
+			walletAddress?: string;
 		},
 		type?: string
 	) {
@@ -807,7 +808,7 @@ export class WalletService {
 			search = 'all';
 		}
 		const walletDb = await this.getUserByToken(token);
-		const WalletAddress = walletDb.WalletAddress;
+		const WalletAddress = filters?.walletAddress || walletDb.WalletAddress;
 		const docClient = new DocumentClient();
 		const filterExpression =
 			type == 'PLATFORM'
