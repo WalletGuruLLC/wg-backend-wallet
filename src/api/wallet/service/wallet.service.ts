@@ -1865,6 +1865,10 @@ export class WalletService {
 		}
 
 		if (validIncomingPayment) {
+			const walletProvider = await this.findWalletByUrl(
+				validIncomingPayment?.ReceiverUrl
+			);
+
 			const quoteInput = {
 				walletAddressId: walletAddressId,
 				receiver: validIncomingPayment?.ReceiverId,
@@ -1971,7 +1975,7 @@ export class WalletService {
 
 					const receiver = await this.createReceiver(inputReceiver);
 					const quoteInput = {
-						walletAddressId: walletAddressId,
+						walletAddressId: walletProvider?.RafikiId,
 						receiver: receiver?.createReceiver?.receiver?.id,
 						receiveAmount: {
 							assetCode: walletAsset?.asset ?? 'USD',
@@ -1984,7 +1988,7 @@ export class WalletService {
 						const quote = await this.createQuote(quoteInput);
 
 						const inputOutgoing = {
-							walletAddressId: walletAddressId,
+							walletAddressId: walletProvider?.RafikiId,
 							quoteId: quote?.createQuote?.quote?.id,
 							metadata: {
 								activityId: activityId || '',
