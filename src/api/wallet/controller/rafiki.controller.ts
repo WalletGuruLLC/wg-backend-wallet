@@ -510,7 +510,7 @@ export class RafikiWalletController {
 			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-				customCode: 'WGE0137',
+				customCode: 'WGE0227',
 			});
 		}
 	}
@@ -592,7 +592,7 @@ export class RafikiWalletController {
 			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-				customCode: 'WGE0137',
+				customCode: 'WGE0227',
 			});
 		}
 	}
@@ -671,7 +671,7 @@ export class RafikiWalletController {
 			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-				customCode: 'WGE0137',
+				customCode: 'WGE0227',
 			});
 		}
 	}
@@ -767,7 +767,7 @@ export class RafikiWalletController {
 			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-				customCode: 'WGE0137',
+				customCode: 'WGE0227',
 			});
 		}
 	}
@@ -1674,7 +1674,7 @@ export class RafikiWalletController {
 			);
 			return res.status(HttpStatus.CREATED).send({
 				statusCode: HttpStatus.CREATED,
-				customCode: 'WGS0080',
+				customCode: 'WGE0227',
 				data: { providerRevenue },
 			});
 		} catch (error) {
@@ -1686,7 +1686,7 @@ export class RafikiWalletController {
 				throw new HttpException(
 					{
 						statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-						customCode: 'WGE0073',
+						customCode: 'WGE0229',
 					},
 					HttpStatus.INTERNAL_SERVER_ERROR
 				);
