@@ -46,6 +46,9 @@ import { flattenObject } from 'src/utils/helpers/flattenObject';
 import { WebSocketAction } from '../entities/webSocketAction.entity';
 import { WebSocketActionSchema } from '../entities/webSocketAction.schema';
 import { CreateWebSocketActionDto } from '../dto/create-web-socket-action.dto';
+import { ProviderRevenues } from '../entities/provider-revenues.entity';
+import { ProviderRevenuesSchema } from '../entities/provider-revenues.schema';
+import { CreateProviderRevenue } from '../dto/provider-revenue.dto';
 
 @Injectable()
 export class WalletService {
@@ -56,6 +59,7 @@ export class WalletService {
 	private dbTransactions: Model<Transaction>;
 	private dbUserInstance: Model<User>;
 	private dbRates: Model<Rates>;
+	private dbProviderRevenues: Model<ProviderRevenues>;
 	private dbUserIncoming: Model<UserIncomingPayment>;
 	private readonly AUTH_MICRO_URL: string;
 	private readonly DOMAIN_WALLET_URL: string;
@@ -89,6 +93,10 @@ export class WalletService {
 		this.dbTransactions = dynamoose.model<Transaction>(
 			'Transactions',
 			TransactionsSchema
+		);
+		this.dbProviderRevenues = dynamoose.model<ProviderRevenues>(
+			'ProviderRevenues',
+			ProviderRevenuesSchema
 		);
 		this.dbRates = dynamoose.model<Rates>('Rates', RatesSchema);
 		this.AUTH_MICRO_URL = process.env.AUTH_URL;
@@ -1605,6 +1613,29 @@ export class WalletService {
 		}
 	}
 
+	async getBatchTransactions(transactionIds: string[]) {
+		const docClient = new DocumentClient();
+		const params = {
+			RequestItems: {
+				Transactions: {
+					Keys: transactionIds.map(id => ({ Id: id })),
+				},
+			},
+		};
+
+		try {
+			const result = await docClient.batchGet(params).promise();
+			const existingTransactions = result.Responses.Transactions;
+			return convertToCamelCase(existingTransactions);
+		} catch (error) {
+			Sentry.captureException(error);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0229',
+			};
+		}
+	}
+
 	async getTransactionByIncomingPaymentId(incomingPaymentId: string) {
 		const docClient = new DocumentClient();
 		const params = {
@@ -2473,5 +2504,47 @@ export class WalletService {
 
 	async getWalletByTokenWS(token: string): Promise<Wallet> {
 		return await this.getUserByToken(token);
+	}
+
+	async createProviderRevenue(
+		createProviderRevenue: CreateProviderRevenue,
+		providerWallet
+	) {
+		try {
+			const startDate = new Date(createProviderRevenue.startDate).getTime();
+			const endDate = new Date(createProviderRevenue.endDate).getTime();
+			const transactions = await this.getBatchTransactions(
+				createProviderRevenue.transactionIds
+			);
+
+			const completedTransactions = transactions.filter(
+				transaction =>
+					transaction?.createdAt >= startDate &&
+					transaction?.createdAt <= endDate &&
+					transaction.state === 'COMPLETED' &&
+					transaction?.receiverUrl === providerWallet?.walletAddress
+			);
+
+			const totalAmount = completedTransactions.reduce((total, transaction) => {
+				return total + parseFloat(transaction?.receiveAmount?.value || 0);
+			}, 0);
+
+			const createProviderRevenueDTO = {
+				ServiceProviderId: createProviderRevenue.serviceProviderId,
+				Value: totalAmount,
+				StartDate: startDate,
+				EndDate: endDate,
+				TransactionIds: createProviderRevenue.transactionIds,
+				...(createProviderRevenue?.observations && {
+					Observations: createProviderRevenue.observations,
+				}),
+			};
+			return await this.dbProviderRevenues.create(createProviderRevenueDTO);
+		} catch (error) {
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0229',
+			};
+		}
 	}
 }
