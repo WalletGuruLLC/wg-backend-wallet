@@ -1824,7 +1824,8 @@ export class WalletService {
 				parameterExists?.base,
 				parameterExists?.comision,
 				parameterExists?.cost,
-				parameterExists?.percent
+				parameterExists?.percent,
+				walletAsset?.scale
 			),
 			walletAsset?.scale
 		);
@@ -1834,7 +1835,8 @@ export class WalletService {
 				parameterExists?.base,
 				parameterExists?.comision,
 				parameterExists?.cost,
-				parameterExists?.percent
+				parameterExists?.percent,
+				walletAsset?.scale
 			),
 			walletAsset?.scale
 		);
