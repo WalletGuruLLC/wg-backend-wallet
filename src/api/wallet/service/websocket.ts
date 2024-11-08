@@ -315,7 +315,7 @@ export class AuthGateway
 	@SubscribeMessage('get-payment-parameters') async getPaymentParameters(
 		client: Socket,
 		data: any
-	): Promise<WsResponse<string>> {
+	): Promise<any> {
 		const headers = client.handshake.headers;
 		const parsedData = data;
 		const publicKeyData =
@@ -324,6 +324,15 @@ export class AuthGateway
 		const paymentParameters = await this.authService.getPaymentParameters(
 			publicKeyData
 		);
-		return { event: 'get-payment-parameters', data: paymentParameters };
+		if (paymentParameters) {
+			client.emit('hc', {
+				message: 'Ok',
+				statusCode: 'WGS0053',
+				data: paymentParameters,
+			});
+		} else {
+			client.disconnect();
+			this.logger.error(`Get payment parameters failed`);
+		}
 	}
 }
