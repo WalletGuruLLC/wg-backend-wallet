@@ -1631,8 +1631,7 @@ export class WalletService {
 			Sentry.captureException(error);
 			return {
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-				customCode: 'WGE0167',
-				error: error.message,
+				customCode: 'WGE0229',
 			};
 		}
 	}
@@ -2542,7 +2541,10 @@ export class WalletService {
 			};
 			return await this.dbProviderRevenues.create(createProviderRevenueDTO);
 		} catch (error) {
-			return {};
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0229',
+			};
 		}
 	}
 }
