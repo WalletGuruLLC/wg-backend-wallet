@@ -43,10 +43,14 @@ import { AuthGateway } from './websocket';
 import { calcularTotalCostoWalletGuru } from 'src/utils/helpers/calcularCostoWalletGuru';
 import * as fastCsv from 'fast-csv';
 import { flattenObject } from 'src/utils/helpers/flattenObject';
+import { WebSocketAction } from '../entities/webSocketAction.entity';
+import { WebSocketActionSchema } from '../entities/webSocketAction.schema';
+import { CreateWebSocketActionDto } from '../dto/create-web-socket-action.dto';
 
 @Injectable()
 export class WalletService {
 	private dbInstance: Model<Wallet>;
+	private dbInstanceSocketLogs: Model<WebSocketAction>;
 	private dbInstanceSocket: Model<SocketKey>;
 	private dbIncomingUser: Model<UserIncomingPayment>;
 	private dbTransactions: Model<Transaction>;
@@ -64,6 +68,10 @@ export class WalletService {
 		private authGateway: AuthGateway
 	) {
 		this.dbUserInstance = dynamoose.model<User>('Users', UserSchema);
+		this.dbInstanceSocketLogs = dynamoose.model<User>(
+			'WebSocketActions',
+			WebSocketActionSchema
+		);
 		this.dbIncomingUser = dynamoose.model<UserIncomingPayment>(
 			'UserIncoming',
 			UserIncomingSchema
@@ -95,6 +103,21 @@ export class WalletService {
 			UserId: createIncomingUserDto.userId,
 		};
 		return this.dbIncomingUser.create(createIncomingDtoConverted);
+	}
+
+	async createWebsocketLogs(
+		createWebSocketActionDto: CreateWebSocketActionDto
+	) {
+		try {
+			const filteredData = Object.fromEntries(
+				Object?.entries(createWebSocketActionDto)?.filter(
+					([_, value]) => value !== undefined
+				)
+			);
+			return this.dbInstanceSocketLogs.create(filteredData);
+		} catch (error) {
+			console.log(`Failed to log event: ${error.message}`);
+		}
 	}
 
 	//SERVICE TO CREATE A WALLET
@@ -800,27 +823,35 @@ export class WalletService {
 			providerIds?: string[];
 			activityId?: string;
 			transactionType?: string[];
-		}
+			walletAddress?: string;
+		},
+		type?: string
 	) {
 		if (!search) {
 			search = 'all';
 		}
 		const walletDb = await this.getUserByToken(token);
-		const WalletAddress = walletDb.WalletAddress;
+		const WalletAddress = walletDb?.WalletAddress;
 		const docClient = new DocumentClient();
+		const filterExpression =
+			type == 'PLATFORM'
+				? '#Type = :TypeIncoming OR #Type = :TypeOutgoing'
+				: '(#ReceiverUrl = :WalletAddress AND #Type = :TypeIncoming) OR (#SenderUrl = :WalletAddress AND #Type = :TypeOutgoing)';
+
 		const outgoingParams: DocumentClient.ScanInput = {
 			TableName: 'Transactions',
-			FilterExpression:
-				'(#ReceiverUrl = :WalletAddress AND #Type = :TypeIncoming) OR (#SenderUrl = :WalletAddress AND #Type = :TypeOutgoing)',
+			FilterExpression: filterExpression,
 			ExpressionAttributeNames: {
-				'#SenderUrl': 'SenderUrl',
-				'#ReceiverUrl': 'ReceiverUrl',
 				'#Type': 'Type',
+				...(type !== 'PLATFORM' && {
+					'#SenderUrl': 'SenderUrl',
+					'#ReceiverUrl': 'ReceiverUrl',
+				}),
 			},
 			ExpressionAttributeValues: {
-				':WalletAddress': WalletAddress,
 				':TypeIncoming': 'IncomingPayment',
 				':TypeOutgoing': 'OutgoingPayment',
+				...(type !== 'PLATFORM' && { ':WalletAddress': WalletAddress }),
 			},
 		};
 
@@ -831,7 +862,7 @@ export class WalletService {
 		if (dynamoOutgoingPayments?.Items?.length > 0) {
 			const sortedArray = dynamoOutgoingPayments?.Items?.sort(
 				(a: any, b: any) =>
-					new Date(b?.createdAt).getTime() - new Date(a?.createdAt).getTime()
+					new Date(b?.createdAt)?.getTime() - new Date(a?.createdAt)?.getTime()
 			);
 
 			const transactionsWithNames: any = await Promise.all(
@@ -891,7 +922,7 @@ export class WalletService {
 			);
 			let validWallets = [];
 			if (filters?.providerIds?.length) {
-				const providerWalletsPromises = filters.providerIds.map(
+				const providerWalletsPromises = filters?.providerIds?.map(
 					async providerId => {
 						const provider = await this.getWalletAddressByProviderId(
 							providerId
@@ -906,26 +937,33 @@ export class WalletService {
 			}
 			const filteredTransactions = transactionsWithNames.filter(transaction => {
 				const matchesActivityId = filters?.activityId
-					? transaction.Metadata?.activityId === filters.activityId
+					? transaction?.Metadata?.activityId === filters.activityId
 					: true;
 				const matchesType = filters?.type
-					? transaction.Type === filters.type
+					? transaction?.Type === filters?.type
 					: true;
 				const matchesState = filters?.state
-					? transaction.State === filters.state
+					? transaction?.State === filters?.state
 					: true;
 
 				const matchesDateRange = filters?.dateRange
-					? new Date(transaction.createdAt) >=
-							new Date(filters.dateRange.start) &&
-					  new Date(transaction.createdAt) <= new Date(filters.dateRange.end)
+					? new Date(transaction?.createdAt) >=
+							new Date(filters?.dateRange?.start) &&
+					  new Date(transaction?.createdAt) <=
+							new Date(filters?.dateRange?.end)
 					: true;
 
 				const matchesProviderId =
 					validWallets.length > 0
 						? validWallets.some(
-								walletAddress => walletAddress === transaction.ReceiverUrl
-						  ) && transaction.Metadata?.type === 'PROVIDER'
+								walletAddress => walletAddress === transaction?.ReceiverUrl
+						  ) && transaction?.Metadata?.type === 'PROVIDER'
+						: true;
+
+				const matchesWalletAddress =
+					type !== 'WALLET' && filters?.walletAddress
+						? transaction?.ReceiverUrl == filters?.walletAddress ||
+						  transaction?.SenderUrl == filters?.walletAddress
 						: true;
 
 				return (
@@ -933,7 +971,8 @@ export class WalletService {
 					matchesType &&
 					matchesState &&
 					matchesDateRange &&
-					matchesProviderId
+					matchesProviderId &&
+					matchesWalletAddress
 				);
 			});
 
@@ -946,11 +985,11 @@ export class WalletService {
 				sortedTransactions = convertToCamelCase(filteredTransactions);
 			} else if (isIncoming) {
 				sortedTransactions = convertToCamelCase(
-					filteredTransactions.filter(t => t.Type === 'IncomingPayment')
+					filteredTransactions.filter(t => t?.Type === 'IncomingPayment')
 				);
 			} else if (isOutgoing) {
 				sortedTransactions = convertToCamelCase(
-					filteredTransactions.filter(t => t.Type === 'OutgoingPayment')
+					filteredTransactions.filter(t => t?.Type === 'OutgoingPayment')
 				);
 			}
 
@@ -959,14 +998,14 @@ export class WalletService {
 			}
 
 			const incomingSorted = filteredTransactions.filter(
-				item => item.Type === 'IncomingPayment'
+				item => item?.Type === 'IncomingPayment'
 			);
 			const outgoingSorted = filteredTransactions.filter(
-				item => item.Type === 'OutgoingPayment'
+				item => item?.Type === 'OutgoingPayment'
 			);
 			const combinedSorted = [...incomingSorted, ...outgoingSorted].sort(
 				(a: any, b: any) =>
-					new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+					new Date(b?.createdAt).getTime() - new Date(a?.createdAt).getTime()
 			);
 
 			return search === 'credit'
@@ -1785,7 +1824,8 @@ export class WalletService {
 				parameterExists?.base,
 				parameterExists?.comision,
 				parameterExists?.cost,
-				parameterExists?.percent
+				parameterExists?.percent,
+				walletAsset?.scale
 			),
 			walletAsset?.scale
 		);
@@ -1795,7 +1835,8 @@ export class WalletService {
 				parameterExists?.base,
 				parameterExists?.comision,
 				parameterExists?.cost,
-				parameterExists?.percent
+				parameterExists?.percent,
+				walletAsset?.scale
 			),
 			walletAsset?.scale
 		);
@@ -1824,6 +1865,10 @@ export class WalletService {
 		}
 
 		if (validIncomingPayment) {
+			const walletProvider = await this.findWalletByUrl(
+				validIncomingPayment?.ReceiverUrl
+			);
+
 			const quoteInput = {
 				walletAddressId: walletAddressId,
 				receiver: validIncomingPayment?.ReceiverId,
@@ -1917,7 +1962,7 @@ export class WalletService {
 							activityId: activityId || '',
 							contentName: itemName || '---',
 							description: '',
-							type: 'PROVIDER',
+							type: 'USER',
 							wgUser: userId,
 						},
 						incomingAmount: {
@@ -1930,7 +1975,7 @@ export class WalletService {
 
 					const receiver = await this.createReceiver(inputReceiver);
 					const quoteInput = {
-						walletAddressId: walletAddressId,
+						walletAddressId: walletProvider?.RafikiId,
 						receiver: receiver?.createReceiver?.receiver?.id,
 						receiveAmount: {
 							assetCode: walletAsset?.asset ?? 'USD',
@@ -1943,13 +1988,13 @@ export class WalletService {
 						const quote = await this.createQuote(quoteInput);
 
 						const inputOutgoing = {
-							walletAddressId: walletAddressId,
+							walletAddressId: walletProvider?.RafikiId,
 							quoteId: quote?.createQuote?.quote?.id,
 							metadata: {
 								activityId: activityId || '',
 								contentName: itemName || '---',
 								description: '',
-								type: 'PROVIDER',
+								type: 'USER',
 								wgUser: userId,
 							},
 						};
