@@ -43,10 +43,14 @@ import { AuthGateway } from './websocket';
 import { calcularTotalCostoWalletGuru } from 'src/utils/helpers/calcularCostoWalletGuru';
 import * as fastCsv from 'fast-csv';
 import { flattenObject } from 'src/utils/helpers/flattenObject';
+import { WebSocketAction } from '../entities/webSocketAction.entity';
+import { WebSocketActionSchema } from '../entities/webSocketAction.schema';
+import { CreateWebSocketActionDto } from '../dto/create-web-socket-action.dto';
 
 @Injectable()
 export class WalletService {
 	private dbInstance: Model<Wallet>;
+	private dbInstanceSocketLogs: Model<WebSocketAction>;
 	private dbInstanceSocket: Model<SocketKey>;
 	private dbIncomingUser: Model<UserIncomingPayment>;
 	private dbTransactions: Model<Transaction>;
@@ -64,6 +68,10 @@ export class WalletService {
 		private authGateway: AuthGateway
 	) {
 		this.dbUserInstance = dynamoose.model<User>('Users', UserSchema);
+		this.dbInstanceSocketLogs = dynamoose.model<User>(
+			'WebSocketActions',
+			WebSocketActionSchema
+		);
 		this.dbIncomingUser = dynamoose.model<UserIncomingPayment>(
 			'UserIncoming',
 			UserIncomingSchema
@@ -95,6 +103,21 @@ export class WalletService {
 			UserId: createIncomingUserDto.userId,
 		};
 		return this.dbIncomingUser.create(createIncomingDtoConverted);
+	}
+
+	async createWebsocketLogs(
+		createWebSocketActionDto: CreateWebSocketActionDto
+	) {
+		try {
+			const filteredData = Object.fromEntries(
+				Object?.entries(createWebSocketActionDto)?.filter(
+					([_, value]) => value !== undefined
+				)
+			);
+			return this.dbInstanceSocketLogs.create(filteredData);
+		} catch (error) {
+			console.log(`Failed to log event: ${error.message}`);
+		}
 	}
 
 	//SERVICE TO CREATE A WALLET
@@ -1801,7 +1824,8 @@ export class WalletService {
 				parameterExists?.base,
 				parameterExists?.comision,
 				parameterExists?.cost,
-				parameterExists?.percent
+				parameterExists?.percent,
+				walletAsset?.scale
 			),
 			walletAsset?.scale
 		);
@@ -1811,7 +1835,8 @@ export class WalletService {
 				parameterExists?.base,
 				parameterExists?.comision,
 				parameterExists?.cost,
-				parameterExists?.percent
+				parameterExists?.percent,
+				walletAsset?.scale
 			),
 			walletAsset?.scale
 		);

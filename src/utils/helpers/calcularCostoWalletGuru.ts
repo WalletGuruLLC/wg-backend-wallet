@@ -2,8 +2,10 @@ export function calcularTotalCostoWalletGuru(
 	base,
 	comision,
 	costo,
-	porcentaje
+	porcentaje,
+	escala = 2
 ) {
 	const serviceProviderCost = costo * (porcentaje / 100) + comision + base;
-	return Math.round(serviceProviderCost * 100) / 100;
+	const multiplicador = Math.pow(10, escala);
+	return Math.round(serviceProviderCost * multiplicador) / multiplicador;
 }
