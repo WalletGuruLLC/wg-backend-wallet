@@ -312,6 +312,7 @@ export class RafikiWalletController {
 	@ApiQuery({ name: 'state', required: false, type: String })
 	@ApiQuery({ name: 'providerIds', required: false, type: [String] })
 	@ApiQuery({ name: 'activityId', required: false, type: String })
+	@ApiQuery({ name: 'walletAddress', required: false, type: String })
 	@ApiOperation({ summary: 'List all user transactions' })
 	@ApiBearerAuth('JWT')
 	@ApiOkResponse({ description: 'Transactions successfully retrieved.' })
@@ -327,7 +328,8 @@ export class RafikiWalletController {
 		@Query('endDate') endDate?: string,
 		@Query('state') state?: string,
 		@Query('providerIds') providerIds?: string | string[],
-		@Query('activityId') activityId?: string
+		@Query('activityId') activityId?: string,
+		@Query('walletAddress') walletAddress?: string
 	) {
 		let token;
 		try {
@@ -378,6 +380,7 @@ export class RafikiWalletController {
 				providerIds: parsedProviderIds,
 				activityId,
 				transactionType: undefined,
+				walletAddress,
 			};
 			if (userType === 'WALLET') {
 				filters.transactionType = ['outgoing'];

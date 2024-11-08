@@ -396,8 +396,8 @@ export class AuthGateway
 				ClientId: client.id,
 				MissingData: true,
 				SessionId: sessionIdData,
-				Action: 'link',
-				SubscribeMessage: 'link',
+				Action: 'unlink',
+				SubscribeMessage: 'unlink',
 			});
 			this.logger.error(`Client ${client.id} failed to provide public key.`);
 			return;
@@ -414,8 +414,8 @@ export class AuthGateway
 				ClientId: client.id,
 				MissingData: true,
 				SessionId: sessionIdData,
-				Action: 'link',
-				SubscribeMessage: 'link',
+				Action: 'unlink',
+				SubscribeMessage: 'unlink',
 				PublicKey: publicKeyData,
 			});
 			this.logger.error(
@@ -446,8 +446,8 @@ export class AuthGateway
 			await this.logToDatabase('unlinkSuccess', {
 				ClientId: client.id,
 				SessionId: sessionIdData,
-				Action: 'link',
-				SubscribeMessage: 'link',
+				Action: 'unlink',
+				SubscribeMessage: 'unlink',
 				PublicKey: publicKeyData,
 			});
 		} else {
@@ -456,8 +456,8 @@ export class AuthGateway
 				ClientId: client.id,
 				MissingData: true,
 				SessionId: sessionIdData,
-				Action: 'link',
-				SubscribeMessage: 'link',
+				Action: 'unlink',
+				SubscribeMessage: 'unlink',
 				PublicKey: publicKeyData,
 			});
 			this.logger.error(
