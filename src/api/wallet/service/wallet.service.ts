@@ -2540,7 +2540,7 @@ export class WalletService {
 					Observations: createProviderRevenue.observations,
 				}),
 			};
-			return this.dbProviderRevenues.create(createProviderRevenueDTO);
+			return await this.dbProviderRevenues.create(createProviderRevenueDTO);
 		} catch (error) {
 			return {};
 		}
