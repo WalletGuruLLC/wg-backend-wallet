@@ -1962,7 +1962,7 @@ export class WalletService {
 							activityId: activityId || '',
 							contentName: itemName || '---',
 							description: '',
-							type: 'PROVIDER',
+							type: 'USER',
 							wgUser: userId,
 						},
 						incomingAmount: {
@@ -1994,7 +1994,7 @@ export class WalletService {
 								activityId: activityId || '',
 								contentName: itemName || '---',
 								description: '',
-								type: 'PROVIDER',
+								type: 'USER',
 								wgUser: userId,
 							},
 						};
