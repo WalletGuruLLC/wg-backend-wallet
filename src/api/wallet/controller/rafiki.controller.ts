@@ -314,6 +314,8 @@ export class RafikiWalletController {
 	@ApiQuery({ name: 'providerIds', required: false, type: [String] })
 	@ApiQuery({ name: 'activityId', required: false, type: String })
 	@ApiQuery({ name: 'walletAddress', required: false, type: String })
+	@ApiQuery({ name: 'page', required: false, type: String })
+	@ApiQuery({ name: 'items', required: false, type: String })
 	@ApiOperation({ summary: 'List all user transactions' })
 	@ApiBearerAuth('JWT')
 	@ApiOkResponse({ description: 'Transactions successfully retrieved.' })
@@ -330,7 +332,9 @@ export class RafikiWalletController {
 		@Query('state') state?: string,
 		@Query('providerIds') providerIds?: string | string[],
 		@Query('activityId') activityId?: string,
-		@Query('walletAddress') walletAddress?: string
+		@Query('walletAddress') walletAddress?: string,
+		@Query('page') page?: string,
+		@Query('items') items?: string
 	) {
 		let token;
 		try {
@@ -382,6 +386,8 @@ export class RafikiWalletController {
 				activityId,
 				transactionType: undefined,
 				walletAddress,
+				page,
+				items,
 			};
 			if (userType === 'WALLET') {
 				filters.transactionType = ['outgoing'];
@@ -403,10 +409,11 @@ export class RafikiWalletController {
 				filters,
 				userType
 			);
+
 			return res.status(HttpStatus.OK).send({
 				statusCode: HttpStatus.OK,
 				customCode: 'WGS0138',
-				data: { transactions: transactions },
+				data: { ...transactions },
 			});
 		} catch (error) {
 			Sentry.captureException(error);
@@ -424,6 +431,8 @@ export class RafikiWalletController {
 	@ApiQuery({ name: 'endDate', required: false, type: String })
 	@ApiQuery({ name: 'state', required: false, type: String })
 	@ApiQuery({ name: 'providerIds', required: false, type: [String] })
+	@ApiQuery({ name: 'page', required: false, type: String })
+	@ApiQuery({ name: 'items', required: false, type: String })
 	@ApiOperation({ summary: 'Download all provider transactions' })
 	@ApiBearerAuth('JWT')
 	@ApiOkResponse({ description: 'Transactions successfully downloaded.' })
@@ -438,7 +447,9 @@ export class RafikiWalletController {
 		@Query('startDate') startDate?: string,
 		@Query('endDate') endDate?: string,
 		@Query('state') state?: string,
-		@Query('providerIds') providerIds?: string | string[]
+		@Query('providerIds') providerIds?: string | string[],
+		@Query('page') page?: string,
+		@Query('items') items?: string
 	) {
 		let token;
 		try {
@@ -489,6 +500,8 @@ export class RafikiWalletController {
 				state,
 				providerIds: parsedProviderIds,
 				transactionType: undefined,
+				page,
+				items,
 			};
 
 			if (userType === 'PROVIDER') {
@@ -522,6 +535,8 @@ export class RafikiWalletController {
 	@ApiQuery({ name: 'endDate', required: false, type: String })
 	@ApiQuery({ name: 'state', required: false, type: String })
 	@ApiQuery({ name: 'activityId', required: false, type: String })
+	@ApiQuery({ name: 'page', required: false, type: String })
+	@ApiQuery({ name: 'items', required: false, type: String })
 	@ApiOperation({ summary: 'Download all transactions by activityId' })
 	@ApiBearerAuth('JWT')
 	@ApiOkResponse({ description: 'Transactions successfully downloaded.' })
@@ -536,7 +551,9 @@ export class RafikiWalletController {
 		@Query('startDate') startDate?: string,
 		@Query('endDate') endDate?: string,
 		@Query('state') state?: string,
-		@Query('activityId') activityId?: string
+		@Query('activityId') activityId?: string,
+		@Query('page') page?: string,
+		@Query('items') items?: string
 	) {
 		let token;
 		try {
@@ -571,6 +588,8 @@ export class RafikiWalletController {
 				state,
 				transactionType: undefined,
 				activityId,
+				page,
+				items,
 			};
 
 			if (userType === 'PLATFORM') {
@@ -603,6 +622,8 @@ export class RafikiWalletController {
 	@ApiQuery({ name: 'startDate', required: false, type: String })
 	@ApiQuery({ name: 'endDate', required: false, type: String })
 	@ApiQuery({ name: 'state', required: false, type: String })
+	@ApiQuery({ name: 'page', required: false, type: String })
+	@ApiQuery({ name: 'items', required: false, type: String })
 	@ApiOperation({ summary: 'Download all user transactions' })
 	@ApiBearerAuth('JWT')
 	@ApiOkResponse({ description: 'Transactions successfully downloaded.' })
@@ -616,7 +637,9 @@ export class RafikiWalletController {
 		@Query('type') type?: string,
 		@Query('startDate') startDate?: string,
 		@Query('endDate') endDate?: string,
-		@Query('state') state?: string
+		@Query('state') state?: string,
+		@Query('page') page?: string,
+		@Query('items') items?: string
 	) {
 		let token;
 		try {
@@ -650,6 +673,8 @@ export class RafikiWalletController {
 					startDate && endDate ? { start: startDate, end: endDate } : undefined,
 				state,
 				transactionType: undefined,
+				page,
+				items,
 			};
 
 			if (userType === 'WALLET') {
@@ -683,6 +708,8 @@ export class RafikiWalletController {
 	@ApiQuery({ name: 'endDate', required: false, type: String })
 	@ApiQuery({ name: 'state', required: false, type: String })
 	@ApiQuery({ name: 'providerIds', required: false, type: [String] })
+	@ApiQuery({ name: 'page', required: false, type: String })
+	@ApiQuery({ name: 'items', required: false, type: String })
 	@ApiOperation({ summary: 'Download all user provider transactions' })
 	@ApiBearerAuth('JWT')
 	@ApiOkResponse({ description: 'Transactions successfully downloaded.' })
@@ -697,7 +724,9 @@ export class RafikiWalletController {
 		@Query('startDate') startDate?: string,
 		@Query('endDate') endDate?: string,
 		@Query('state') state?: string,
-		@Query('providerIds') providerIds?: string | string[]
+		@Query('providerIds') providerIds?: string | string[],
+		@Query('page') page?: string,
+		@Query('items') items?: string
 	) {
 		let token;
 		try {
@@ -746,6 +775,8 @@ export class RafikiWalletController {
 				state,
 				providerIds: parsedProviderIds,
 				transactionType: undefined,
+				page,
+				items,
 			};
 
 			if (userType === 'WALLET') {
