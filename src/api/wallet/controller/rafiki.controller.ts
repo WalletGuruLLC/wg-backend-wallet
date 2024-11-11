@@ -314,6 +314,8 @@ export class RafikiWalletController {
 	@ApiQuery({ name: 'providerIds', required: false, type: [String] })
 	@ApiQuery({ name: 'activityId', required: false, type: String })
 	@ApiQuery({ name: 'walletAddress', required: false, type: String })
+	@ApiQuery({ name: 'page', required: false, type: String })
+	@ApiQuery({ name: 'items', required: false, type: String })
 	@ApiOperation({ summary: 'List all user transactions' })
 	@ApiBearerAuth('JWT')
 	@ApiOkResponse({ description: 'Transactions successfully retrieved.' })
@@ -330,7 +332,9 @@ export class RafikiWalletController {
 		@Query('state') state?: string,
 		@Query('providerIds') providerIds?: string | string[],
 		@Query('activityId') activityId?: string,
-		@Query('walletAddress') walletAddress?: string
+		@Query('walletAddress') walletAddress?: string,
+		@Query('page') page?: string,
+		@Query('items') items?: string
 	) {
 		let token;
 		try {
@@ -382,6 +386,8 @@ export class RafikiWalletController {
 				activityId,
 				transactionType: undefined,
 				walletAddress,
+				page,
+				items,
 			};
 			if (userType === 'WALLET') {
 				filters.transactionType = ['outgoing'];
@@ -403,10 +409,11 @@ export class RafikiWalletController {
 				filters,
 				userType
 			);
+
 			return res.status(HttpStatus.OK).send({
 				statusCode: HttpStatus.OK,
 				customCode: 'WGS0138',
-				data: { transactions: transactions },
+				data: { ...transactions },
 			});
 		} catch (error) {
 			Sentry.captureException(error);
