@@ -821,8 +821,8 @@ export class WalletService {
 		};
 	}
 
-	paginatedResults(page, itemsPerPage, results) {
-		const offset = (Number(page) - 1) * Number(itemsPerPage);
+	paginatedResults(page= 1, itemsPerPage = 10, results) {
+		const offset = (Number(page) - 1) * Number(itemsPerPage) 
 		const total = results.length;
 		const totalPages = Math.ceil(total / Number(itemsPerPage));
 		const paginatedTransactions = results.slice(
