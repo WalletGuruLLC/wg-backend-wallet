@@ -390,7 +390,7 @@ export class RafikiWalletController {
 				items,
 			};
 			if (userType === 'WALLET') {
-				filters.transactionType = ['outgoing'];
+				filters.transactionType = ['incoming', 'outgoing'];
 			} else if (userType === 'PROVIDER') {
 				filters.providerIds = parsedProviderIds;
 				filters.transactionType = ['incoming', 'outgoing'];
