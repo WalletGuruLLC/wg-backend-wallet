@@ -65,6 +65,8 @@ import { Model } from 'dynamoose/dist/Model';
 import { Transaction } from '../entities/transactions.entity';
 import { TransactionsSchema } from '../entities/transactions.schema';
 import { UserWsGateway } from '../service/websocket-users';
+import { getGrantForIncomingPayment } from 'src/utils/helpers/openPaymentMethods';
+import { toBase64 } from 'src/utils/helpers/openPaymentSignature';
 
 @ApiTags('wallet-rafiki')
 @Controller('api/v1/wallets-rafiki')
@@ -76,6 +78,7 @@ export class RafikiWalletController {
 	constructor(
 		private readonly walletService: WalletService,
 		private readonly verifyService: VerifyService,
+		private readonly paymentService: PaymentService,
 		private readonly authGateway: AuthGateway,
 		private readonly userWsGateway: UserWsGateway,
         private readonly paymentService: PaymentService
@@ -1371,6 +1374,78 @@ export class RafikiWalletController {
 		}
 	}
 
+	@Post('auth-payment')
+	@ApiBody({
+		schema: {
+			type: 'object',
+			properties: {
+				clientWalletAddress: { type: 'string', example: '0x123456789abcdef' },
+				walletId: { type: 'string', example: '0x123456789abcdef' },
+			},
+		},
+		description: 'auth open payment',
+	})
+	@ApiOperation({ summary: 'Open payment - auth payment' })
+	async postAuthPayment(
+		@Body('clientWalletAddress') clientWalletAddress: string,
+		@Body('walletId') walletId: string,
+		@Req() req,
+		@Res() res
+	) {
+		try {
+			console.log('entro');
+			// const walletBase64 = await toBase64(`-----BEGIN PRIVATE KEY-----
+			// 	MC4CAQAwBQYDK2VwBCIEIBMpCsvlIOjAuAry7zI7mAnZuldbgUri7LjY0WgdhkZG
+			// 	-----END PRIVATE KEY-----`);
+
+			const walletKey = await this.walletService.findWalletByUrl(
+				clientWalletAddress
+			);
+
+			const response = await getGrantForIncomingPayment(
+				clientWalletAddress,
+				req,
+				walletId,
+				'LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1DNENBUUF3QlFZREsyVndCQ0lFSUxwOXpCc2JCRFhzdVlIQVlmR1Y5ZkpKb1gxS3lwK3lZUWt6QTk5ZVc1UmwKLS0tLS1FTkQgUFJJVkFURSBLRVktLS0tLQ=='
+			);
+			return response;
+		} catch (error) {
+			console.log('error', error?.message);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0155',
+			});
+		}
+	}
+
+	@Post('incoming-payment')
+	@ApiBody({
+		schema: {
+			type: 'object',
+			properties: {
+				receiverWalletAddress: { type: 'string', example: '0x123456789abcdef' },
+			},
+		},
+		description: 'Incoming open payment',
+	})
+	@ApiOperation({ summary: 'Open payment - incoming payment' })
+	async incomingPayment(
+		@Body('receiverWalletAddress') receiverWalletAddress: string,
+		@Req() req,
+		@Res() res
+	) {
+		try {
+			await addApiSignatureHeader(req, req.body);
+			await addHostHeader(req, process.env.URL_BASE_OPEN_PAYMENTS);
+			return this.paymentService.createIncomingPayment(receiverWalletAddress);
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0155',
+			});
+		}
+	}
 	@Get(':id/asset')
 	@ApiOperation({ summary: 'Get wallet address by Rafiki ID' })
 	@ApiBearerAuth('JWT')
@@ -1414,6 +1489,112 @@ export class RafikiWalletController {
 		}
 	}
 
+	@Post('outgoing-payment-auth')
+	@ApiBody({
+		schema: {
+			type: 'object',
+			properties: {
+				senderWalletAddress: { type: 'string', example: '0x987654321fedcba' },
+				clientWalletAddress: { type: 'string', example: '0xa1b2c3d4e5f67890' },
+				debitAmount: { type: 'number', example: 100 },
+				receiveAmount: { type: 'number', example: 95 },
+			},
+		},
+		description: 'Outgoing payment authentication',
+	})
+	@ApiOperation({ summary: 'Open payment - outgoing payment' })
+	async outgoingPaymentAuth(
+		@Body('senderWalletAddress') senderWalletAddress: string,
+		@Body('clientWalletAddress') clientWalletAddress: string,
+		@Body('debitAmount') debitAmount: number,
+		@Body('receiveAmount') receiveAmount: number,
+		@Req() req,
+		@Res() res
+	) {
+		try {
+			await addApiSignatureHeader(req, req.body);
+			return this.paymentService.postOutgoingPaymentAuth(
+				senderWalletAddress,
+				clientWalletAddress,
+				debitAmount,
+				receiveAmount
+			);
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0155',
+			});
+		}
+	}
+
+	@Post('continue/:continueId')
+	@ApiBody({
+		schema: {
+			type: 'object',
+			properties: {
+				interact_ref: { type: 'string', example: 'ref12345' },
+			},
+		},
+		description: 'Continue open payment interaction',
+	})
+	@ApiOperation({ summary: 'Open payment - continue' })
+	async continueInteraction(
+		@Param('continueId') continueId: string,
+		@Body('interact_ref') interactRef: string,
+		@Req() req,
+		@Res() res
+	) {
+		try {
+			await addApiSignatureHeader(req, req.body);
+			return this.paymentService.continueInteraction(continueId, interactRef);
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0155',
+			});
+		}
+	}
+
+	@Post('outgoing-payment')
+	@ApiBody({
+		schema: {
+			type: 'object',
+			properties: {
+				senderWalletAddress: { type: 'string', example: '0x123456789abcdef' },
+				incomingPaymentUrl: {
+					type: 'string',
+					example: 'https://payment-url.com',
+				},
+				debitAmount: { type: 'number', example: 150 },
+			},
+		},
+		description: 'Create outgoing open payment',
+	})
+	@ApiOperation({ summary: 'Open payment - create outgoing payment' })
+	async outgoingPayment(
+		@Body('senderWalletAddress') senderWalletAddress: string,
+		@Body('incomingPaymentUrl') incomingPaymentUrl: string,
+		@Body('debitAmount') debitAmount: number,
+		@Req() req,
+		@Res() res
+	) {
+		try {
+			await addApiSignatureHeader(req, req.body);
+			return this.paymentService.createOutgoingPayment(
+				senderWalletAddress,
+				incomingPaymentUrl,
+				debitAmount
+			);
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0155',
+			});
+		}
+	}
 	@Post('create/incoming-payment')
 	@ApiOperation({ summary: 'Create an Incoming Payment' })
 	@ApiBearerAuth('JWT')
@@ -1501,12 +1682,30 @@ export class RafikiWalletController {
 			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-				customCode: 'WGE0165',
-				message: error.message,
+				customCode: 'WGE0155',
 			});
 		}
 	}
 
+	@Get('outgoing-payment/:outgoingPaymentId')
+	@ApiOperation({ summary: 'Open payment - get outgoing payment' })
+	async getOutgoingPayment(
+		@Param('outgoingPaymentId') outgoingPaymentId: string,
+		@Req() req,
+		@Res() res
+	) {
+		try {
+			await addHostHeader(req, process.env.URL_BASE_OPEN_PAYMENTS);
+			await addApiSignatureHeader(req, req.body);
+			return this.paymentService.getOutgoingPayment(outgoingPaymentId);
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0155',
+			});
+		}
+	}
 	@Post('action/outgoing-payment')
 	@ApiOperation({ summary: 'Execute an outgoing payment action' })
 	@ApiBearerAuth('JWT')

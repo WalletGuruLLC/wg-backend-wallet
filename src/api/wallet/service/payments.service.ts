@@ -10,6 +10,7 @@ import { SocketKey } from '../entities/socket.entity';
 import { SocketKeySchema } from '../entities/socket.schema';
 import { Rates } from '../entities/rates.entity';
 import { RatesSchema } from '../entities/rates.schema';
+import { generateBackendApiSignature } from 'src/utils/helpers/signatureHelper';
 
 @Injectable()
 export class PaymentService {
@@ -37,19 +38,32 @@ export class PaymentService {
 		);
 	}
 
-	async postAuthPayment(clientWalletAddress: string) {
+	async postAuthPayment(clientWalletAddress: string, body: any) {
 		try {
-			const response = await axios.post(`${this.baseUrl}:4006`, {
-				access_token: {
-					access: [
-						{
-							type: 'incoming-payment',
-							actions: ['create', 'read', 'list', 'complete'],
-						},
-					],
+			const formattedBody = { ...body };
+			if (body?.variables) {
+				formattedBody.variables = JSON.parse(body?.variables);
+			}
+			const signature = await generateBackendApiSignature(formattedBody);
+			const response = await axios.post(
+				`${this.baseUrl}:4006`,
+				{
+					access_token: {
+						access: [
+							{
+								type: 'incoming-payment',
+								actions: ['create', 'read', 'list', 'complete'],
+							},
+						],
+					},
+					client: clientWalletAddress,
 				},
-				client: clientWalletAddress,
-			});
+				{
+					headers: {
+						signature: signature,
+					},
+				}
+			);
 			console.log('First request completed:', response.data);
 			return response.data;
 		} catch (error) {
