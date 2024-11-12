@@ -105,12 +105,17 @@ export class WalletService {
 	}
 
 	async createIncoming(createIncomingUserDto: CreateIncomingUserDto) {
-		const createIncomingDtoConverted = {
-			IncomingPaymentId: createIncomingUserDto.incomingPaymentId,
-			ServiceProviderId: createIncomingUserDto.serviceProviderId,
-			UserId: createIncomingUserDto.userId,
-		};
-		return this.dbIncomingUser.create(createIncomingDtoConverted);
+		try {
+			const createIncomingDtoConverted = {
+				IncomingPaymentId: createIncomingUserDto.incomingPaymentId,
+				ServiceProviderId: createIncomingUserDto.serviceProviderId,
+				UserId: createIncomingUserDto.userId,
+			};
+			return this.dbIncomingUser.create(createIncomingDtoConverted);
+		} catch (error) {
+			Sentry.captureException(error);
+			console.log(`Failed incoming: ${error.message}`);
+		}
 	}
 
 	async createWebsocketLogs(
@@ -124,6 +129,7 @@ export class WalletService {
 			);
 			return this.dbInstanceSocketLogs.create(filteredData);
 		} catch (error) {
+			Sentry.captureException(error);
 			console.log(`Failed to log event: ${error.message}`);
 		}
 	}
@@ -542,6 +548,7 @@ export class WalletService {
 				jwk
 			);
 		} catch (error) {
+			Sentry.captureException(error);
 			if (error instanceof ApolloError) {
 				if (
 					error.message.includes(
@@ -664,6 +671,7 @@ export class WalletService {
 				jwk
 			);
 		} catch (error) {
+			Sentry.captureException(error);
 			if (error instanceof ApolloError) {
 				if (
 					error.message.includes(
@@ -1179,6 +1187,7 @@ export class WalletService {
 		try {
 			return await this.graphqlService.createReceiver(input);
 		} catch (error) {
+			Sentry.captureException(error);
 			throw new Error(`Error creating receiver: ${error.message}`);
 		}
 	}
@@ -1464,6 +1473,7 @@ export class WalletService {
 		try {
 			return await this.graphqlService.createDepositOutgoingMutation(input);
 		} catch (error) {
+			Sentry.captureException(error);
 			throw new Error(
 				`Error creating deposit outoing mutation: ${error.message}`
 			);
@@ -1742,6 +1752,7 @@ export class WalletService {
 			const result = await docClient.query(params).promise();
 			return convertToCamelCase(result.Items?.[0]);
 		} catch (error) {
+			Sentry.captureException(error);
 			return {};
 		}
 	}
@@ -1765,6 +1776,7 @@ export class WalletService {
 		try {
 			return await this.graphqlService.createReceiver(input);
 		} catch (error) {
+			Sentry.captureException(error);
 			throw new Error(`Error creating receiver: ${error.message}`);
 		}
 	}
@@ -2273,6 +2285,7 @@ export class WalletService {
 			await this.sqsService.sendMessage(process.env.SQS_QUEUE_URL, sqsMsg);
 			return;
 		} catch (error) {
+			Sentry.captureException(error);
 			throw new Error(`Error creating outgoing payment: ${error.message}`);
 		}
 	}
@@ -2306,6 +2319,7 @@ export class WalletService {
 				throw new Error(`Error fetching wallet: ${error.message}`);
 			}
 		} catch (error) {
+			Sentry.captureException(error);
 			throw new Error(
 				`Error creating deposit outoing mutation: ${error.message}`
 			);
@@ -2575,6 +2589,7 @@ export class WalletService {
 			};
 			return await this.dbProviderRevenues.create(createProviderRevenueDTO);
 		} catch (error) {
+			Sentry.captureException(error);
 			return {
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
 				customCode: 'WGE0229',
