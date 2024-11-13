@@ -105,12 +105,17 @@ export class WalletService {
 	}
 
 	async createIncoming(createIncomingUserDto: CreateIncomingUserDto) {
-		const createIncomingDtoConverted = {
-			IncomingPaymentId: createIncomingUserDto.incomingPaymentId,
-			ServiceProviderId: createIncomingUserDto.serviceProviderId,
-			UserId: createIncomingUserDto.userId,
-		};
-		return this.dbIncomingUser.create(createIncomingDtoConverted);
+		try {
+			const createIncomingDtoConverted = {
+				IncomingPaymentId: createIncomingUserDto.incomingPaymentId,
+				ServiceProviderId: createIncomingUserDto.serviceProviderId,
+				UserId: createIncomingUserDto.userId,
+			};
+			return this.dbIncomingUser.create(createIncomingDtoConverted);
+		} catch (error) {
+			Sentry.captureException(error);
+			console.log(`Failed incoming: ${error.message}`);
+		}
 	}
 
 	async createWebsocketLogs(
@@ -124,6 +129,7 @@ export class WalletService {
 			);
 			return this.dbInstanceSocketLogs.create(filteredData);
 		} catch (error) {
+			Sentry.captureException(error);
 			console.log(`Failed to log event: ${error.message}`);
 		}
 	}
@@ -542,6 +548,7 @@ export class WalletService {
 				jwk
 			);
 		} catch (error) {
+			Sentry.captureException(error);
 			if (error instanceof ApolloError) {
 				if (
 					error.message.includes(
@@ -664,6 +671,7 @@ export class WalletService {
 				jwk
 			);
 		} catch (error) {
+			Sentry.captureException(error);
 			if (error instanceof ApolloError) {
 				if (
 					error.message.includes(
@@ -821,6 +829,23 @@ export class WalletService {
 		};
 	}
 
+	paginatedResults(page, itemsPerPage, results) {
+		const offset = (page - 1) * itemsPerPage;
+		const total = results.length;
+		const totalPages = Math.ceil(total / itemsPerPage);
+		const paginatedTransactions = results.slice(
+			offset,
+			offset + Number(itemsPerPage)
+		);
+
+		return convertToCamelCase({
+			transactions: paginatedTransactions,
+			currentPage: page,
+			total,
+			totalPages,
+		});
+	}
+
 	async listTransactions(
 		token: string,
 		search: string,
@@ -832,6 +857,8 @@ export class WalletService {
 			activityId?: string;
 			transactionType?: string[];
 			walletAddress?: string;
+			page?: string;
+			items?: string;
 		},
 		type?: string
 	) {
@@ -841,6 +868,9 @@ export class WalletService {
 		const walletDb = await this.getUserByToken(token);
 		const WalletAddress = walletDb?.WalletAddress;
 		const docClient = new DocumentClient();
+
+		const pagedParsed = Number(filters?.page) || 1;
+		const itemsParsed = Number(filters?.items) || 10;
 		const filterExpression =
 			type == 'PLATFORM'
 				? '#Type = :TypeIncoming OR #Type = :TypeOutgoing'
@@ -990,13 +1020,21 @@ export class WalletService {
 			let sortedTransactions;
 
 			if (isIncoming && isOutgoing) {
-				sortedTransactions = convertToCamelCase(filteredTransactions);
+				sortedTransactions = this.paginatedResults(
+					pagedParsed,
+					itemsParsed,
+					convertToCamelCase(filteredTransactions)
+				);
 			} else if (isIncoming) {
-				sortedTransactions = convertToCamelCase(
+				sortedTransactions = this.paginatedResults(
+					pagedParsed,
+					itemsParsed,
 					filteredTransactions.filter(t => t?.Type === 'IncomingPayment')
 				);
 			} else if (isOutgoing) {
-				sortedTransactions = convertToCamelCase(
+				sortedTransactions = this.paginatedResults(
+					pagedParsed,
+					itemsParsed,
 					filteredTransactions.filter(t => t?.Type === 'OutgoingPayment')
 				);
 			}
@@ -1149,6 +1187,7 @@ export class WalletService {
 		try {
 			return await this.graphqlService.createReceiver(input);
 		} catch (error) {
+			Sentry.captureException(error);
 			throw new Error(`Error creating receiver: ${error.message}`);
 		}
 	}
@@ -1434,6 +1473,7 @@ export class WalletService {
 		try {
 			return await this.graphqlService.createDepositOutgoingMutation(input);
 		} catch (error) {
+			Sentry.captureException(error);
 			throw new Error(
 				`Error creating deposit outoing mutation: ${error.message}`
 			);
@@ -1712,6 +1752,7 @@ export class WalletService {
 			const result = await docClient.query(params).promise();
 			return convertToCamelCase(result.Items?.[0]);
 		} catch (error) {
+			Sentry.captureException(error);
 			return {};
 		}
 	}
@@ -1735,6 +1776,7 @@ export class WalletService {
 		try {
 			return await this.graphqlService.createReceiver(input);
 		} catch (error) {
+			Sentry.captureException(error);
 			throw new Error(`Error creating receiver: ${error.message}`);
 		}
 	}
@@ -2243,6 +2285,7 @@ export class WalletService {
 			await this.sqsService.sendMessage(process.env.SQS_QUEUE_URL, sqsMsg);
 			return;
 		} catch (error) {
+			Sentry.captureException(error);
 			throw new Error(`Error creating outgoing payment: ${error.message}`);
 		}
 	}
@@ -2276,6 +2319,7 @@ export class WalletService {
 				throw new Error(`Error fetching wallet: ${error.message}`);
 			}
 		} catch (error) {
+			Sentry.captureException(error);
 			throw new Error(
 				`Error creating deposit outoing mutation: ${error.message}`
 			);
@@ -2545,6 +2589,7 @@ export class WalletService {
 			};
 			return await this.dbProviderRevenues.create(createProviderRevenueDTO);
 		} catch (error) {
+			Sentry.captureException(error);
 			return {
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
 				customCode: 'WGE0229',
