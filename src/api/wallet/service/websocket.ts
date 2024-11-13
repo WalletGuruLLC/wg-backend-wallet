@@ -60,6 +60,30 @@ export class AuthGateway
 		}
 	}
 
+	async createOrUpdateClient(client: Socket, sessionIdData?: string) {
+		const clientId = client.id;
+
+		const existingClientIndex = this?.wsClients?.findIndex(
+			clientObj => clientObj?.clientId === clientId
+		);
+
+		if (existingClientIndex !== -1) {
+			const existingClient = this?.wsClients?.[existingClientIndex];
+			if (!existingClient?.sessionId || existingClient?.sessionId === '') {
+				this.wsClients[existingClientIndex] = {
+					...existingClient,
+					sessionId: sessionIdData || '',
+				};
+			}
+		} else {
+			this.wsClients.push({
+				clientId: clientId,
+				client: client,
+				sessionId: sessionIdData || '',
+			});
+		}
+	}
+
 	async updateClientSessionId(clientsArray, clientId, sessionIdData) {
 		return clientsArray.map(clientObj => {
 			if (
@@ -163,9 +187,8 @@ export class AuthGateway
 		const nonceData =
 			parsedData['x-nonce']?.toString() || headers['nonce']?.toString();
 		const sessionIdData = parsedData.sessionId?.toString();
-
-		await this.updateClientSessionId(this.wsClients, client?.id, sessionIdData);
-
+		await this.createOrUpdateClient(client, sessionIdData);
+		console.log('wsClients link', this.wsClients);
 		if (!publicKeyData) {
 			this.sendDataClientId('error', client.id, {
 				message: 'Public key missing!',
