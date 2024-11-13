@@ -2460,15 +2460,21 @@ export class WalletService {
 		const users = await docClient.scan(scanParams).promise();
 		const usersToUpdate = users?.Items ?? [];
 
-		for (let i = 0; i < usersToUpdate?.length; i++) {
-			const user = usersToUpdate[i];
+		if (usersToUpdate.length === 0) {
+			return {
+				statusCode: HttpStatus.NOT_FOUND,
+				message: 'No users found with the specified sessionId.',
+			};
+		}
+
+		for (const user of usersToUpdate) {
 			const linkedProviders = user?.LinkedServiceProviders ?? [];
 
 			const updatedProviders = linkedProviders.filter(
 				provider => provider?.sessionId !== sessionId
 			);
 
-			if (updatedProviders?.length !== linkedProviders?.length) {
+			if (updatedProviders.length !== linkedProviders.length) {
 				const updateParams = {
 					TableName: 'Users',
 					Key: { Id: user?.Id },
