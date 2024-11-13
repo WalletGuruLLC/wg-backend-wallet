@@ -821,6 +821,23 @@ export class WalletService {
 		};
 	}
 
+	paginatedResults(page, itemsPerPage, results) {
+		const offset = (page - 1) * itemsPerPage;
+		const total = results.length;
+		const totalPages = Math.ceil(total / itemsPerPage);
+		const paginatedTransactions = results.slice(
+			offset,
+			offset + Number(itemsPerPage)
+		);
+
+		return convertToCamelCase({
+			transactions: paginatedTransactions,
+			currentPage: page,
+			total,
+			totalPages,
+		});
+	}
+
 	async listTransactions(
 		token: string,
 		search: string,
@@ -832,6 +849,8 @@ export class WalletService {
 			activityId?: string;
 			transactionType?: string[];
 			walletAddress?: string;
+			page?: string;
+			items?: string;
 		},
 		type?: string
 	) {
@@ -841,6 +860,9 @@ export class WalletService {
 		const walletDb = await this.getUserByToken(token);
 		const WalletAddress = walletDb?.WalletAddress;
 		const docClient = new DocumentClient();
+
+		const pagedParsed = Number(filters?.page) || 1;
+		const itemsParsed = Number(filters?.items) || 10;
 		const filterExpression =
 			type == 'PLATFORM'
 				? '#Type = :TypeIncoming OR #Type = :TypeOutgoing'
@@ -990,13 +1012,21 @@ export class WalletService {
 			let sortedTransactions;
 
 			if (isIncoming && isOutgoing) {
-				sortedTransactions = convertToCamelCase(filteredTransactions);
+				sortedTransactions = this.paginatedResults(
+					pagedParsed,
+					itemsParsed,
+					convertToCamelCase(filteredTransactions)
+				);
 			} else if (isIncoming) {
-				sortedTransactions = convertToCamelCase(
+				sortedTransactions = this.paginatedResults(
+					pagedParsed,
+					itemsParsed,
 					filteredTransactions.filter(t => t?.Type === 'IncomingPayment')
 				);
 			} else if (isOutgoing) {
-				sortedTransactions = convertToCamelCase(
+				sortedTransactions = this.paginatedResults(
+					pagedParsed,
+					itemsParsed,
 					filteredTransactions.filter(t => t?.Type === 'OutgoingPayment')
 				);
 			}
