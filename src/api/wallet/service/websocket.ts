@@ -37,6 +37,16 @@ export class AuthGateway
 		}
 	}
 
+	sendDataSessionId(action: string, sessionId: string, data: any) {
+		for (const c of this.wsClients) {
+			if (c?.sessionId) {
+				if (c?.sessionId === sessionId) {
+					c.client.emit(action, data);
+				}
+			}
+		}
+	}
+
 	async logToDatabase(eventType: string, data: any) {
 		const params = {
 			EventType: eventType,
@@ -50,6 +60,21 @@ export class AuthGateway
 		}
 	}
 
+	async updateClientSessionId(clientsArray, clientId, sessionIdData) {
+		return clientsArray.map(clientObj => {
+			if (
+				clientObj?.clientId === clientId &&
+				(!clientObj?.sessionId || clientObj?.sessionId === '')
+			) {
+				return {
+					...clientObj,
+					sessionId: sessionIdData || '',
+				};
+			}
+			return clientObj;
+		});
+	}
+
 	async handleConnection(client: Socket, ...args: any[]) {
 		const timestamp = Math.floor(new Date().getTime() / 1000);
 		const headers = client.handshake.headers;
@@ -58,7 +83,6 @@ export class AuthGateway
 			body['x-public-key']?.toString() || headers['public-key']?.toString();
 		const nonceData =
 			body['x-nonce']?.toString() || headers['nonce']?.toString();
-		const sessionIdData = body?.sessionId?.toString();
 
 		if (!publicKeyData) {
 			client.emit('error', {
@@ -94,7 +118,6 @@ export class AuthGateway
 			this.wsClients.push({
 				clientId: client.id,
 				client: client,
-				sessionId: sessionIdData ?? '',
 				publicKey: publicKeyData,
 			});
 			await this.logToDatabase('connectionSuccess', {
@@ -140,6 +163,8 @@ export class AuthGateway
 		const nonceData =
 			parsedData['x-nonce']?.toString() || headers['nonce']?.toString();
 		const sessionIdData = parsedData.sessionId?.toString();
+
+		await this.updateClientSessionId(this.wsClients, client?.id, sessionIdData);
 
 		if (!publicKeyData) {
 			this.sendDataClientId('error', client.id, {
