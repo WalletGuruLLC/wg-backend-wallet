@@ -513,12 +513,15 @@ export class RafikiWalletController {
 				});
 			}
 
-			const transactions = await this.walletService.listTransactions(
+			const paginatedTransactions = await this.walletService.listTransactions(
 				token,
 				search,
 				filters
 			);
-			await this.walletService.generateCsv(res, transactions);
+			await this.walletService.generateCsv(
+				res,
+				paginatedTransactions?.transactions
+			);
 		} catch (error) {
 			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
@@ -601,12 +604,15 @@ export class RafikiWalletController {
 				});
 			}
 
-			const transactions = await this.walletService.listTransactions(
+			const paginatedTransactions = await this.walletService.listTransactions(
 				token,
 				search,
 				filters
 			);
-			await this.walletService.generateCsv(res, transactions);
+			await this.walletService.generateCsv(
+				res,
+				paginatedTransactions?.transactions
+			);
 		} catch (error) {
 			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
@@ -686,12 +692,15 @@ export class RafikiWalletController {
 				});
 			}
 
-			const transactions = await this.walletService.listTransactions(
+			const paginatedTransactions = await this.walletService.listTransactions(
 				token,
 				search,
 				filters
 			);
-			await this.walletService.generateCsv(res, transactions);
+			await this.walletService.generateCsv(
+				res,
+				paginatedTransactions?.transactions
+			);
 		} catch (error) {
 			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
@@ -788,12 +797,15 @@ export class RafikiWalletController {
 				});
 			}
 
-			const transactions = await this.walletService.listTransactions(
+			const paginatedTransactions = await this.walletService.listTransactions(
 				token,
 				search,
 				filters
 			);
-			await this.walletService.generateCsv(res, transactions);
+			await this.walletService.generateCsv(
+				res,
+				paginatedTransactions?.transactions
+			);
 		} catch (error) {
 			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
@@ -1009,7 +1021,7 @@ export class RafikiWalletController {
 				});
 			}
 
-			this.authGateway.server.emit('hc', {
+			this.authGateway.sendDataSessionId('hc', input?.sessionId, {
 				message: 'Account linked',
 				statusCode: 'WGS0051',
 				sessionId: input?.sessionId,

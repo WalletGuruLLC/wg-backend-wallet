@@ -41,14 +41,19 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 		};
 
 		try {
-			const userWallet = await this.walletService.getWalletByUser(userId);
-			if (eventWebHookDTO?.data?.metadata?.type === 'PROVIDER') {
+			const userWalletValue = await this.walletService.getWalletByUser(userId);
+			let providerWallet;
+			if (!userWalletValue?.id) {
+				providerWallet = await this.walletService.getWalletByProviderId(userId);
+			}
+			const userWallet = userWalletValue?.id ? userWalletValue : providerWallet;
+			if (eventWebHookDTO?.data?.metadata?.type === 'PROVIDER' && userId) {
 				const debits =
-					(userWallet.pendingDebits || 0) +
+					(userWallet?.pendingDebits || 0) +
 					parseInt(eventWebHookDTO.data.incomingAmount.value);
 				const userWalletParams = {
 					Key: {
-						Id: userWallet.id,
+						Id: userWallet?.id,
 					},
 					TableName: 'Wallets',
 					UpdateExpression: 'SET PendingDebits = :pendingDebits',
@@ -66,7 +71,7 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 					postedDebit: sender.Attributes?.PostedDebits,
 				};
 
-				this.userWsGateway.sendBalance(userWallet.userId, balance);
+				this.userWsGateway.sendBalance(userWallet?.userId, balance);
 			}
 
 			const recieverWallet = await this.walletService.getWalletByRafikyId(
