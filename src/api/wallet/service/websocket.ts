@@ -174,6 +174,12 @@ export class AuthGateway
 			Action: 'disconnect',
 			SubscribeMessage: 'disconnect',
 		});
+		for (let i = 0; i < this.wsClients.length; i++) {
+			if (this.wsClients[i].client === client) {
+				this.wsClients.splice(i, 1);
+				break;
+			}
+		}
 		this.logger.log(`Client disconnected: ${client.id}`);
 	}
 
