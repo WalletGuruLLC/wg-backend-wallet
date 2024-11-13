@@ -18,6 +18,7 @@ export class AuthGateway
 {
 	@WebSocketServer() server: Server;
 	private logger: Logger = new Logger('MessageGateway');
+	wsClients = [];
 
 	constructor(
 		@Inject(forwardRef(() => WalletService))
@@ -26,6 +27,14 @@ export class AuthGateway
 
 	afterInit(server: any) {
 		console.log('WebSocket server initialized');
+	}
+
+	sendDataClientId(action: string, clientId: string, data: any) {
+		for (const c of this.wsClients) {
+			if (c.clientId === clientId) {
+				c.client.emit(action, data);
+			}
+		}
 	}
 
 	async logToDatabase(eventType: string, data: any) {
@@ -49,6 +58,7 @@ export class AuthGateway
 			body['x-public-key']?.toString() || headers['public-key']?.toString();
 		const nonceData =
 			body['x-nonce']?.toString() || headers['nonce']?.toString();
+		const sessionIdData = body?.sessionId?.toString();
 
 		if (!publicKeyData) {
 			client.emit('error', {
@@ -80,6 +90,12 @@ export class AuthGateway
 				message: 'You are authenticated!',
 				statusCode: 'WGS0050',
 				sessionId: '',
+			});
+			this.wsClients.push({
+				clientId: client.id,
+				client: client,
+				sessionId: sessionIdData ?? '',
+				publicKey: publicKeyData,
 			});
 			await this.logToDatabase('connectionSuccess', {
 				ClientId: client.id,
@@ -126,7 +142,7 @@ export class AuthGateway
 		const sessionIdData = parsedData.sessionId?.toString();
 
 		if (!publicKeyData) {
-			client.emit('error', {
+			this.sendDataClientId('error', client.id, {
 				message: 'Public key missing!',
 				statusCode: 'WGE0151',
 				sessionId: '',
@@ -144,7 +160,7 @@ export class AuthGateway
 		}
 
 		if (!nonceData) {
-			client.emit('error', {
+			this.sendDataClientId('error', client.id, {
 				message: 'You need send auth',
 				statusCode: 'WGE0151',
 				sessionId: '',
@@ -161,7 +177,7 @@ export class AuthGateway
 			this.logger.error(`Client ${client.id} failed to authenticate.`);
 		}
 		if (!sessionIdData) {
-			client.emit('error', {
+			this.sendDataClientId('error', client.id, {
 				message: 'You need send session id',
 				statusCode: 'WGE0152',
 				sessionId: '',
@@ -200,7 +216,7 @@ export class AuthGateway
 		if (validTokenRange.includes(nonceData)) {
 			this.logger.log(`Client ${client.id} authenticated successfully.`);
 			// TODO: Guardar sessionId en la base de datos
-			client.emit('hc', {
+			this.sendDataClientId('hc', client.id, {
 				message: 'Ok',
 				statusCode: 'WGS0053',
 				sessionId: sessionIdData,
@@ -247,7 +263,7 @@ export class AuthGateway
 		const serviceProviderId = objectSecret?.ServiceProviderId;
 		const walletAddress = await this.authService.findWalletByUserId(wgUserId);
 		if (!publicKeyData) {
-			client.emit('error', {
+			this.sendDataClientId('error', client.id, {
 				message: 'Public key missing!',
 				statusCode: 'WGE0151',
 				sessionId: '',
@@ -265,7 +281,7 @@ export class AuthGateway
 		}
 
 		if (!nonceData) {
-			client.emit('error', {
+			this.sendDataClientId('error', client.id, {
 				message: 'You need send auth',
 				statusCode: 'WGE0151',
 				sessionId: '',
@@ -284,7 +300,7 @@ export class AuthGateway
 			);
 		}
 		if (!activityId) {
-			client.emit('error', {
+			this.sendDataClientId('error', client.id, {
 				message: 'You need send activity id',
 				statusCode: 'WGE0152',
 				sessionId: '',
@@ -331,7 +347,8 @@ export class AuthGateway
 					wgUserId,
 					walletAddress?.walletUrl,
 					activityId,
-					contentName
+					contentName,
+					client?.id
 				);
 				await this.logToDatabase('activityCharge', {
 					ClientId: client.id,
@@ -343,7 +360,7 @@ export class AuthGateway
 					PublicKey: publicKeyData,
 				});
 			} else if (action == 'stop' || action == 'pause' || action == 'play') {
-				client.emit('hc', {
+				this.sendDataClientId('hc', client.id, {
 					message: 'Ok',
 					statusCode: 'WGS0053',
 					activityId: activityId,
@@ -372,7 +389,6 @@ export class AuthGateway
 				PublicKey: publicKeyData,
 			});
 		}
-		// return { event: 'response', data: 'Stop processed.' };
 	}
 
 	@SubscribeMessage('unlink')
@@ -386,7 +402,7 @@ export class AuthGateway
 			parsedData['x-nonce']?.toString() || headers['nonce']?.toString();
 		const sessionIdData = parsedData.sessionId?.toString();
 		if (!publicKeyData) {
-			client.emit('error', {
+			this.sendDataClientId('error', client.id, {
 				message: 'Public key missing!',
 				statusCode: 'WGE0151',
 				sessionId: '',
@@ -404,7 +420,7 @@ export class AuthGateway
 		}
 
 		if (!nonceData) {
-			client.emit('error', {
+			this.sendDataClientId('error', client.id, {
 				message: 'You need send auth',
 				statusCode: 'WGE0151',
 				sessionId: '',
@@ -470,6 +486,7 @@ export class AuthGateway
 		client: Socket,
 		data: any
 	): Promise<any> {
+		console.log(this.wsClients);
 		const headers = client.handshake.headers;
 		const parsedData = data;
 		const publicKeyData =
@@ -479,7 +496,7 @@ export class AuthGateway
 			publicKeyData
 		);
 		if (paymentParameters) {
-			client.emit('hc', {
+			this.sendDataClientId('hc', client.id, {
 				message: 'Ok',
 				statusCode: 'WGS0053',
 				data: paymentParameters,
