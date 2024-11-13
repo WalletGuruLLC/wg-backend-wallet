@@ -26,7 +26,6 @@ import {
 
 import { WalletService } from '../service/wallet.service';
 import { VerifyService } from '../../../verify/verify.service';
-import { errorCodes, successCodes } from 'src/utils/constants';
 
 import * as Sentry from '@sentry/nestjs';
 import { MapOfStringToList } from 'aws-sdk/clients/apigateway';
@@ -42,6 +41,7 @@ import {
 	GeneralReceiverInputDTO,
 	LinkInputDTO,
 	ReceiverInputDTO,
+	UnLinkInputDTO,
 } from '../dto/payments-rafiki.dto';
 import { isValidStringLength } from 'src/utils/helpers/isValidStringLength';
 import { v4 as uuidv4 } from 'uuid';
@@ -55,6 +55,7 @@ import { Model } from 'dynamoose/dist/Model';
 import { Transaction } from '../entities/transactions.entity';
 import { TransactionsSchema } from '../entities/transactions.schema';
 import { UserWsGateway } from '../service/websocket-users';
+import { CreateProviderRevenue } from '../dto/provider-revenue.dto';
 
 @ApiTags('wallet-rafiki')
 @Controller('api/v1/wallets-rafiki')
@@ -312,6 +313,9 @@ export class RafikiWalletController {
 	@ApiQuery({ name: 'state', required: false, type: String })
 	@ApiQuery({ name: 'providerIds', required: false, type: [String] })
 	@ApiQuery({ name: 'activityId', required: false, type: String })
+	@ApiQuery({ name: 'walletAddress', required: false, type: String })
+	@ApiQuery({ name: 'page', required: false, type: String })
+	@ApiQuery({ name: 'items', required: false, type: String })
 	@ApiOperation({ summary: 'List all user transactions' })
 	@ApiBearerAuth('JWT')
 	@ApiOkResponse({ description: 'Transactions successfully retrieved.' })
@@ -327,7 +331,10 @@ export class RafikiWalletController {
 		@Query('endDate') endDate?: string,
 		@Query('state') state?: string,
 		@Query('providerIds') providerIds?: string | string[],
-		@Query('activityId') activityId?: string
+		@Query('activityId') activityId?: string,
+		@Query('walletAddress') walletAddress?: string,
+		@Query('page') page?: string,
+		@Query('items') items?: string
 	) {
 		let token;
 		try {
@@ -378,24 +385,132 @@ export class RafikiWalletController {
 				providerIds: parsedProviderIds,
 				activityId,
 				transactionType: undefined,
+				walletAddress,
+				page,
+				items,
 			};
-
 			if (userType === 'WALLET') {
-				filters.transactionType = ['outgoing'];
+				filters.transactionType = ['incoming', 'outgoing'];
 			} else if (userType === 'PROVIDER') {
 				filters.providerIds = parsedProviderIds;
 				filters.transactionType = ['incoming', 'outgoing'];
 			} else if (userType === 'PLATFORM') {
 				filters.transactionType = ['incoming', 'outgoing'];
 			} else {
-				throw new HttpException(
-					{
-						statusCode: HttpStatus.UNAUTHORIZED,
-						customCode: 'WGE0022',
-						message: 'User type not recognized',
+				return res.status(HttpStatus.UNAUTHORIZED).send({
+					statusCode: HttpStatus.UNAUTHORIZED,
+					customCode: 'WGE0022',
+				});
+			}
+
+			const transactions = await this.walletService.listTransactions(
+				token,
+				search,
+				filters,
+				userType
+			);
+
+			return res.status(HttpStatus.OK).send({
+				statusCode: HttpStatus.OK,
+				customCode: 'WGS0138',
+				data: { ...transactions },
+			});
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0137',
+			});
+		}
+	}
+
+	@Get('download-transactions-provider')
+	@ApiQuery({ name: 'search', required: false, type: String })
+	@ApiQuery({ name: 'type', required: false, type: String })
+	@ApiQuery({ name: 'startDate', required: false, type: String })
+	@ApiQuery({ name: 'endDate', required: false, type: String })
+	@ApiQuery({ name: 'state', required: false, type: String })
+	@ApiQuery({ name: 'providerIds', required: false, type: [String] })
+	@ApiQuery({ name: 'page', required: false, type: String })
+	@ApiQuery({ name: 'items', required: false, type: String })
+	@ApiOperation({ summary: 'Download all provider transactions' })
+	@ApiBearerAuth('JWT')
+	@ApiOkResponse({ description: 'Transactions successfully downloaded.' })
+	@ApiResponse({ status: 206, description: 'Incomplete parameters.' })
+	@ApiResponse({ status: 401, description: 'Unauthorized access.' })
+	@ApiResponse({ status: 500, description: 'Server error.' })
+	async donwloadProvider(
+		@Headers() headers: Record<string, string>,
+		@Res() res,
+		@Query('search') search?: string,
+		@Query('type') type?: string,
+		@Query('startDate') startDate?: string,
+		@Query('endDate') endDate?: string,
+		@Query('state') state?: string,
+		@Query('providerIds') providerIds?: string | string[],
+		@Query('page') page?: string,
+		@Query('items') items?: string
+	) {
+		let token;
+		try {
+			token = headers.authorization ?? '';
+			const instanceVerifier = await this.verifyService.getVerifiedFactory();
+			await instanceVerifier.verify(token.toString().split(' ')[1]);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new HttpException(
+				{
+					statusCode: HttpStatus.UNAUTHORIZED,
+					customCode: 'WGE0021',
+				},
+				HttpStatus.UNAUTHORIZED
+			);
+		}
+
+		try {
+			let userInfo = await axios.get(
+				this.AUTH_MICRO_URL + '/api/v1/users/current-user',
+				{
+					headers: {
+						Authorization: token,
 					},
-					HttpStatus.UNAUTHORIZED
-				);
+				}
+			);
+			userInfo = userInfo.data;
+			const userType = userInfo?.data?.type;
+
+			let parsedProviderIds: string[] = [];
+			if (typeof providerIds === 'string') {
+				try {
+					parsedProviderIds = JSON.parse(providerIds);
+					if (!Array.isArray(parsedProviderIds)) {
+						parsedProviderIds = providerIds?.split(',');
+					}
+				} catch {
+					parsedProviderIds = providerIds?.split(',');
+				}
+			} else if (Array.isArray(providerIds)) {
+				parsedProviderIds = providerIds;
+			}
+
+			const filters = {
+				type,
+				dateRange:
+					startDate && endDate ? { start: startDate, end: endDate } : undefined,
+				state,
+				providerIds: parsedProviderIds,
+				transactionType: undefined,
+				page,
+				items,
+			};
+
+			if (userType === 'PROVIDER') {
+				filters.transactionType = ['incoming', 'outgoing'];
+			} else {
+				return res.status(HttpStatus.UNAUTHORIZED).send({
+					statusCode: HttpStatus.UNAUTHORIZED,
+					customCode: 'WGE0022',
+				});
 			}
 
 			const transactions = await this.walletService.listTransactions(
@@ -403,17 +518,287 @@ export class RafikiWalletController {
 				search,
 				filters
 			);
-
-			return res.status(HttpStatus.OK).send({
-				statusCode: HttpStatus.OK,
-				customCode: 'WGS0138',
-				data: { transactions: transactions },
-			});
+			await this.walletService.generateCsv(res, transactions);
 		} catch (error) {
 			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-				customCode: 'WGE0137',
+				customCode: 'WGE0227',
+			});
+		}
+	}
+
+	@Get('download-transactions-activity')
+	@ApiQuery({ name: 'search', required: false, type: String })
+	@ApiQuery({ name: 'type', required: false, type: String })
+	@ApiQuery({ name: 'startDate', required: false, type: String })
+	@ApiQuery({ name: 'endDate', required: false, type: String })
+	@ApiQuery({ name: 'state', required: false, type: String })
+	@ApiQuery({ name: 'activityId', required: false, type: String })
+	@ApiQuery({ name: 'page', required: false, type: String })
+	@ApiQuery({ name: 'items', required: false, type: String })
+	@ApiOperation({ summary: 'Download all transactions by activityId' })
+	@ApiBearerAuth('JWT')
+	@ApiOkResponse({ description: 'Transactions successfully downloaded.' })
+	@ApiResponse({ status: 206, description: 'Incomplete parameters.' })
+	@ApiResponse({ status: 401, description: 'Unauthorized access.' })
+	@ApiResponse({ status: 500, description: 'Server error.' })
+	async donwloadTransactionActivity(
+		@Headers() headers: Record<string, string>,
+		@Res() res,
+		@Query('search') search?: string,
+		@Query('type') type?: string,
+		@Query('startDate') startDate?: string,
+		@Query('endDate') endDate?: string,
+		@Query('state') state?: string,
+		@Query('activityId') activityId?: string,
+		@Query('page') page?: string,
+		@Query('items') items?: string
+	) {
+		let token;
+		try {
+			token = headers.authorization ?? '';
+			const instanceVerifier = await this.verifyService.getVerifiedFactory();
+			await instanceVerifier.verify(token.toString().split(' ')[1]);
+		} catch (error) {
+			Sentry.captureException(error);
+
+			return res.status(HttpStatus.UNAUTHORIZED).send({
+				statusCode: HttpStatus.UNAUTHORIZED,
+				customCode: 'WGE0022',
+			});
+		}
+
+		try {
+			let userInfo = await axios.get(
+				this.AUTH_MICRO_URL + '/api/v1/users/current-user',
+				{
+					headers: {
+						Authorization: token,
+					},
+				}
+			);
+			userInfo = userInfo.data;
+			const userType = userInfo?.data?.type;
+
+			const filters = {
+				type,
+				dateRange:
+					startDate && endDate ? { start: startDate, end: endDate } : undefined,
+				state,
+				transactionType: undefined,
+				activityId,
+				page,
+				items,
+			};
+
+			if (userType === 'PLATFORM') {
+				filters.transactionType = ['incoming', 'outgoing'];
+			} else {
+				return res.status(HttpStatus.UNAUTHORIZED).send({
+					statusCode: HttpStatus.UNAUTHORIZED,
+					customCode: 'WGE0022',
+				});
+			}
+
+			const transactions = await this.walletService.listTransactions(
+				token,
+				search,
+				filters
+			);
+			await this.walletService.generateCsv(res, transactions);
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0227',
+			});
+		}
+	}
+
+	@Get('download-transactions-user')
+	@ApiQuery({ name: 'search', required: false, type: String })
+	@ApiQuery({ name: 'type', required: false, type: String })
+	@ApiQuery({ name: 'startDate', required: false, type: String })
+	@ApiQuery({ name: 'endDate', required: false, type: String })
+	@ApiQuery({ name: 'state', required: false, type: String })
+	@ApiQuery({ name: 'page', required: false, type: String })
+	@ApiQuery({ name: 'items', required: false, type: String })
+	@ApiOperation({ summary: 'Download all user transactions' })
+	@ApiBearerAuth('JWT')
+	@ApiOkResponse({ description: 'Transactions successfully downloaded.' })
+	@ApiResponse({ status: 206, description: 'Incomplete parameters.' })
+	@ApiResponse({ status: 401, description: 'Unauthorized access.' })
+	@ApiResponse({ status: 500, description: 'Server error.' })
+	async downloadUser(
+		@Headers() headers: Record<string, string>,
+		@Res() res,
+		@Query('search') search?: string,
+		@Query('type') type?: string,
+		@Query('startDate') startDate?: string,
+		@Query('endDate') endDate?: string,
+		@Query('state') state?: string,
+		@Query('page') page?: string,
+		@Query('items') items?: string
+	) {
+		let token;
+		try {
+			token = headers.authorization ?? '';
+			const instanceVerifier = await this.verifyService.getVerifiedFactory();
+			await instanceVerifier.verify(token.toString().split(' ')[1]);
+		} catch (error) {
+			Sentry.captureException(error);
+
+			return res.status(HttpStatus.UNAUTHORIZED).send({
+				statusCode: HttpStatus.UNAUTHORIZED,
+				customCode: 'WGE0022',
+			});
+		}
+
+		try {
+			let userInfo = await axios.get(
+				this.AUTH_MICRO_URL + '/api/v1/users/current-user',
+				{
+					headers: {
+						Authorization: token,
+					},
+				}
+			);
+			userInfo = userInfo.data;
+			const userType = userInfo?.data?.type;
+
+			const filters = {
+				type,
+				dateRange:
+					startDate && endDate ? { start: startDate, end: endDate } : undefined,
+				state,
+				transactionType: undefined,
+				page,
+				items,
+			};
+
+			if (userType === 'WALLET') {
+				filters.transactionType = ['incoming', 'outgoing'];
+			} else {
+				return res.status(HttpStatus.UNAUTHORIZED).send({
+					statusCode: HttpStatus.UNAUTHORIZED,
+					customCode: 'WGE0022',
+				});
+			}
+
+			const transactions = await this.walletService.listTransactions(
+				token,
+				search,
+				filters
+			);
+			await this.walletService.generateCsv(res, transactions);
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0227',
+			});
+		}
+	}
+
+	@Get('download-transactions-user-provider')
+	@ApiQuery({ name: 'search', required: false, type: String })
+	@ApiQuery({ name: 'type', required: false, type: String })
+	@ApiQuery({ name: 'startDate', required: false, type: String })
+	@ApiQuery({ name: 'endDate', required: false, type: String })
+	@ApiQuery({ name: 'state', required: false, type: String })
+	@ApiQuery({ name: 'providerIds', required: false, type: [String] })
+	@ApiQuery({ name: 'page', required: false, type: String })
+	@ApiQuery({ name: 'items', required: false, type: String })
+	@ApiOperation({ summary: 'Download all user provider transactions' })
+	@ApiBearerAuth('JWT')
+	@ApiOkResponse({ description: 'Transactions successfully downloaded.' })
+	@ApiResponse({ status: 206, description: 'Incomplete parameters.' })
+	@ApiResponse({ status: 401, description: 'Unauthorized access.' })
+	@ApiResponse({ status: 500, description: 'Server error.' })
+	async downloadUserProvider(
+		@Headers() headers: Record<string, string>,
+		@Res() res,
+		@Query('search') search?: string,
+		@Query('type') type?: string,
+		@Query('startDate') startDate?: string,
+		@Query('endDate') endDate?: string,
+		@Query('state') state?: string,
+		@Query('providerIds') providerIds?: string | string[],
+		@Query('page') page?: string,
+		@Query('items') items?: string
+	) {
+		let token;
+		try {
+			token = headers.authorization ?? '';
+			const instanceVerifier = await this.verifyService.getVerifiedFactory();
+			await instanceVerifier.verify(token.toString().split(' ')[1]);
+		} catch (error) {
+			Sentry.captureException(error);
+
+			return res.status(HttpStatus.UNAUTHORIZED).send({
+				statusCode: HttpStatus.UNAUTHORIZED,
+				customCode: 'WGE0022',
+			});
+		}
+
+		try {
+			let userInfo = await axios.get(
+				this.AUTH_MICRO_URL + '/api/v1/users/current-user',
+				{
+					headers: {
+						Authorization: token,
+					},
+				}
+			);
+			userInfo = userInfo.data;
+			const userType = userInfo?.data?.type;
+
+			let parsedProviderIds: string[] = [];
+			if (typeof providerIds === 'string') {
+				try {
+					parsedProviderIds = JSON.parse(providerIds);
+					if (!Array.isArray(parsedProviderIds)) {
+						parsedProviderIds = providerIds?.split(',');
+					}
+				} catch {
+					parsedProviderIds = providerIds?.split(',');
+				}
+			} else if (Array.isArray(providerIds)) {
+				parsedProviderIds = providerIds;
+			}
+
+			const filters = {
+				type,
+				dateRange:
+					startDate && endDate ? { start: startDate, end: endDate } : undefined,
+				state,
+				providerIds: parsedProviderIds,
+				transactionType: undefined,
+				page,
+				items,
+			};
+
+			if (userType === 'WALLET') {
+				filters.transactionType = ['incoming', 'outgoing'];
+			} else {
+				return res.status(HttpStatus.UNAUTHORIZED).send({
+					statusCode: HttpStatus.UNAUTHORIZED,
+					customCode: 'WGE0022',
+				});
+			}
+
+			const transactions = await this.walletService.listTransactions(
+				token,
+				search,
+				filters
+			);
+			await this.walletService.generateCsv(res, transactions);
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0227',
 			});
 		}
 	}
@@ -601,11 +986,9 @@ export class RafikiWalletController {
 					customCode: 'WGE0074',
 				});
 			}
-
 			const userWalletByToken = convertToCamelCase(
 				await this.walletService.getWalletByToken(token)
 			);
-
 			if (userWalletByToken?.walletDb?.userId !== userWallet?.userId) {
 				return res.status(HttpStatus.UNAUTHORIZED).send({
 					statusCode: HttpStatus.UNAUTHORIZED,
@@ -695,6 +1078,84 @@ export class RafikiWalletController {
 			return res.status(200).send({
 				data: {
 					linkedProviders: linkedProviders,
+				},
+				customCode: 'WGE0150',
+			});
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0151',
+			});
+		}
+	}
+
+	@Post('service-provider-unlink')
+	@ApiOperation({ summary: 'Unlink a service provider by session id' })
+	@ApiBearerAuth('JWT')
+	@ApiCreatedResponse({
+		description: 'Service provider successfully unlinked.',
+	})
+	@ApiResponse({ status: 400, description: 'Bad request.' })
+	@ApiResponse({ status: 401, description: 'Unauthorized access.' })
+	@ApiResponse({ status: 500, description: 'Server error.' })
+	async unlinkTransactionProvider(
+		@Headers() headers: MapOfStringToList,
+		@Body() input: UnLinkInputDTO,
+		@Req() req,
+		@Res() res
+	) {
+		try {
+			let token;
+			try {
+				token = headers.authorization ?? '';
+				const instanceVerifier = await this.verifyService.getVerifiedFactory();
+				await instanceVerifier.verify(token.toString().split(' ')[1]);
+			} catch (error) {
+				Sentry.captureException(error);
+				throw new HttpException(
+					{
+						statusCode: HttpStatus.UNAUTHORIZED,
+						customCode: 'WGE0021',
+					},
+					HttpStatus.UNAUTHORIZED
+				);
+			}
+
+			let userInfo = await axios.get(
+				this.AUTH_MICRO_URL + '/api/v1/users/current-user',
+				{
+					headers: {
+						Authorization: token,
+					},
+				}
+			);
+			userInfo = userInfo.data;
+
+			const userId = userInfo?.data?.id;
+
+			const linkProvider =
+				await this.walletService.unlinkServiceProviderBySessionId(
+					input?.sessionId
+				);
+
+			if (linkProvider?.customCode) {
+				return res.status(HttpStatus.NOT_FOUND).send({
+					statusCode: HttpStatus.NOT_FOUND,
+					customCode: linkProvider?.customCode,
+				});
+			}
+
+			this.authGateway.server.emit('hc', {
+				message: 'Account unlinked',
+				statusCode: 'WGS0051',
+				sessionId: input?.sessionId,
+				wgUserId: userId,
+			});
+
+			return res.status(200).send({
+				data: {
+					linkedProvider: linkProvider,
 				},
 				customCode: 'WGE0150',
 			});
@@ -1168,6 +1629,100 @@ export class RafikiWalletController {
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
 				customCode: 'WGE0167',
 			});
+		}
+	}
+
+	@Post('provider/revenue')
+	@ApiOperation({ summary: 'Create a new provider revenue' })
+	@ApiBody({
+		type: CreateProviderRevenue,
+		description: 'Data required to create a new provider revenue',
+	})
+	@ApiResponse({
+		status: 201,
+		description: 'Provider Revenue Has Been Created Successfully',
+	})
+	@ApiResponse({
+		status: 400,
+		description: 'Error Creating Provider Revenue',
+	})
+	@ApiResponse({
+		status: 500,
+		description: 'Internal Server Error',
+	})
+	async createProviderRevenue(
+		@Body()
+		createProviderRevenue: CreateProviderRevenue,
+		@Headers() headers: MapOfStringToList,
+		@Res() res
+	) {
+		let token;
+		try {
+			token = headers.authorization ?? '';
+			const instanceVerifier = await this.verifyService.getVerifiedFactory();
+			await instanceVerifier.verify(token.toString().split(' ')[1]);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new HttpException(
+				{
+					statusCode: HttpStatus.UNAUTHORIZED,
+					customCode: 'WGE0021',
+				},
+				HttpStatus.UNAUTHORIZED
+			);
+		}
+		token = token || '';
+		try {
+			let userInfo = await axios.get(
+				this.AUTH_MICRO_URL + '/api/v1/users/current-user',
+				{ headers: { Authorization: token } }
+			);
+			userInfo = userInfo.data;
+			const userType = userInfo?.data?.type;
+
+			if (userType !== 'PLATFORM') {
+				return res.status(HttpStatus.UNAUTHORIZED).send({
+					statusCode: HttpStatus.UNAUTHORIZED,
+					customCode: 'WGE0022',
+				});
+			}
+
+			const providerWallet =
+				await this.walletService.getWalletAddressByProviderId(
+					createProviderRevenue.serviceProviderId
+				);
+
+			if (!providerWallet) {
+				return res.status(HttpStatus.NOT_FOUND).send({
+					statusCode: HttpStatus.NOT_FOUND,
+					customCode: 'WGE0074',
+				});
+			}
+
+			const providerRevenue = await this.walletService.createProviderRevenue(
+				createProviderRevenue,
+				providerWallet
+			);
+			return res.status(HttpStatus.CREATED).send({
+				statusCode: HttpStatus.CREATED,
+				customCode: 'WGE0227',
+				data: { providerRevenue },
+			});
+		} catch (error) {
+			Sentry.captureException(error);
+			if (
+				error instanceof HttpException &&
+				error.getStatus() === HttpStatus.INTERNAL_SERVER_ERROR
+			) {
+				throw new HttpException(
+					{
+						statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+						customCode: 'WGE0229',
+					},
+					HttpStatus.INTERNAL_SERVER_ERROR
+				);
+			}
+			throw error;
 		}
 	}
 

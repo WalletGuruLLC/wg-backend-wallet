@@ -32,7 +32,6 @@ import { SqsService } from '../sqs/sqs.service';
 import { UserIncomingPayment } from '../entities/user-incoming.entity';
 import { UserIncomingSchema } from '../entities/user-incoming.schema';
 import { CreatePaymentDTO } from '../dto/create-payment-rafiki.dto';
-import { adjustValueByCurrency } from 'src/utils/helpers/adjustValueCurrecy';
 import { Transaction, TransactionType } from '../entities/transactions.entity';
 import { TransactionsSchema } from '../entities/transactions.schema';
 import { User } from '../entities/user.entity';
@@ -42,15 +41,25 @@ import { calcularTotalCosto } from 'src/utils/helpers/calcularTotalTransactionPl
 import { parseStringToBoolean } from 'src/utils/helpers/parseStringToBoolean';
 import { AuthGateway } from './websocket';
 import { calcularTotalCostoWalletGuru } from 'src/utils/helpers/calcularCostoWalletGuru';
+import * as fastCsv from 'fast-csv';
+import { flattenObject } from 'src/utils/helpers/flattenObject';
+import { WebSocketAction } from '../entities/webSocketAction.entity';
+import { WebSocketActionSchema } from '../entities/webSocketAction.schema';
+import { CreateWebSocketActionDto } from '../dto/create-web-socket-action.dto';
+import { ProviderRevenues } from '../entities/provider-revenues.entity';
+import { ProviderRevenuesSchema } from '../entities/provider-revenues.schema';
+import { CreateProviderRevenue } from '../dto/provider-revenue.dto';
 
 @Injectable()
 export class WalletService {
 	private dbInstance: Model<Wallet>;
+	private dbInstanceSocketLogs: Model<WebSocketAction>;
 	private dbInstanceSocket: Model<SocketKey>;
 	private dbIncomingUser: Model<UserIncomingPayment>;
 	private dbTransactions: Model<Transaction>;
 	private dbUserInstance: Model<User>;
 	private dbRates: Model<Rates>;
+	private dbProviderRevenues: Model<ProviderRevenues>;
 	private dbUserIncoming: Model<UserIncomingPayment>;
 	private readonly AUTH_MICRO_URL: string;
 	private readonly DOMAIN_WALLET_URL: string;
@@ -63,6 +72,10 @@ export class WalletService {
 		private authGateway: AuthGateway
 	) {
 		this.dbUserInstance = dynamoose.model<User>('Users', UserSchema);
+		this.dbInstanceSocketLogs = dynamoose.model<User>(
+			'WebSocketActions',
+			WebSocketActionSchema
+		);
 		this.dbIncomingUser = dynamoose.model<UserIncomingPayment>(
 			'UserIncoming',
 			UserIncomingSchema
@@ -81,6 +94,10 @@ export class WalletService {
 			'Transactions',
 			TransactionsSchema
 		);
+		this.dbProviderRevenues = dynamoose.model<ProviderRevenues>(
+			'ProviderRevenues',
+			ProviderRevenuesSchema
+		);
 		this.dbRates = dynamoose.model<Rates>('Rates', RatesSchema);
 		this.AUTH_MICRO_URL = process.env.AUTH_URL;
 		this.DOMAIN_WALLET_URL = process.env.DOMAIN_WALLET_URL;
@@ -88,12 +105,33 @@ export class WalletService {
 	}
 
 	async createIncoming(createIncomingUserDto: CreateIncomingUserDto) {
-		const createIncomingDtoConverted = {
-			IncomingPaymentId: createIncomingUserDto.incomingPaymentId,
-			ServiceProviderId: createIncomingUserDto.serviceProviderId,
-			UserId: createIncomingUserDto.userId,
-		};
-		return this.dbIncomingUser.create(createIncomingDtoConverted);
+		try {
+			const createIncomingDtoConverted = {
+				IncomingPaymentId: createIncomingUserDto.incomingPaymentId,
+				ServiceProviderId: createIncomingUserDto.serviceProviderId,
+				UserId: createIncomingUserDto.userId,
+			};
+			return this.dbIncomingUser.create(createIncomingDtoConverted);
+		} catch (error) {
+			Sentry.captureException(error);
+			console.log(`Failed incoming: ${error.message}`);
+		}
+	}
+
+	async createWebsocketLogs(
+		createWebSocketActionDto: CreateWebSocketActionDto
+	) {
+		try {
+			const filteredData = Object.fromEntries(
+				Object?.entries(createWebSocketActionDto)?.filter(
+					([_, value]) => value !== undefined
+				)
+			);
+			return this.dbInstanceSocketLogs.create(filteredData);
+		} catch (error) {
+			Sentry.captureException(error);
+			console.log(`Failed to log event: ${error.message}`);
+		}
 	}
 
 	//SERVICE TO CREATE A WALLET
@@ -510,6 +548,7 @@ export class WalletService {
 				jwk
 			);
 		} catch (error) {
+			Sentry.captureException(error);
 			if (error instanceof ApolloError) {
 				if (
 					error.message.includes(
@@ -632,6 +671,7 @@ export class WalletService {
 				jwk
 			);
 		} catch (error) {
+			Sentry.captureException(error);
 			if (error instanceof ApolloError) {
 				if (
 					error.message.includes(
@@ -789,6 +829,23 @@ export class WalletService {
 		};
 	}
 
+	paginatedResults(page, itemsPerPage, results) {
+		const offset = (page - 1) * itemsPerPage;
+		const total = results.length;
+		const totalPages = Math.ceil(total / itemsPerPage);
+		const paginatedTransactions = results.slice(
+			offset,
+			offset + Number(itemsPerPage)
+		);
+
+		return convertToCamelCase({
+			transactions: paginatedTransactions,
+			currentPage: page,
+			total,
+			totalPages,
+		});
+	}
+
 	async listTransactions(
 		token: string,
 		search: string,
@@ -799,29 +856,40 @@ export class WalletService {
 			providerIds?: string[];
 			activityId?: string;
 			transactionType?: string[];
-		}
+			walletAddress?: string;
+			page?: string;
+			items?: string;
+		},
+		type?: string
 	) {
 		if (!search) {
 			search = 'all';
 		}
-
 		const walletDb = await this.getUserByToken(token);
-		const WalletAddress = walletDb.WalletAddress;
+		const WalletAddress = walletDb?.WalletAddress;
 		const docClient = new DocumentClient();
+
+		const pagedParsed = Number(filters?.page) || 1;
+		const itemsParsed = Number(filters?.items) || 10;
+		const filterExpression =
+			type == 'PLATFORM'
+				? '#Type = :TypeIncoming OR #Type = :TypeOutgoing'
+				: '(#ReceiverUrl = :WalletAddress AND #Type = :TypeIncoming) OR (#SenderUrl = :WalletAddress AND #Type = :TypeOutgoing)';
 
 		const outgoingParams: DocumentClient.ScanInput = {
 			TableName: 'Transactions',
-			FilterExpression:
-				'(#ReceiverUrl = :WalletAddress AND #Type = :TypeIncoming) OR (#SenderUrl = :WalletAddress AND #Type = :TypeOutgoing)',
+			FilterExpression: filterExpression,
 			ExpressionAttributeNames: {
-				'#SenderUrl': 'SenderUrl',
-				'#ReceiverUrl': 'ReceiverUrl',
 				'#Type': 'Type',
+				...(type !== 'PLATFORM' && {
+					'#SenderUrl': 'SenderUrl',
+					'#ReceiverUrl': 'ReceiverUrl',
+				}),
 			},
 			ExpressionAttributeValues: {
-				':WalletAddress': WalletAddress,
 				':TypeIncoming': 'IncomingPayment',
 				':TypeOutgoing': 'OutgoingPayment',
+				...(type !== 'PLATFORM' && { ':WalletAddress': WalletAddress }),
 			},
 		};
 
@@ -832,7 +900,7 @@ export class WalletService {
 		if (dynamoOutgoingPayments?.Items?.length > 0) {
 			const sortedArray = dynamoOutgoingPayments?.Items?.sort(
 				(a: any, b: any) =>
-					new Date(b?.createdAt).getTime() - new Date(a?.createdAt).getTime()
+					new Date(b?.createdAt)?.getTime() - new Date(a?.createdAt)?.getTime()
 			);
 
 			const transactionsWithNames: any = await Promise.all(
@@ -890,10 +958,9 @@ export class WalletService {
 					};
 				})
 			);
-
 			let validWallets = [];
 			if (filters?.providerIds?.length) {
-				const providerWalletsPromises = filters.providerIds.map(
+				const providerWalletsPromises = filters?.providerIds?.map(
 					async providerId => {
 						const provider = await this.getWalletAddressByProviderId(
 							providerId
@@ -901,35 +968,40 @@ export class WalletService {
 						return provider?.walletAddress;
 					}
 				);
-
 				const providerWallets = await Promise.all(providerWalletsPromises);
 				validWallets = providerWallets.filter(
 					walletAddress => walletAddress != null
 				);
 			}
-
 			const filteredTransactions = transactionsWithNames.filter(transaction => {
 				const matchesActivityId = filters?.activityId
-					? transaction.Metadata?.activityId === filters.activityId
+					? transaction?.Metadata?.activityId === filters.activityId
 					: true;
 				const matchesType = filters?.type
-					? transaction.Type === filters.type
+					? transaction?.Type === filters?.type
 					: true;
 				const matchesState = filters?.state
-					? transaction.State === filters.state
+					? transaction?.State === filters?.state
 					: true;
 
 				const matchesDateRange = filters?.dateRange
-					? new Date(transaction.createdAt) >=
-							new Date(filters.dateRange.start) &&
-					  new Date(transaction.createdAt) <= new Date(filters.dateRange.end)
+					? new Date(transaction?.createdAt) >=
+							new Date(filters?.dateRange?.start) &&
+					  new Date(transaction?.createdAt) <=
+							new Date(filters?.dateRange?.end)
 					: true;
 
 				const matchesProviderId =
 					validWallets.length > 0
 						? validWallets.some(
-								walletAddress => walletAddress === transaction.ReceiverUrl
-						  ) && transaction.Metadata?.type === 'PROVIDER'
+								walletAddress => walletAddress === transaction?.ReceiverUrl
+						  ) && transaction?.Metadata?.type === 'PROVIDER'
+						: true;
+
+				const matchesWalletAddress =
+					type !== 'WALLET' && filters?.walletAddress
+						? transaction?.ReceiverUrl == filters?.walletAddress ||
+						  transaction?.SenderUrl == filters?.walletAddress
 						: true;
 
 				return (
@@ -937,7 +1009,8 @@ export class WalletService {
 					matchesType &&
 					matchesState &&
 					matchesDateRange &&
-					matchesProviderId
+					matchesProviderId &&
+					matchesWalletAddress
 				);
 			});
 
@@ -947,14 +1020,22 @@ export class WalletService {
 			let sortedTransactions;
 
 			if (isIncoming && isOutgoing) {
-				sortedTransactions = convertToCamelCase(filteredTransactions);
+				sortedTransactions = this.paginatedResults(
+					pagedParsed,
+					itemsParsed,
+					convertToCamelCase(filteredTransactions)
+				);
 			} else if (isIncoming) {
-				sortedTransactions = convertToCamelCase(
-					filteredTransactions.filter(t => t.Type === 'IncomingPayment')
+				sortedTransactions = this.paginatedResults(
+					pagedParsed,
+					itemsParsed,
+					filteredTransactions.filter(t => t?.Type === 'IncomingPayment')
 				);
 			} else if (isOutgoing) {
-				sortedTransactions = convertToCamelCase(
-					filteredTransactions.filter(t => t.Type === 'OutgoingPayment')
+				sortedTransactions = this.paginatedResults(
+					pagedParsed,
+					itemsParsed,
+					filteredTransactions.filter(t => t?.Type === 'OutgoingPayment')
 				);
 			}
 
@@ -963,14 +1044,14 @@ export class WalletService {
 			}
 
 			const incomingSorted = filteredTransactions.filter(
-				item => item.Type === 'IncomingPayment'
+				item => item?.Type === 'IncomingPayment'
 			);
 			const outgoingSorted = filteredTransactions.filter(
-				item => item.Type === 'OutgoingPayment'
+				item => item?.Type === 'OutgoingPayment'
 			);
 			const combinedSorted = [...incomingSorted, ...outgoingSorted].sort(
 				(a: any, b: any) =>
-					new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+					new Date(b?.createdAt).getTime() - new Date(a?.createdAt).getTime()
 			);
 
 			return search === 'credit'
@@ -1051,6 +1132,28 @@ export class WalletService {
 		return convertToCamelCase(incomingSorted);
 	}
 
+	async generateCsv(res, transactions: any[]) {
+		const now = new Date();
+		const year = now.getFullYear();
+		const month = String(now.getMonth() + 1).padStart(2, '0'); // Mes con 2 dígitos
+		const day = String(now.getDate()).padStart(2, '0');
+
+		const filename = `${year}-${month}-${day}.csv`;
+
+		res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+		res.setHeader('Content-Type', 'text/csv');
+
+		const csvStream = fastCsv.format({ headers: true, delimiter: ';' });
+		csvStream.pipe(res);
+
+		transactions.forEach(transaction => {
+			const flatTransaction = flattenObject(transaction);
+			csvStream.write(flatTransaction);
+		});
+
+		csvStream.end();
+	}
+
 	async getUserByToken(token: string) {
 		let userInfo = await axios.get(
 			this.AUTH_MICRO_URL + '/api/v1/users/current-user',
@@ -1084,6 +1187,7 @@ export class WalletService {
 		try {
 			return await this.graphqlService.createReceiver(input);
 		} catch (error) {
+			Sentry.captureException(error);
 			throw new Error(`Error creating receiver: ${error.message}`);
 		}
 	}
@@ -1369,6 +1473,7 @@ export class WalletService {
 		try {
 			return await this.graphqlService.createDepositOutgoingMutation(input);
 		} catch (error) {
+			Sentry.captureException(error);
 			throw new Error(
 				`Error creating deposit outoing mutation: ${error.message}`
 			);
@@ -1548,6 +1653,29 @@ export class WalletService {
 		}
 	}
 
+	async getBatchTransactions(transactionIds: string[]) {
+		const docClient = new DocumentClient();
+		const params = {
+			RequestItems: {
+				Transactions: {
+					Keys: transactionIds.map(id => ({ Id: id })),
+				},
+			},
+		};
+
+		try {
+			const result = await docClient.batchGet(params).promise();
+			const existingTransactions = result.Responses.Transactions;
+			return convertToCamelCase(existingTransactions);
+		} catch (error) {
+			Sentry.captureException(error);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0229',
+			};
+		}
+	}
+
 	async getTransactionByIncomingPaymentId(incomingPaymentId: string) {
 		const docClient = new DocumentClient();
 		const params = {
@@ -1624,6 +1752,7 @@ export class WalletService {
 			const result = await docClient.query(params).promise();
 			return convertToCamelCase(result.Items?.[0]);
 		} catch (error) {
+			Sentry.captureException(error);
 			return {};
 		}
 	}
@@ -1647,6 +1776,7 @@ export class WalletService {
 		try {
 			return await this.graphqlService.createReceiver(input);
 		} catch (error) {
+			Sentry.captureException(error);
 			throw new Error(`Error creating receiver: ${error.message}`);
 		}
 	}
@@ -1728,7 +1858,7 @@ export class WalletService {
 		userId,
 		senderUrl,
 		activityId,
-		contentName
+		itemName
 	) {
 		const parameterExists = await this.validatePaymentParameterId(
 			parameterId,
@@ -1767,7 +1897,8 @@ export class WalletService {
 				parameterExists?.base,
 				parameterExists?.comision,
 				parameterExists?.cost,
-				parameterExists?.percent
+				parameterExists?.percent,
+				walletAsset?.scale
 			),
 			walletAsset?.scale
 		);
@@ -1777,7 +1908,8 @@ export class WalletService {
 				parameterExists?.base,
 				parameterExists?.comision,
 				parameterExists?.cost,
-				parameterExists?.percent
+				parameterExists?.percent,
+				walletAsset?.scale
 			),
 			walletAsset?.scale
 		);
@@ -1806,6 +1938,10 @@ export class WalletService {
 		}
 
 		if (validIncomingPayment) {
+			const walletProvider = await this.findWalletByUrl(
+				validIncomingPayment?.ReceiverUrl
+			);
+
 			const quoteInput = {
 				walletAddressId: walletAddressId,
 				receiver: validIncomingPayment?.ReceiverId,
@@ -1857,7 +1993,7 @@ export class WalletService {
 					quoteId: quote?.createQuote?.quote?.id,
 					metadata: {
 						activityId: activityId || '',
-						contentName: contentName || 'Thieves Of The Sea - Origin',
+						contentName: itemName || '---',
 						description: '',
 						type: 'PROVIDER',
 						wgUser: userId,
@@ -1897,9 +2033,9 @@ export class WalletService {
 					const inputReceiver = {
 						metadata: {
 							activityId: activityId || '',
-							contentName: contentName || 'Thieves Of The Sea - Origin',
+							contentName: itemName || '---',
 							description: '',
-							type: 'PROVIDER',
+							type: 'USER',
 							wgUser: userId,
 						},
 						incomingAmount: {
@@ -1912,7 +2048,7 @@ export class WalletService {
 
 					const receiver = await this.createReceiver(inputReceiver);
 					const quoteInput = {
-						walletAddressId: walletAddressId,
+						walletAddressId: walletProvider?.RafikiId,
 						receiver: receiver?.createReceiver?.receiver?.id,
 						receiveAmount: {
 							assetCode: walletAsset?.asset ?? 'USD',
@@ -1925,13 +2061,13 @@ export class WalletService {
 						const quote = await this.createQuote(quoteInput);
 
 						const inputOutgoing = {
-							walletAddressId: walletAddressId,
+							walletAddressId: walletProvider?.RafikiId,
 							quoteId: quote?.createQuote?.quote?.id,
 							metadata: {
 								activityId: activityId || '',
-								contentName: contentName || 'Thieves Of The Sea - Origin',
+								contentName: itemName || '---',
 								description: '',
-								type: 'PROVIDER',
+								type: 'USER',
 								wgUser: userId,
 							},
 						};
@@ -2149,6 +2285,7 @@ export class WalletService {
 			await this.sqsService.sendMessage(process.env.SQS_QUEUE_URL, sqsMsg);
 			return;
 		} catch (error) {
+			Sentry.captureException(error);
 			throw new Error(`Error creating outgoing payment: ${error.message}`);
 		}
 	}
@@ -2182,6 +2319,7 @@ export class WalletService {
 				throw new Error(`Error fetching wallet: ${error.message}`);
 			}
 		} catch (error) {
+			Sentry.captureException(error);
 			throw new Error(
 				`Error creating deposit outoing mutation: ${error.message}`
 			);
@@ -2306,6 +2444,50 @@ export class WalletService {
 		}
 	}
 
+	async unlinkServiceProviderBySessionId(sessionId: string): Promise<any> {
+		const docClient = new DocumentClient();
+
+		const scanParams = {
+			TableName: 'Users',
+			FilterExpression:
+				'contains(LinkedServiceProviders.sessionId, :sessionId)',
+			ExpressionAttributeValues: {
+				':sessionId': sessionId,
+			},
+		};
+
+		const users = await docClient.scan(scanParams).promise();
+		const usersToUpdate = users?.Items ?? [];
+
+		for (let i = 0; i < usersToUpdate?.length; i++) {
+			const user = usersToUpdate[i];
+			const linkedProviders = user?.LinkedServiceProviders ?? [];
+
+			const updatedProviders = linkedProviders.filter(
+				provider => provider?.sessionId !== sessionId
+			);
+
+			if (updatedProviders?.length !== linkedProviders?.length) {
+				const updateParams = {
+					TableName: 'Users',
+					Key: { Id: user?.Id },
+					UpdateExpression: 'SET LinkedServiceProviders = :updatedProviders',
+					ExpressionAttributeValues: {
+						':updatedProviders': updatedProviders,
+					},
+					ReturnValues: 'ALL_NEW',
+				};
+
+				await docClient.update(updateParams).promise();
+			}
+		}
+
+		return {
+			statusCode: HttpStatus.OK,
+			message: 'Service provider unlinked successfully.',
+		};
+	}
+
 	async updateListServiceProviders(
 		id: string,
 		address: string,
@@ -2370,5 +2552,48 @@ export class WalletService {
 
 	async getWalletByTokenWS(token: string): Promise<Wallet> {
 		return await this.getUserByToken(token);
+	}
+
+	async createProviderRevenue(
+		createProviderRevenue: CreateProviderRevenue,
+		providerWallet
+	) {
+		try {
+			const startDate = new Date(createProviderRevenue.startDate).getTime();
+			const endDate = new Date(createProviderRevenue.endDate).getTime();
+			const transactions = await this.getBatchTransactions(
+				createProviderRevenue.transactionIds
+			);
+
+			const completedTransactions = transactions.filter(
+				transaction =>
+					transaction?.createdAt >= startDate &&
+					transaction?.createdAt <= endDate &&
+					transaction.state === 'COMPLETED' &&
+					transaction?.receiverUrl === providerWallet?.walletAddress
+			);
+
+			const totalAmount = completedTransactions.reduce((total, transaction) => {
+				return total + parseFloat(transaction?.receiveAmount?.value || 0);
+			}, 0);
+
+			const createProviderRevenueDTO = {
+				ServiceProviderId: createProviderRevenue.serviceProviderId,
+				Value: totalAmount,
+				StartDate: startDate,
+				EndDate: endDate,
+				TransactionIds: createProviderRevenue.transactionIds,
+				...(createProviderRevenue?.observations && {
+					Observations: createProviderRevenue.observations,
+				}),
+			};
+			return await this.dbProviderRevenues.create(createProviderRevenueDTO);
+		} catch (error) {
+			Sentry.captureException(error);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0229',
+			};
+		}
 	}
 }

@@ -28,6 +28,19 @@ export class AuthGateway
 		console.log('WebSocket server initialized');
 	}
 
+	async logToDatabase(eventType: string, data: any) {
+		const params = {
+			EventType: eventType,
+			Timestamp: new Date(),
+			...data,
+		};
+		try {
+			await this.authService.createWebsocketLogs(params);
+		} catch (error) {
+			this.logger.error(`Failed to log event: ${error.message}`);
+		}
+	}
+
 	async handleConnection(client: Socket, ...args: any[]) {
 		const timestamp = Math.floor(new Date().getTime() / 1000);
 		const headers = client.handshake.headers;
@@ -44,6 +57,12 @@ export class AuthGateway
 				sessionId: '',
 			});
 			client.disconnect();
+			await this.logToDatabase('authenticationFailed', {
+				ClientId: client.id,
+				PublicKey: publicKeyData,
+				Action: 'connection',
+				SubscribeMessage: 'connection',
+			});
 			this.logger.error(`Client ${client.id} failed to provide public key.`);
 			return;
 		}
@@ -62,6 +81,12 @@ export class AuthGateway
 				statusCode: 'WGS0050',
 				sessionId: '',
 			});
+			await this.logToDatabase('connectionSuccess', {
+				ClientId: client.id,
+				PublicKey: publicKeyData,
+				Action: 'connection',
+				SubscribeMessage: 'connection',
+			});
 			this.logger.log(`Client ${client.id} authenticated successfully.`);
 		} else {
 			client.emit('error', {
@@ -70,18 +95,29 @@ export class AuthGateway
 				sessionId: '',
 			});
 			client.disconnect();
+			await this.logToDatabase('authenticationFailed', {
+				ClientId: client.id,
+				PublicKey: publicKeyData,
+				Action: 'connection',
+				SubscribeMessage: 'connection',
+			});
 			this.logger.error(`Client ${client.id} failed to authenticate.`);
 		}
 	}
 
 	handleDisconnect(client: Socket) {
+		this.logToDatabase('disconnect', {
+			ClientId: client.id,
+			Action: 'disconnect',
+			SubscribeMessage: 'disconnect',
+		});
 		this.logger.log(`Client disconnected: ${client.id}`);
 	}
 
 	@SubscribeMessage('link')
 	async handleLogin(client: Socket, data: any): Promise<WsResponse<string>> {
 		const headers = client.handshake.headers;
-		const parsedData = JSON.parse(data);
+		const parsedData = data;
 		const publicKeyData =
 			parsedData['x-public-key']?.toString() ||
 			headers['public-key']?.toString();
@@ -96,6 +132,13 @@ export class AuthGateway
 				sessionId: '',
 			});
 			client.disconnect();
+			await this.logToDatabase('linkFailed', {
+				ClientId: client.id,
+				MissingData: true,
+				SessionId: sessionIdData,
+				Action: 'link',
+				SubscribeMessage: 'link',
+			});
 			this.logger.error(`Client ${client.id} failed to provide public key.`);
 			return;
 		}
@@ -107,6 +150,14 @@ export class AuthGateway
 				sessionId: '',
 			});
 			client.disconnect();
+			await this.logToDatabase('linkFailed', {
+				ClientId: client.id,
+				MissingData: true,
+				SessionId: sessionIdData,
+				PublicKey: publicKeyData,
+				Action: 'link',
+				SubscribeMessage: 'link',
+			});
 			this.logger.error(`Client ${client.id} failed to authenticate.`);
 		}
 		if (!sessionIdData) {
@@ -116,6 +167,14 @@ export class AuthGateway
 				sessionId: '',
 			});
 			client.disconnect();
+			await this.logToDatabase('linkFailed', {
+				ClientId: client.id,
+				MissingData: true,
+				SessionId: sessionIdData,
+				PublicKey: publicKeyData,
+				Action: 'link',
+				SubscribeMessage: 'link',
+			});
 			this.logger.error(`Client ${client.id} failed to authenticate.`);
 		}
 		const timestamp = Math.floor(new Date().getTime() / 1000);
@@ -146,8 +205,22 @@ export class AuthGateway
 				statusCode: 'WGS0053',
 				sessionId: sessionIdData,
 			});
+			await this.logToDatabase('linkSuccess', {
+				ClientId: client.id,
+				SessionId: sessionIdData,
+				PublicKey: publicKeyData,
+				Action: 'link',
+				SubscribeMessage: 'link',
+			});
 		} else {
 			client.disconnect();
+			await this.logToDatabase('linkFailed', {
+				ClientId: client.id,
+				SessionId: sessionIdData,
+				PublicKey: publicKeyData,
+				Action: 'link',
+				SubscribeMessage: 'link',
+			});
 			this.logger.error(`Client ${client.id} failed to authenticate.`);
 		}
 	}
@@ -155,7 +228,7 @@ export class AuthGateway
 	@SubscribeMessage('activity')
 	async handlePlay(client: Socket, data: any): Promise<WsResponse<string>> {
 		const headers = client.handshake.headers;
-		const parsedData = JSON.parse(data);
+		const parsedData = data;
 		const publicKeyData =
 			parsedData['x-public-key']?.toString() ||
 			headers['public-key']?.toString();
@@ -165,7 +238,9 @@ export class AuthGateway
 		const activityId = parsedData.activityId?.toString();
 		const paymentType = parsedData.paymentType?.toString();
 		const wgUserId = parsedData.wgUserId?.toString();
-		const contentName = parsedData.contentName?.toString();
+		const contentName =
+			parsedData?.itemName?.toString() || parsedData?.contentName?.toString();
+
 		const objectSecret = await this.authService.getServiceProviderWihtPublicKey(
 			publicKeyData
 		);
@@ -178,6 +253,13 @@ export class AuthGateway
 				sessionId: '',
 			});
 			client.disconnect();
+			await this.logToDatabase('activityFailed', {
+				MissingData: true,
+				ClientId: client.id,
+				ActivityId: activityId,
+				Action: action,
+				SubscribeMessage: 'activity',
+			});
 			this.logger.error(`Client ${client.id} failed to provide public key.`);
 			return;
 		}
@@ -189,6 +271,14 @@ export class AuthGateway
 				sessionId: '',
 			});
 			client.disconnect();
+			await this.logToDatabase('activityFailed', {
+				MissingData: true,
+				ClientId: client.id,
+				ActivityId: activityId,
+				Action: action,
+				SubscribeMessage: 'activity',
+				PublicKey: publicKeyData,
+			});
 			this.logger.error(
 				`Client ${client.id} failed to authenticate. in activity`
 			);
@@ -200,6 +290,14 @@ export class AuthGateway
 				sessionId: '',
 			});
 			client.disconnect();
+			await this.logToDatabase('activityFailed', {
+				MissingData: true,
+				ClientId: client.id,
+				ActivityId: activityId,
+				Action: action,
+				SubscribeMessage: 'activity',
+				PublicKey: publicKeyData,
+			});
 			this.logger.error(
 				`Client ${client.id} failed to authenticate. in activity`
 			);
@@ -235,11 +333,29 @@ export class AuthGateway
 					activityId,
 					contentName
 				);
+				await this.logToDatabase('activityCharge', {
+					ClientId: client.id,
+					ActivityId: activityId,
+					Action: action,
+					WgUserId: wgUserId,
+					ItemName: contentName,
+					SubscribeMessage: 'activity',
+					PublicKey: publicKeyData,
+				});
 			} else if (action == 'stop' || action == 'pause' || action == 'play') {
 				client.emit('hc', {
 					message: 'Ok',
 					statusCode: 'WGS0053',
 					activityId: activityId,
+				});
+				await this.logToDatabase('activityAction', {
+					ClientId: client.id,
+					ActivityId: activityId,
+					Action: action,
+					WgUserId: wgUserId,
+					ItemName: contentName ?? '',
+					SubscribeMessage: 'activity',
+					PublicKey: publicKeyData,
 				});
 			}
 		} else {
@@ -247,22 +363,136 @@ export class AuthGateway
 			this.logger.error(
 				`Client ${client.id} failed to authenticate. in activity`
 			);
+			await this.logToDatabase('activityFailed', {
+				MissingData: true,
+				ClientId: client.id,
+				ActivityId: activityId,
+				Action: action,
+				SubscribeMessage: 'activity',
+				PublicKey: publicKeyData,
+			});
 		}
 		// return { event: 'response', data: 'Stop processed.' };
+	}
+
+	@SubscribeMessage('unlink')
+	async handleUnlink(client: Socket, data: any): Promise<WsResponse<string>> {
+		const headers = client.handshake.headers;
+		const parsedData = data;
+		const publicKeyData =
+			parsedData['x-public-key']?.toString() ||
+			headers['public-key']?.toString();
+		const nonceData =
+			parsedData['x-nonce']?.toString() || headers['nonce']?.toString();
+		const sessionIdData = parsedData.sessionId?.toString();
+		if (!publicKeyData) {
+			client.emit('error', {
+				message: 'Public key missing!',
+				statusCode: 'WGE0151',
+				sessionId: '',
+			});
+			client.disconnect();
+			await this.logToDatabase('unlinkFailed', {
+				ClientId: client.id,
+				MissingData: true,
+				SessionId: sessionIdData,
+				Action: 'unlink',
+				SubscribeMessage: 'unlink',
+			});
+			this.logger.error(`Client ${client.id} failed to provide public key.`);
+			return;
+		}
+
+		if (!nonceData) {
+			client.emit('error', {
+				message: 'You need send auth',
+				statusCode: 'WGE0151',
+				sessionId: '',
+			});
+			client.disconnect();
+			await this.logToDatabase('unlinkFailed', {
+				ClientId: client.id,
+				MissingData: true,
+				SessionId: sessionIdData,
+				Action: 'unlink',
+				SubscribeMessage: 'unlink',
+				PublicKey: publicKeyData,
+			});
+			this.logger.error(
+				`Client ${client.id} failed to authenticate. in activity`
+			);
+		}
+		const data_aux = { ...parsedData };
+		delete data_aux['x-nonce'];
+		delete data_aux['x-public-key'];
+		delete data_aux['x-timestamp'];
+		const timestamp = Math.floor(new Date().getTime() / 1000);
+		const tokenPromises = [];
+
+		for (let i = -5; i <= 5; i++) {
+			tokenPromises.push(
+				this.authService.generateToken(
+					data_aux,
+					`${timestamp + i}`,
+					publicKeyData
+				)
+			);
+		}
+
+		const validTokenRange = await Promise.all(tokenPromises);
+
+		if (validTokenRange.includes(nonceData)) {
+			await this.authService.unlinkServiceProviderBySessionId(sessionIdData);
+			await this.logToDatabase('unlinkSuccess', {
+				ClientId: client.id,
+				SessionId: sessionIdData,
+				Action: 'unlink',
+				SubscribeMessage: 'unlink',
+				PublicKey: publicKeyData,
+			});
+		} else {
+			client.disconnect();
+			await this.logToDatabase('unlinkFailed', {
+				ClientId: client.id,
+				MissingData: true,
+				SessionId: sessionIdData,
+				Action: 'unlink',
+				SubscribeMessage: 'unlink',
+				PublicKey: publicKeyData,
+			});
+			this.logger.error(
+				`Client ${client.id} failed to authenticate. in activity`
+			);
+		}
 	}
 
 	@SubscribeMessage('get-payment-parameters') async getPaymentParameters(
 		client: Socket,
 		data: any
-	): Promise<WsResponse<string>> {
+	): Promise<any> {
 		const headers = client.handshake.headers;
-		const parsedData = JSON.parse(data);
+		const parsedData = data;
 		const publicKeyData =
 			parsedData['x-public-key']?.toString() ||
 			headers['public-key']?.toString();
 		const paymentParameters = await this.authService.getPaymentParameters(
 			publicKeyData
 		);
-		return { event: 'get-payment-parameters', data: paymentParameters };
+		if (paymentParameters) {
+			client.emit('hc', {
+				message: 'Ok',
+				statusCode: 'WGS0053',
+				data: paymentParameters,
+			});
+			await this.logToDatabase('getPaymentParameters', {
+				ClientId: client.id,
+				PublicKey: publicKeyData,
+				Action: 'get-payment-parameters',
+				SubscribeMessage: 'get-payment-parameters',
+			});
+		} else {
+			client.disconnect();
+			this.logger.error(`Get payment parameters failed`);
+		}
 	}
 }

@@ -1,5 +1,5 @@
-export function calcularTotalCosto(base, comision, costo, porcentaje) {
-	const serviceProviderCost = costo * (porcentaje / 100) + comision + base;
-	const value = costo - serviceProviderCost;
-	return Math.round(value * 100) / 100;
+export function calcularTotalCosto(base, comision, costo, porcentaje, escala) {
+	const value = costo;
+	const multiplicador = Math.pow(10, escala);
+	return Math.round(value * multiplicador) / multiplicador;
 }
