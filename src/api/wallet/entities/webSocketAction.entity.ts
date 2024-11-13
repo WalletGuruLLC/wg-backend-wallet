@@ -4,6 +4,7 @@ export class WebSocketAction extends Document {
 	Id?: string;
 	PublicKey?: string;
 	Nonce?: string;
+	ClientId?: string;
 	SessionId?: string;
 	ActivityId?: string;
 	WgUserId?: string;
