@@ -1000,8 +1000,8 @@ export class WalletService {
 
 				const matchesWalletAddress =
 					type !== 'WALLET' && filters?.walletAddress
-						? transaction?.ReceiverUrl == filters?.walletAddress ||
-						  transaction?.SenderUrl == filters?.walletAddress
+						? transaction?.ReceiverUrl?.includes(filters?.walletAddress) ||
+						  transaction?.SenderUrl?.includes(filters?.walletAddress)
 						: true;
 
 				return (
@@ -1858,7 +1858,8 @@ export class WalletService {
 		userId,
 		senderUrl,
 		activityId,
-		itemName
+		itemName,
+		clientId
 	) {
 		const parameterExists = await this.validatePaymentParameterId(
 			parameterId,
@@ -1866,7 +1867,7 @@ export class WalletService {
 		);
 
 		if (!parameterExists?.id) {
-			this.authGateway.server.emit('error', {
+			this.authGateway.sendDataClientId('error', clientId, {
 				message: 'The specified type parameter does not exist',
 				statusCode: 'WGE0222',
 			});
@@ -1882,7 +1883,7 @@ export class WalletService {
 			.exec();
 
 		if (!incomingPayment || incomingPayment.length === 0) {
-			this.authGateway.server.emit('error', {
+			this.authGateway.sendDataClientId('error', clientId, {
 				message: 'You don’t have any incoming payments yet.',
 				statusCode: 'WGE0223',
 			});
@@ -1931,7 +1932,7 @@ export class WalletService {
 		}
 
 		if (!validIncomingPayment) {
-			this.authGateway.server.emit('error', {
+			this.authGateway.sendDataClientId('error', clientId, {
 				message: 'Insufficient funds',
 				statusCode: 'WGE0220',
 			});
@@ -1971,7 +1972,7 @@ export class WalletService {
 				(userWallet?.PendingDebits + userWallet?.PostedDebits);
 
 			if (quoteInput?.receiveAmount?.value > balance) {
-				this.authGateway.server.emit('error', {
+				this.authGateway.sendDataClientId('error', clientId, {
 					message: 'Insufficient funds',
 					statusCode: 'WGE0220',
 				});
@@ -1981,7 +1982,7 @@ export class WalletService {
 			const providerWalletId = quote?.createQuote?.quote?.receiver?.split('/');
 
 			if (!providerWalletId) {
-				this.authGateway.server.emit('error', {
+				this.authGateway.sendDataClientId('error', clientId, {
 					message: 'Invalid quote',
 					statusCode: 'WGE0221',
 				});
@@ -2005,7 +2006,7 @@ export class WalletService {
 				);
 
 				if (incomingState?.state == 'COMPLETED') {
-					this.authGateway.server.emit('error', {
+					this.authGateway.sendDataClientId('error', clientId, {
 						message: 'Missing funds',
 						statusCode: 'WGE0220',
 					});
@@ -2083,7 +2084,7 @@ export class WalletService {
 					}, 500);
 				}
 
-				this.authGateway.server.emit('hc', {
+				this.authGateway.sendDataClientId('hc', clientId, {
 					message: 'Ok',
 					statusCode: 'WGS0053',
 					activityId: activityId,
@@ -2301,7 +2302,7 @@ export class WalletService {
 				IndexName: 'ServiceProviderIdIndex',
 				KeyConditionExpression: `ServiceProviderId = :serviceproviderid`,
 				ExpressionAttributeValues: {
-					':serviceproviderid': socketKeys[0].ServiceProviderId,
+					':serviceproviderid': socketKeys?.[0]?.ServiceProviderId,
 				},
 			};
 			try {
@@ -2605,7 +2606,7 @@ export class WalletService {
 		const docClient = new DocumentClient();
 
 		try {
-			let params: DocumentClient.ScanInput = {
+			const params: DocumentClient.ScanInput = {
 				TableName: 'ProviderRevenues',
 			};
 
