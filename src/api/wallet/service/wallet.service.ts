@@ -2036,8 +2036,8 @@ export class WalletService {
 							activityId: activityId || '',
 							contentName: itemName || '---',
 							description: '',
-							type: 'USER',
-							wgUser: userId,
+							type: 'PROVIDER',
+							wgUser: walletProvider?.ProviderId,
 						},
 						incomingAmount: {
 							value: sendValueWalletGuru,
@@ -2068,8 +2068,8 @@ export class WalletService {
 								activityId: activityId || '',
 								contentName: itemName || '---',
 								description: '',
-								type: 'USER',
-								wgUser: userId,
+								type: 'PROVIDER',
+								wgUser: walletProvider?.ProviderId,
 							},
 						};
 						const outgoingValue = await this.createOutgoingPayment(
@@ -2167,22 +2167,26 @@ export class WalletService {
 	}
 
 	async getWalletByUser(userId: string) {
-		const docClient = new DocumentClient();
-		const params = {
-			TableName: 'Wallets',
-			IndexName: 'UserIdIndex',
-			KeyConditionExpression: `UserId  = :userId`,
-			ExpressionAttributeValues: {
-				':userId': userId,
-			},
-		};
+		if (userId) {
+			const docClient = new DocumentClient();
+			const params = {
+				TableName: 'Wallets',
+				IndexName: 'UserIdIndex',
+				KeyConditionExpression: `UserId  = :userId`,
+				ExpressionAttributeValues: {
+					':userId': userId,
+				},
+			};
 
-		try {
-			const result = await docClient.query(params).promise();
-			return convertToCamelCase(result.Items?.[0]);
-		} catch (error) {
-			Sentry.captureException(error);
-			throw new Error(`Error fetching wallet by user: ${error.message}`);
+			try {
+				const result = await docClient.query(params).promise();
+				return convertToCamelCase(result.Items?.[0]);
+			} catch (error) {
+				Sentry.captureException(error);
+				throw new Error(`Error fetching wallet by user: ${error.message}`);
+			}
+		} else {
+			return {};
 		}
 	}
 
