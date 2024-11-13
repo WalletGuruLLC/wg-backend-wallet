@@ -2596,4 +2596,49 @@ export class WalletService {
 			};
 		}
 	}
+
+	async getProviderRevenues(
+		serviceProviderId?: string,
+		createDate?: string,
+		endDate?: string
+	) {
+		const docClient = new DocumentClient();
+
+		try {
+			let params: DocumentClient.ScanInput = {
+				TableName: 'ProviderRevenues',
+			};
+
+			if (serviceProviderId || createDate || endDate) {
+				params.FilterExpression = '';
+				params.ExpressionAttributeValues = {};
+
+				if (serviceProviderId) {
+					params.IndexName = 'ServiceProviderIdIndex';
+					params.FilterExpression += 'ServiceProviderId = :serviceProviderId';
+					params.ExpressionAttributeValues[':serviceProviderId'] =
+						serviceProviderId;
+				}
+
+				if (createDate) {
+					params.FilterExpression +=
+						(params.FilterExpression ? ' AND ' : '') +
+						'CreateDate = :CreateDate';
+					params.ExpressionAttributeValues[':CreateDate'] = Number(createDate);
+				}
+
+				if (endDate) {
+					params.FilterExpression +=
+						(params.FilterExpression ? ' AND ' : '') + 'EndDate <= :EndDate';
+					params.ExpressionAttributeValues[':EndDate'] = Number(endDate);
+				}
+			}
+
+			const result = await docClient.scan(params).promise();
+			return result.Items.map(convertToCamelCase);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new Error(`Error fetching provider revenues: ${error.message}`);
+		}
+	}
 }
