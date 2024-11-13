@@ -1000,8 +1000,8 @@ export class WalletService {
 
 				const matchesWalletAddress =
 					type !== 'WALLET' && filters?.walletAddress
-						? transaction?.ReceiverUrl == filters?.walletAddress ||
-						  transaction?.SenderUrl == filters?.walletAddress
+						? transaction?.ReceiverUrl?.includes(filters?.walletAddress) ||
+						  transaction?.SenderUrl?.includes(filters?.walletAddress)
 						: true;
 
 				return (
@@ -2605,7 +2605,7 @@ export class WalletService {
 		const docClient = new DocumentClient();
 
 		try {
-			let params: DocumentClient.ScanInput = {
+			const params: DocumentClient.ScanInput = {
 				TableName: 'ProviderRevenues',
 			};
 
