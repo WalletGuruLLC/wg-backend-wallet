@@ -76,9 +76,8 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 				eventWebHookDTO?.data?.walletAddressId
 			);
 
-			const senderWalletValue = await this.walletService.getWalletByProviderId(
-				providerId
-			);
+			const senderWalletValue =
+				await this.walletService.getWalletAddressByProviderId(providerId);
 
 			const transaction = {
 				Type: 'IncomingPayment',
