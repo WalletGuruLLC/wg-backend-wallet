@@ -10,6 +10,7 @@ export class MetadataWebHookDTO {
 	wgUser: string;
 	activityId?: string;
 	contentName?: string;
+	serviceProviderId?: string;
 }
 
 interface WebHookData {
