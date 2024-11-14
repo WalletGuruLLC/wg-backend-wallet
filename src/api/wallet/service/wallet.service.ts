@@ -2037,7 +2037,7 @@ export class WalletService {
 							contentName: itemName || '---',
 							description: '',
 							type: 'PROVIDER',
-							wgUser: walletProvider?.ProviderId,
+							wgUser: userId,
 						},
 						incomingAmount: {
 							value: sendValueWalletGuru,
@@ -2069,7 +2069,7 @@ export class WalletService {
 								contentName: itemName || '---',
 								description: '',
 								type: 'PROVIDER',
-								wgUser: walletProvider?.ProviderId,
+								wgUser: userId,
 							},
 						};
 						const outgoingValue = await this.createOutgoingPayment(
