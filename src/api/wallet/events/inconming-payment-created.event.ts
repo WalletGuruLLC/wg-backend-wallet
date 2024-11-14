@@ -28,6 +28,11 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 		const credits =
 			(wallet.pendingCredits || 0) +
 			parseInt(eventWebHookDTO.data.incomingAmount.value);
+		console.log(
+			wallet.pendingCredits,
+			parseInt(eventWebHookDTO.data.incomingAmount.value),
+			credits
+		);
 		const params = {
 			Key: {
 				Id: wallet.id,
