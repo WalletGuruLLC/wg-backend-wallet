@@ -2012,21 +2012,21 @@ export class WalletService {
 					});
 				}
 
-				await this.createOutgoingPayment(inputOutgoing);
+				const outgoing = await this.createOutgoingPayment(inputOutgoing);
 
 				const docClient = new DocumentClient();
 				const params = {
 					TableName: 'Users',
 					Key: { Id: userId },
 				};
-				await docClient.get(params).promise();
+				const userDynamo = await docClient.get(params).promise();
 
-				// if (userDynamo?.Item?.Grant == 1) {
-				// 	await this.createDepositOutgoingMutationService({
-				// 		outgoingPaymentId: outgoing?.createOutgoingPayment?.payment?.id,
-				// 		idempotencyKey: uuidv4(),
-				// 	});
-				// }
+				if (userDynamo?.Item?.Grant == 1) {
+					await this.createDepositOutgoingMutationService({
+						outgoingPaymentId: outgoing?.createOutgoingPayment?.payment?.id,
+						idempotencyKey: uuidv4(),
+					});
+				}
 
 				// Send fee wg
 
