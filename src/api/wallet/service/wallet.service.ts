@@ -866,7 +866,14 @@ export class WalletService {
 			search = 'all';
 		}
 		const walletDb = await this.getUserByToken(token);
-		const WalletAddress = walletDb?.WalletAddress;
+		const providerId = await this.getProviderIdByUserToken(token);
+		const walletDbProvider = await this.getWalletAddressByProviderId(
+			providerId
+		);
+		const WalletAddress =
+			type == 'PROVIDER'
+				? walletDbProvider?.walletAddress
+				: walletDb?.WalletAddress;
 		const docClient = new DocumentClient();
 
 		const pagedParsed = Number(filters?.page) || 1;
@@ -1181,6 +1188,21 @@ export class WalletService {
 			])
 			.exec();
 		return walletByUserId[0];
+	}
+
+	async getProviderIdByUserToken(token: string) {
+		let userInfo = await axios.get(
+			this.AUTH_MICRO_URL + '/api/v1/users/current-user',
+			{
+				headers: {
+					Authorization: token,
+				},
+			}
+		);
+		userInfo = userInfo.data;
+
+		const providerId = userInfo?.data?.serviceProviderId;
+		return providerId;
 	}
 
 	async createReceiver(input: any) {
