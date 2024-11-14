@@ -194,7 +194,6 @@ export class AuthGateway
 			parsedData['x-nonce']?.toString() || headers['nonce']?.toString();
 		const sessionIdData = parsedData.sessionId?.toString();
 		await this.createOrUpdateClient(client, sessionIdData);
-		console.log('wsClients link', this.wsClients);
 		if (!publicKeyData) {
 			this.sendDataClientId('error', client.id, {
 				message: 'Public key missing!',
@@ -540,7 +539,6 @@ export class AuthGateway
 		client: Socket,
 		data: any
 	): Promise<any> {
-		console.log(this.wsClients);
 		const headers = client.handshake.headers;
 		const parsedData = data;
 		const publicKeyData =
