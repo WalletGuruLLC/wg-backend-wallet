@@ -36,20 +36,18 @@ export class IncomingPaymentCompletedEvent implements EventWebHook {
 						eventWebHookDTO.data.id
 					);
 
-				if (userIncoming?.id) {
-					const params = {
-						Key: {
-							Id: userIncoming?.id,
-						},
-						TableName: 'UserIncoming',
-						UpdateExpression: 'SET Status = :status',
-						ExpressionAttributeValues: {
-							':status': false,
-						},
-						ReturnValues: 'ALL_NEW',
-					};
-					await docClient.update(params).promise();
-				}
+				const params = {
+					Key: {
+						Id: userIncoming?.id,
+					},
+					TableName: 'UserIncoming',
+					UpdateExpression: 'SET Status = :status',
+					ExpressionAttributeValues: {
+						':status': false,
+					},
+					ReturnValues: 'ALL_NEW',
+				};
+				await docClient.update(params).promise();
 			}
 			await docClient.update(transactionParams).promise();
 		} catch (error) {
