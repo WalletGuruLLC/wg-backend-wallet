@@ -1047,7 +1047,7 @@ export class RafikiWalletController {
 				});
 			}
 
-			this.authGateway.server.emit('hc', {
+			this.authGateway.sendDataSessionId('hc', input?.sessionId, {
 				message: 'Account linked',
 				statusCode: 'WGS0051',
 				sessionId: input?.sessionId,
