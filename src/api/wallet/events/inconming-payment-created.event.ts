@@ -25,6 +25,8 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 	async trigger(eventWebHookDTO: EventWebHookDTO, wallet): Promise<void> {
 		const docClient = new DocumentClient();
 		const userId = eventWebHookDTO?.data?.metadata?.wgUser;
+		const providerId = eventWebHookDTO?.data?.metadata?.serviceProviderId;
+
 		const credits =
 			(wallet.pendingCredits || 0) +
 			parseInt(eventWebHookDTO.data.incomingAmount.value);
@@ -78,12 +80,19 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 				eventWebHookDTO?.data?.walletAddressId
 			);
 
+			const senderWalletValue = await this.walletService.getWalletByProviderId(
+				providerId
+			);
+
 			const transaction = {
 				Type: 'IncomingPayment',
 				IncomingPaymentId: eventWebHookDTO.data?.id,
 				WalletAddressId: eventWebHookDTO?.data?.walletAddressId,
 				ReceiverUrl: recieverWallet?.walletAddress,
-				SenderUrl: userWallet?.walletAddress,
+				SenderUrl:
+					eventWebHookDTO?.data?.metadata?.type === 'REVENUE'
+						? senderWalletValue?.walletAddress
+						: userWallet?.walletAddress,
 				State: 'PENDING',
 				Metadata: eventWebHookDTO.data?.metadata,
 				IncomingAmount: {
