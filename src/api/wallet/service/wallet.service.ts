@@ -2072,15 +2072,13 @@ export class WalletService {
 								wgUser: userId,
 							},
 						};
-						const outgoingValue = await this.createOutgoingPayment(
-							inputOutgoing
-						);
+						await this.createOutgoingPayment(inputOutgoing);
 
-						await this.createDepositOutgoingMutationService({
-							outgoingPaymentId:
-								outgoingValue?.createOutgoingPayment?.payment?.id,
-							idempotencyKey: uuidv4(),
-						});
+						// await this.createDepositOutgoingMutationService({
+						// 	outgoingPaymentId:
+						// 		outgoingValue?.createOutgoingPayment?.payment?.id,
+						// 	idempotencyKey: uuidv4(),
+						// });
 					}, 500);
 				}
 
