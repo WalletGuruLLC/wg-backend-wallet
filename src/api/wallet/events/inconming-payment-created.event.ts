@@ -47,7 +47,10 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 				providerWallet = await this.walletService.getWalletByProviderId(userId);
 			}
 			const userWallet = userWalletValue?.id ? userWalletValue : providerWallet;
-			if (eventWebHookDTO?.data?.metadata?.type === 'PROVIDER' && userId) {
+			if (
+				eventWebHookDTO?.data?.metadata?.type === 'PROVIDER' &&
+				userWallet?.id
+			) {
 				const debits =
 					(userWallet?.pendingDebits || 0) +
 					parseInt(eventWebHookDTO.data.incomingAmount.value);
@@ -78,94 +81,102 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 				eventWebHookDTO?.data?.walletAddressId
 			);
 
-			const transaction = {
-				Type: 'IncomingPayment',
-				IncomingPaymentId: eventWebHookDTO.data?.id,
-				WalletAddressId: eventWebHookDTO?.data?.walletAddressId,
-				ReceiverUrl: recieverWallet?.walletAddress,
-				SenderUrl: userWallet?.walletAddress,
-				State: 'PENDING',
-				Metadata: eventWebHookDTO.data?.metadata,
-				IncomingAmount: {
-					_Typename: 'Amount',
-					value: eventWebHookDTO.data?.incomingAmount?.value,
-					assetCode: eventWebHookDTO.data?.incomingAmount?.assetCode,
-					assetScale: eventWebHookDTO.data?.incomingAmount?.assetScale,
-				},
-				Description: '',
-			};
-
-			const transactionValue = await this.dbTransactions.create(transaction);
-
-			const senderWallet = await this.walletService.getWalletByAddress(
-				transaction?.SenderUrl
-			);
-			const receiverWallet = await this.walletService.getWalletByAddress(
-				transaction?.ReceiverUrl
+			console.log(
+				'address create incoming',
+				recieverWallet?.walletAddress,
+				userWallet?.walletAddress
 			);
 
-			let senderName = 'Unknown';
-			let receiverName = 'Unknown';
+			if (recieverWallet?.walletAddress && userWallet?.walletAddress) {
+				const transaction = {
+					Type: 'IncomingPayment',
+					IncomingPaymentId: eventWebHookDTO.data?.id,
+					WalletAddressId: eventWebHookDTO?.data?.walletAddressId,
+					ReceiverUrl: recieverWallet?.walletAddress,
+					SenderUrl: userWallet?.walletAddress,
+					State: 'PENDING',
+					Metadata: eventWebHookDTO.data?.metadata,
+					IncomingAmount: {
+						_Typename: 'Amount',
+						value: eventWebHookDTO.data?.incomingAmount?.value,
+						assetCode: eventWebHookDTO.data?.incomingAmount?.assetCode,
+						assetScale: eventWebHookDTO.data?.incomingAmount?.assetScale,
+					},
+					Description: '',
+				};
 
-			if (senderWallet?.userId) {
-				const senderWalletInfo = await this.walletService.getUserInfoById(
-					senderWallet?.userId
+				const transactionValue = await this.dbTransactions.create(transaction);
+
+				const senderWallet = await this.walletService.getWalletByAddress(
+					transaction?.SenderUrl
 				);
-				if (senderWalletInfo) {
-					senderName = `${senderWalletInfo?.firstName} ${senderWalletInfo?.lastName}`;
-				}
-			}
-
-			if (receiverWallet?.userId) {
-				const receiverWalletInfo = await this.walletService.getUserInfoById(
-					receiverWallet?.userId
+				const receiverWallet = await this.walletService.getWalletByAddress(
+					transaction?.ReceiverUrl
 				);
-				if (receiverWalletInfo) {
-					receiverName = `${receiverWalletInfo?.firstName} ${receiverWalletInfo?.lastName}`;
-				}
-			}
 
-			if (senderName === 'Unknown' && senderWallet?.providerId) {
-				const senderProviderInfo = await this.walletService.getProviderById(
-					senderWallet?.providerId
+				let senderName = 'Unknown';
+				let receiverName = 'Unknown';
+
+				if (senderWallet?.userId) {
+					const senderWalletInfo = await this.walletService.getUserInfoById(
+						senderWallet?.userId
+					);
+					if (senderWalletInfo) {
+						senderName = `${senderWalletInfo?.firstName} ${senderWalletInfo?.lastName}`;
+					}
+				}
+
+				if (receiverWallet?.userId) {
+					const receiverWalletInfo = await this.walletService.getUserInfoById(
+						receiverWallet?.userId
+					);
+					if (receiverWalletInfo) {
+						receiverName = `${receiverWalletInfo?.firstName} ${receiverWalletInfo?.lastName}`;
+					}
+				}
+
+				if (senderName === 'Unknown' && senderWallet?.providerId) {
+					const senderProviderInfo = await this.walletService.getProviderById(
+						senderWallet?.providerId
+					);
+					if (senderProviderInfo) {
+						senderName = senderProviderInfo?.name;
+					}
+				}
+
+				if (receiverName === 'Unknown' && receiverWallet?.providerId) {
+					const receiverProviderInfo = await this.walletService.getProviderById(
+						receiverWallet?.providerId
+					);
+					if (receiverProviderInfo) {
+						receiverName = receiverProviderInfo?.name;
+					}
+				}
+
+				const transactionFormated = {
+					...transactionValue,
+					senderName,
+					receiverName,
+				};
+
+				this.userWsGateway.sendTransaction(
+					recieverWallet?.userId || recieverWallet?.providerId,
+					transactionFormated
 				);
-				if (senderProviderInfo) {
-					senderName = senderProviderInfo?.name;
-				}
+
+				const receiver = await docClient.update(params).promise();
+
+				const balance = {
+					pendingCredit: receiver.Attributes?.PendingCredits,
+					pendingDebit: receiver.Attributes?.PendingDebits,
+					postedCredit: receiver.Attributes?.PostedCredits,
+					postedDebit: receiver.Attributes?.PostedDebits,
+				};
+
+				this.userWsGateway.sendBalance(receiver.Attributes?.UserId, balance);
+
+				return convertToCamelCase(receiver);
 			}
-
-			if (receiverName === 'Unknown' && receiverWallet?.providerId) {
-				const receiverProviderInfo = await this.walletService.getProviderById(
-					receiverWallet?.providerId
-				);
-				if (receiverProviderInfo) {
-					receiverName = receiverProviderInfo?.name;
-				}
-			}
-
-			const transactionFormated = {
-				...transactionValue,
-				senderName,
-				receiverName,
-			};
-
-			this.userWsGateway.sendTransaction(
-				recieverWallet?.userId || recieverWallet?.providerId,
-				transactionFormated
-			);
-
-			const receiver = await docClient.update(params).promise();
-
-			const balance = {
-				pendingCredit: receiver.Attributes?.PendingCredits,
-				pendingDebit: receiver.Attributes?.PendingDebits,
-				postedCredit: receiver.Attributes?.PostedCredits,
-				postedDebit: receiver.Attributes?.PostedDebits,
-			};
-
-			this.userWsGateway.sendBalance(receiver.Attributes?.UserId, balance);
-
-			return convertToCamelCase(receiver);
 		} catch (error) {
 			Sentry.captureException(error);
 			throw new Error(
