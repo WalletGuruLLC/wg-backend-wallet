@@ -2038,7 +2038,7 @@ export class WalletService {
 							description: '',
 							type: 'REVENUE',
 							wgUser: userId,
-							serviceProviderId: walletProvider?.ProviderId
+							serviceProviderId: walletProvider?.ProviderId,
 						},
 						incomingAmount: {
 							value: sendValueWalletGuru,
@@ -2071,7 +2071,7 @@ export class WalletService {
 								description: '',
 								type: 'REVENUE',
 								wgUser: userId,
-								serviceProviderId: walletProvider?.ProviderId
+								serviceProviderId: walletProvider?.ProviderId,
 							},
 						};
 						await this.createOutgoingPayment(inputOutgoing);
