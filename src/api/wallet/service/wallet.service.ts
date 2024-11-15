@@ -2481,7 +2481,7 @@ export class WalletService {
 		const users = await docClient.scan(scanParams).promise();
 		const usersToUpdate =
 			users?.Items?.filter(user =>
-				user.LinkedServiceProviders?.some(
+				user?.LinkedServiceProviders?.some(
 					provider => provider?.sessionId === sessionId
 				)
 			) ?? [];
