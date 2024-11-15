@@ -1363,6 +1363,101 @@ export class WalletService {
 		}
 	}
 
+	async getIncomingByServiceProviderAndUserId(
+		serviceProviderId: string,
+		userId: string
+	) {
+		try {
+			const resultsByServiceProvider = await this.dbIncomingUser
+				.query('ServiceProviderId')
+				.eq(serviceProviderId)
+				.exec();
+
+			const filteredResults = resultsByServiceProvider?.filter(
+				item => item?.UserId === userId
+			);
+
+			return filteredResults;
+		} catch (error) {
+			console.error('Error fetching incoming payments:', error?.message);
+		}
+	}
+
+	async cancelUserIncomingPaymentId(incomingPaymentId: string, userId: string) {
+		try {
+			const docClient = new DocumentClient();
+			const userIncoming = await this.getUserIncomingPaymentById(
+				incomingPaymentId
+			);
+			const incomingPayment = await this.getIncomingPaymentById(
+				incomingPaymentId
+			);
+			const userWallet = await this.getWalletByUser(userId);
+
+			if (!userIncoming) {
+				return {
+					statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+					customCode: 'WGE0167',
+				};
+			}
+
+			if (!incomingPayment) {
+				return {
+					statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+					customCode: 'WGE0167',
+				};
+			}
+
+			if (userIncoming?.status && userWallet) {
+				const receivedAmount = parseInt(incomingPayment?.receivedAmount.value);
+				const incomingValue = parseInt(incomingPayment.incomingAmount.value);
+				const pendingDebits: number =
+					(userWallet?.pendingDebits || 0) - (incomingValue - receivedAmount);
+
+				const params = {
+					Key: {
+						Id: userWallet.id,
+					},
+					TableName: 'Wallets',
+					UpdateExpression: 'SET PendingDebits = :pendingDebits',
+					ExpressionAttributeValues: {
+						':pendingDebits': pendingDebits,
+					},
+					ReturnValues: 'ALL_NEW',
+				};
+
+				const userIncomingParams = {
+					Key: {
+						Id: userIncoming.id,
+					},
+					TableName: 'UserIncoming',
+					ExpressionAttributeNames: {
+						'#status': 'Status',
+					},
+					UpdateExpression: 'SET #status = :status',
+					ExpressionAttributeValues: {
+						':status': false,
+					},
+					ReturnValues: 'ALL_NEW',
+				};
+
+				if (!receivedAmount) {
+					await this.cancelIncomingPayment(incomingPaymentId);
+				}
+
+				const wallet = await docClient.update(params).promise();
+				await docClient.update(userIncomingParams).promise();
+				return wallet?.Attributes;
+			}
+		} catch (error) {
+			Sentry.captureException(error);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0167',
+			};
+		}
+	}
+
 	async createQuote(input: any) {
 		try {
 			return await this.graphqlService.createQuote(input);
@@ -2512,6 +2607,17 @@ export class WalletService {
 				};
 
 				await docClient.update(updateParams).promise();
+
+				const incomingPaymentsProvider =
+					await this.getIncomingByServiceProviderAndUserId(
+						linkedProviders?.[0]?.serviceProviderId,
+						user?.Id
+					);
+
+				for (let i = 0; i < incomingPaymentsProvider?.length; i++) {
+					const incomingId = incomingPaymentsProvider?.[i]?.IncomingPaymentId;
+					await this.cancelUserIncomingPaymentId(incomingId, user?.Id);
+				}
 			}
 		}
 
