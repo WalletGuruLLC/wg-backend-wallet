@@ -519,6 +519,11 @@ export class AuthGateway
 				SubscribeMessage: 'unlink',
 				PublicKey: publicKeyData,
 			});
+			this.sendDataClientId('hc', client.id, {
+				message: 'Service provider unlinked successfully.',
+				statusCode: 'WGE0230',
+				sessionId: sessionIdData,
+			});
 		} else {
 			client.disconnect();
 			await this.logToDatabase('unlinkFailed', {
