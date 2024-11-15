@@ -866,7 +866,14 @@ export class WalletService {
 			search = 'all';
 		}
 		const walletDb = await this.getUserByToken(token);
-		const WalletAddress = walletDb?.WalletAddress;
+		const providerId = await this.getProviderIdByUserToken(token);
+		const walletDbProvider = await this.getWalletAddressByProviderId(
+			providerId
+		);
+		const WalletAddress =
+			type == 'PROVIDER'
+				? walletDbProvider?.walletAddress
+				: walletDb?.WalletAddress;
 		const docClient = new DocumentClient();
 
 		const pagedParsed = Number(filters?.page) || 1;
@@ -1181,6 +1188,21 @@ export class WalletService {
 			])
 			.exec();
 		return walletByUserId[0];
+	}
+
+	async getProviderIdByUserToken(token: string) {
+		let userInfo = await axios.get(
+			this.AUTH_MICRO_URL + '/api/v1/users/current-user',
+			{
+				headers: {
+					Authorization: token,
+				},
+			}
+		);
+		userInfo = userInfo.data;
+
+		const providerId = userInfo?.data?.serviceProviderId;
+		return providerId;
 	}
 
 	async createReceiver(input: any) {
@@ -2454,15 +2476,15 @@ export class WalletService {
 
 		const scanParams = {
 			TableName: 'Users',
-			FilterExpression:
-				'contains(LinkedServiceProviders.sessionId, :sessionId)',
-			ExpressionAttributeValues: {
-				':sessionId': sessionId,
-			},
 		};
 
 		const users = await docClient.scan(scanParams).promise();
-		const usersToUpdate = users?.Items ?? [];
+		const usersToUpdate =
+			users?.Items?.filter(user =>
+				user?.LinkedServiceProviders?.some(
+					provider => provider?.sessionId === sessionId
+				)
+			) ?? [];
 
 		if (usersToUpdate.length === 0) {
 			return {
