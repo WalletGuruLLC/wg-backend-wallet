@@ -2476,15 +2476,15 @@ export class WalletService {
 
 		const scanParams = {
 			TableName: 'Users',
-			FilterExpression:
-				'contains(LinkedServiceProviders.sessionId, :sessionId)',
-			ExpressionAttributeValues: {
-				':sessionId': sessionId,
-			},
 		};
 
 		const users = await docClient.scan(scanParams).promise();
-		const usersToUpdate = users?.Items ?? [];
+		const usersToUpdate =
+			users?.Items?.filter(user =>
+				user?.LinkedServiceProviders?.some(
+					provider => provider?.sessionId === sessionId
+				)
+			) ?? [];
 
 		if (usersToUpdate.length === 0) {
 			return {
