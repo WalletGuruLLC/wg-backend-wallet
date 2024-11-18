@@ -1516,6 +1516,16 @@ export class RafikiWalletController {
 
 	@Get('list-incoming-payments')
 	@ApiQuery({ name: 'status', required: false, type: Boolean })
+	@ApiQuery({
+		name: 'userId',
+		required: false,
+		type: String,
+	})
+	@ApiQuery({
+		name: 'serviceProviderId',
+		required: false,
+		type: String,
+	})
 	@ApiOperation({ summary: 'List all incoming payments' })
 	@ApiBearerAuth('JWT')
 	@ApiOkResponse({ description: 'Incoming payments retrieved successfully.' })
@@ -1524,7 +1534,9 @@ export class RafikiWalletController {
 	async listIncomingPayments(
 		@Headers() headers: MapOfStringToList,
 		@Res() res,
-		@Query('status') status?: boolean
+		@Query('status') status?: boolean,
+		@Query('userId') userId?: string,
+		@Query('serviceProviderId') serviceProviderId?: string
 	) {
 		let token;
 		try {
@@ -1556,7 +1568,9 @@ export class RafikiWalletController {
 			const incomingPayments = await this.walletService.listIncomingPayments(
 				token,
 				status,
-				userInfo
+				userInfo,
+				userId,
+				serviceProviderId
 			);
 
 			if (incomingPayments?.customCode) {
