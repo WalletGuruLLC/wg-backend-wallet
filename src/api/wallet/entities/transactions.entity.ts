@@ -30,6 +30,7 @@ export class Transaction extends Document {
 	Description: string;
 	SenderUrl: string;
 	ReceiverUrl: string;
+	Pay?: boolean;
 }
 
 export interface BaseTransaction {
