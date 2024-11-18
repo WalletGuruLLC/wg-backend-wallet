@@ -2274,7 +2274,7 @@ export class WalletService {
 
 			const sqsMsg = {
 				event: 'RECEIVE_MONEY_CONFIRMATION',
-				email: receiver.Item.Email,
+				email: result.Item.Email,
 				username:
 					receiver.Item.FirstName +
 					(receiver.Item.Lastname ? ' ' + receiver.Item.Lastname : ''),
