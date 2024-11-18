@@ -1096,14 +1096,31 @@ export class WalletService {
 		}
 	}
 
-	async listIncomingPayments(token: string, state?: any, userInfo?: any) {
+	async listIncomingPayments(
+		token: string,
+		state?: any,
+		userInfo?: any,
+		userId?: any,
+		serviceProviderId?: any
+	) {
 		const userWallet = await this.getUserByToken(token);
+		let userIncomingPayment: any[];
 
-		const userIncomingPayment = await this.getIncomingPaymentsByUser(
-			userWallet?.UserId,
-			state,
-			userInfo
-		);
+		if (userId) {
+			userIncomingPayment = await this.getIncomingPaymentsByUser(
+				userId,
+				state,
+				userInfo,
+				serviceProviderId
+			);
+		} else {
+			userIncomingPayment = await this.getIncomingPaymentsByUser(
+				userWallet?.UserId,
+				state,
+				userInfo,
+				serviceProviderId
+			);
+		}
 
 		if (userIncomingPayment?.[0]?.state == 'BLANK') {
 			return userIncomingPayment;
@@ -1709,7 +1726,8 @@ export class WalletService {
 	async getIncomingPaymentsByUser(
 		userId: string,
 		status?: boolean,
-		userInfo?: any
+		userInfo?: any,
+		serviceProviderId?: any
 	) {
 		const docClient = new DocumentClient();
 		const linkedProviders = await this.getLinkedProvidersUserById(userId);
@@ -1732,6 +1750,11 @@ export class WalletService {
 
 		try {
 			const result = await docClient.query(params).promise();
+			if (serviceProviderId) {
+				result.Items = result.Items.filter(
+					item => item.ServiceProviderId === serviceProviderId
+				);
+			}
 
 			if (!result?.Items?.length) {
 				const expireDate = await this.expireDate();
