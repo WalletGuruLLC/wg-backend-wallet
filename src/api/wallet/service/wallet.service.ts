@@ -2438,13 +2438,13 @@ export class WalletService {
 			const receiverValue = {
 				value: valueReceiverFormatted / pow,
 				asset: incomingPayment.incomingAmount.assetCode,
-				walletAddress: receiverInfo.walletAddress,
+				walletAddress: walletInfo.walletAddress,
 				date: receiverDateFormatted,
 			};
 
 			const sqsMsg = {
 				event: 'RECEIVE_MONEY_CONFIRMATION',
-				email: result.Item.Email,
+				email: receiver.Item.Email,
 				username:
 					receiver.Item.FirstName +
 					(receiver.Item.Lastname ? ' ' + receiver.Item.Lastname : ''),
