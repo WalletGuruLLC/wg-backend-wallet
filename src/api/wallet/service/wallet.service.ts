@@ -2390,7 +2390,7 @@ export class WalletService {
 			const receiverValue = {
 				value: valueReceiverFormatted / pow,
 				asset: incomingPayment.incomingAmount.assetCode,
-				walletAddress: receiverInfo.walletAddress,
+				walletAddress: walletInfo.walletAddress,
 				date: receiverDateFormatted,
 			};
 
