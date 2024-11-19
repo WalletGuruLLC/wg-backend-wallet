@@ -1,7 +1,7 @@
 import * as dynamoose from 'dynamoose';
 import { v4 as uuidv4 } from 'uuid';
 
-export const ProviderRevenuesSchema = new dynamoose.Schema(
+export const ClearPaymentsSchema = new dynamoose.Schema(
 	{
 		Id: {
 			type: String,
@@ -24,10 +24,7 @@ export const ProviderRevenuesSchema = new dynamoose.Schema(
 			type: Array,
 			schema: [String],
 		},
-		StartDate: {
-			type: Number,
-		},
-		EndDate: {
+		RevenueDate: {
 			type: Number,
 		},
 		Observations: {

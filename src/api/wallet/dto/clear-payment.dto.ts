@@ -1,17 +1,23 @@
-import { IsArray, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import {
+	IsArray,
+	IsNotEmpty,
+	IsNumber,
+	IsOptional,
+	IsString,
+} from 'class-validator';
 
-export class CreateProviderRevenue {
+export class CreateClearPayment {
 	@IsString()
 	@IsNotEmpty()
 	serviceProviderId: string;
 
-	@IsString()
+	@IsNumber()
 	@IsNotEmpty()
-	startDate: string;
+	startDate: number;
 
-	@IsString()
+	@IsNumber()
 	@IsNotEmpty()
-	endDate: string;
+	endDate: number;
 
 	@IsArray()
 	@IsString({ each: true })

@@ -55,7 +55,6 @@ import { Model } from 'dynamoose/dist/Model';
 import { Transaction } from '../entities/transactions.entity';
 import { TransactionsSchema } from '../entities/transactions.schema';
 import { UserWsGateway } from '../service/websocket-users';
-import { CreateProviderRevenue } from '../dto/provider-revenue.dto';
 
 @ApiTags('wallet-rafiki')
 @Controller('api/v1/wallets-rafiki')
@@ -1693,100 +1692,6 @@ export class RafikiWalletController {
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
 				customCode: 'WGE0167',
 			});
-		}
-	}
-
-	@Post('provider/revenue')
-	@ApiOperation({ summary: 'Create a new provider revenue' })
-	@ApiBody({
-		type: CreateProviderRevenue,
-		description: 'Data required to create a new provider revenue',
-	})
-	@ApiResponse({
-		status: 201,
-		description: 'Provider Revenue Has Been Created Successfully',
-	})
-	@ApiResponse({
-		status: 400,
-		description: 'Error Creating Provider Revenue',
-	})
-	@ApiResponse({
-		status: 500,
-		description: 'Internal Server Error',
-	})
-	async createProviderRevenue(
-		@Body()
-		createProviderRevenue: CreateProviderRevenue,
-		@Headers() headers: MapOfStringToList,
-		@Res() res
-	) {
-		let token;
-		try {
-			token = headers.authorization ?? '';
-			const instanceVerifier = await this.verifyService.getVerifiedFactory();
-			await instanceVerifier.verify(token.toString().split(' ')[1]);
-		} catch (error) {
-			Sentry.captureException(error);
-			throw new HttpException(
-				{
-					statusCode: HttpStatus.UNAUTHORIZED,
-					customCode: 'WGE0021',
-				},
-				HttpStatus.UNAUTHORIZED
-			);
-		}
-		token = token || '';
-		try {
-			let userInfo = await axios.get(
-				this.AUTH_MICRO_URL + '/api/v1/users/current-user',
-				{ headers: { Authorization: token } }
-			);
-			userInfo = userInfo.data;
-			const userType = userInfo?.data?.type;
-
-			if (userType !== 'PLATFORM') {
-				return res.status(HttpStatus.UNAUTHORIZED).send({
-					statusCode: HttpStatus.UNAUTHORIZED,
-					customCode: 'WGE0022',
-				});
-			}
-
-			const providerWallet =
-				await this.walletService.getWalletAddressByProviderId(
-					createProviderRevenue.serviceProviderId
-				);
-
-			if (!providerWallet) {
-				return res.status(HttpStatus.NOT_FOUND).send({
-					statusCode: HttpStatus.NOT_FOUND,
-					customCode: 'WGE0074',
-				});
-			}
-
-			const providerRevenue = await this.walletService.createProviderRevenue(
-				createProviderRevenue,
-				providerWallet
-			);
-			return res.status(HttpStatus.CREATED).send({
-				statusCode: HttpStatus.CREATED,
-				customCode: 'WGE0227',
-				data: { providerRevenue },
-			});
-		} catch (error) {
-			Sentry.captureException(error);
-			if (
-				error instanceof HttpException &&
-				error.getStatus() === HttpStatus.INTERNAL_SERVER_ERROR
-			) {
-				throw new HttpException(
-					{
-						statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-						customCode: 'WGE0229',
-					},
-					HttpStatus.INTERNAL_SERVER_ERROR
-				);
-			}
-			throw error;
 		}
 	}
 
