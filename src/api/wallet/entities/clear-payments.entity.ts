@@ -8,4 +8,7 @@ export class ClearPayments extends Document {
 	RevenueDate?: number;
 	CreateDate?: string;
 	UpdateDate?: string;
+	Fees?: number;
+	ReferenceNumber?: string;
+	State?: boolean;
 }

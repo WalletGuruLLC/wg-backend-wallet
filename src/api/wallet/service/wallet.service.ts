@@ -2029,6 +2029,29 @@ export class WalletService {
 		}
 	}
 
+	async getProviders(): Promise<any> {
+		const docClient = new DocumentClient();
+
+		const params: DocumentClient.ScanInput = {
+			TableName: 'Providers',
+			FilterExpression: '#active = :active',
+			ExpressionAttributeNames: {
+				'#active': 'Active',
+			},
+			ExpressionAttributeValues: {
+				':active': true,
+			},
+		};
+
+		try {
+			const result = await docClient.scan(params).promise();
+			const providers = convertToCamelCase(result.Items || []);
+			return providers;
+		} catch (error) {
+			Sentry.captureException(error);
+		}
+	}
+
 	async validatePaymentParameterId(
 		paymentId: string,
 		serviceProviderId: string
@@ -2357,6 +2380,33 @@ export class WalletService {
 		} catch (error) {
 			Sentry.captureException(error);
 			throw new Error(`Error fetching wallet by address: ${error.message}`);
+		}
+	}
+
+	async getProviderCompletedTransactions(receiverUrl: string) {
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'Transactions',
+			IndexName: 'ReceiverUrlIndex',
+			KeyConditionExpression: `ReceiverUrl  = :receiverUrl`,
+			FilterExpression: '#state = :state AND #pay = :pay',
+			ExpressionAttributeNames: {
+				'#state': 'State',
+				'#pay': 'Pay',
+			},
+			ExpressionAttributeValues: {
+				':state': 'COMPLETED',
+				':pay': false,
+				':receiverUrl': receiverUrl,
+			},
+		};
+
+		try {
+			const result = await docClient.query(params).promise();
+			return convertToCamelCase(result.Items);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new Error(`Error fetching provider transactions: ${error.message}`);
 		}
 	}
 
@@ -2770,7 +2820,75 @@ export class WalletService {
 		return await this.getUserByToken(token);
 	}
 
-	async createProviderRevenue(
+	async generateClearPayments() {
+		try {
+			const providers = await this.getProviders();
+			const now = new Date();
+			const lastMonth = new Date(now);
+			lastMonth.setMonth(now.getMonth() - 1);
+			lastMonth.setDate(1);
+			lastMonth.setHours(0, 0, 0, 0);
+			Promise.all(
+				providers.map(async provider => {
+					const providerWallet = await this.getWalletAddressByProviderId(
+						provider?.id
+					);
+
+					const transactions = await this.getProviderCompletedTransactions(
+						providerWallet?.walletAddress
+					);
+
+					if (transactions?.length) {
+						const paymentParameters = await this.getPaymentsParameters(
+							provider?.id
+						);
+
+						const transactionIds = transactions?.map(transaction => {
+							return transaction?.id;
+						});
+
+						const totalAmount = transactions.reduce((total, transaction) => {
+							return (
+								total + parseFloat(transaction?.incomingAmount?.value || 0)
+							);
+						}, 0);
+
+						const walletInfo = await this.graphqlService.listWalletInfo(
+							providerWallet.rafikiId
+						);
+						const scale = walletInfo.data.walletAddress.asset.scale;
+						const code = walletInfo.data.walletAddress.asset.code;
+						const paymentParameter =
+							paymentParameters?.find(parameter => parameter?.asset === code) ||
+							paymentParameters?.[0];
+						const fees = adjustValue(
+							calcularTotalCostoWalletGuru(
+								paymentParameter?.base,
+								paymentParameter?.comision,
+								paymentParameter?.cost,
+								paymentParameter?.percent,
+								scale
+							),
+							scale
+						);
+
+						const createProviderRevenueDTO = {
+							ServiceProviderId: provider?.id,
+							Value: totalAmount,
+							RevenueDate: lastMonth.getTime(),
+							Fees: fees,
+							TransactionIds: transactionIds,
+						};
+						await this.dbClearPayments.create(createProviderRevenueDTO);
+					}
+				})
+			);
+		} catch (error) {
+			Sentry.captureException(error);
+		}
+	}
+
+	async createClearPayment(
 		createProviderRevenue: CreateClearPayment,
 		providerWallet
 	) {
@@ -2796,22 +2914,44 @@ export class WalletService {
 			);
 
 			const totalAmount = completedTransactions.reduce((total, transaction) => {
-				return total + parseFloat(transaction?.IncomingAmount?.value || 0);
+				return total + parseFloat(transaction?.incomingAmount?.value || 0);
 			}, 0);
 
 			if (completedTransactions?.length) {
+				const paymentParameters = await this.getPaymentsParameters(
+					createProviderRevenue?.serviceProviderId
+				);
+
+				const walletInfo = await this.graphqlService.listWalletInfo(
+					providerWallet.rafikiId
+				);
+
+				const code = walletInfo.data.walletAddress.asset.code;
+				const scale = walletInfo.data.walletAddress.asset.scale;
+				const paymentParameter =
+					paymentParameters?.find(parameter => parameter?.asset === code) ||
+					paymentParameters?.[0];
+
+				const fees = adjustValue(
+					calcularTotalCostoWalletGuru(
+						paymentParameter?.base,
+						paymentParameter?.comision,
+						paymentParameter?.cost,
+						paymentParameter?.percent,
+						scale
+					),
+					scale
+				);
+
 				const createProviderRevenueDTO = {
-					ServiceProviderId: createProviderRevenue.serviceProviderId,
+					ServiceProviderId: createProviderRevenue?.serviceProviderId,
 					Value: totalAmount,
 					RevenueDate: new Date().getTime(),
-					TransactionIds: createProviderRevenue.transactionIds,
-					...(createProviderRevenue?.observations && {
-						Observations: createProviderRevenue.observations,
-					}),
+					Fees: fees,
+					TransactionIds: completedTransactionIds,
 				};
 
 				revenues = await this.dbClearPayments.create(createProviderRevenueDTO);
-				await this.batchUpdateTransactions(completedTransactionIds);
 				return convertToCamelCase(revenues);
 			}
 

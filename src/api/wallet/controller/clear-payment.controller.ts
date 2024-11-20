@@ -107,13 +107,13 @@ export class ClearPaymentController {
 				});
 			}
 
-			const providerRevenue = await this.walletService.createProviderRevenue(
+			const providerRevenue = await this.walletService.createClearPayment(
 				createProviderRevenue,
 				providerWallet
 			);
 
 			if (providerRevenue?.statusCode) {
-				return res.status().send({
+				return res.status(providerRevenue?.statusCode).send({
 					statusCode: providerRevenue?.statusCode,
 					customCode: providerRevenue?.customCode,
 				});
