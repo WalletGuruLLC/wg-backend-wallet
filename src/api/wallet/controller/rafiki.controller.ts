@@ -308,6 +308,14 @@ export class RafikiWalletController {
 	@Get('list-transactions')
 	@ApiQuery({ name: 'search', required: false, type: String })
 	@ApiQuery({ name: 'type', required: false, type: String })
+	@ApiQuery({ name: 'userType', required: false, type: String })
+	@ApiQuery({
+		name: 'orderBy',
+		required: false,
+		isArray: true,
+		type: String,
+		description: 'Order by fields (e.g., providerId, date)',
+	})
 	@ApiQuery({ name: 'startDate', required: false, type: String })
 	@ApiQuery({ name: 'endDate', required: false, type: String })
 	@ApiQuery({ name: 'state', required: false, type: String })
@@ -327,6 +335,7 @@ export class RafikiWalletController {
 		@Res() res,
 		@Query('search') search?: string,
 		@Query('type') type?: string,
+		@Query('userType') userType?: string,
 		@Query('startDate') startDate?: string,
 		@Query('endDate') endDate?: string,
 		@Query('state') state?: string,
@@ -334,7 +343,8 @@ export class RafikiWalletController {
 		@Query('activityId') activityId?: string,
 		@Query('walletAddress') walletAddress?: string,
 		@Query('page') page?: string,
-		@Query('items') items?: string
+		@Query('items') items?: string,
+		@Query('orderBy') orderBy?: ('providerId' | 'date')[]
 	) {
 		let token;
 		try {
@@ -362,7 +372,7 @@ export class RafikiWalletController {
 				}
 			);
 			userInfo = userInfo.data;
-			const userType = userInfo?.data?.type;
+			const userTypeInfo = userInfo?.data?.type;
 			let parsedProviderIds: string[] = [];
 			if (typeof providerIds === 'string') {
 				try {
@@ -379,6 +389,7 @@ export class RafikiWalletController {
 
 			const filters = {
 				type,
+				userType,
 				dateRange:
 					startDate && endDate ? { start: startDate, end: endDate } : undefined,
 				state,
@@ -388,13 +399,14 @@ export class RafikiWalletController {
 				walletAddress,
 				page,
 				items,
+				orderBy,
 			};
-			if (userType === 'WALLET') {
+			if (userTypeInfo === 'WALLET') {
 				filters.transactionType = ['incoming', 'outgoing'];
-			} else if (userType === 'PROVIDER') {
+			} else if (userTypeInfo === 'PROVIDER') {
 				filters.providerIds = parsedProviderIds;
 				filters.transactionType = ['incoming', 'outgoing'];
-			} else if (userType === 'PLATFORM') {
+			} else if (userTypeInfo === 'PLATFORM') {
 				filters.transactionType = ['incoming', 'outgoing'];
 			} else {
 				return res.status(HttpStatus.UNAUTHORIZED).send({
@@ -407,7 +419,7 @@ export class RafikiWalletController {
 				token,
 				search,
 				filters,
-				userType
+				userTypeInfo
 			);
 
 			return res.status(HttpStatus.OK).send({

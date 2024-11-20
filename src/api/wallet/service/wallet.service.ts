@@ -851,6 +851,7 @@ export class WalletService {
 		search: string,
 		filters?: {
 			type?: string;
+			userType?: string;
 			dateRange?: { start: string; end: string };
 			state?: string;
 			providerIds?: string[];
@@ -859,6 +860,7 @@ export class WalletService {
 			walletAddress?: string;
 			page?: string;
 			items?: string;
+			orderBy?: ('providerId' | 'date')[];
 		},
 		type?: string
 	) {
@@ -1011,15 +1013,38 @@ export class WalletService {
 						  transaction?.SenderUrl?.includes(filters?.walletAddress)
 						: true;
 
+				const matchesUserType = filters?.userType
+					? transaction?.Metadata?.type === filters?.userType
+					: true;
+
 				return (
 					matchesActivityId &&
 					matchesType &&
 					matchesState &&
 					matchesDateRange &&
 					matchesProviderId &&
-					matchesWalletAddress
+					matchesWalletAddress &&
+					matchesUserType
 				);
 			});
+
+			if (filters?.orderBy?.length) {
+				filteredTransactions?.sort((a, b) => {
+					for (const field of filters.orderBy) {
+						if (field === 'providerId') {
+							const aProviderId = a?.Metadata?.providerId || '';
+							const bProviderId = b?.Metadata?.providerId || '';
+							if (aProviderId < bProviderId) return -1;
+							if (aProviderId > bProviderId) return 1;
+						} else if (field === 'date') {
+							const aDate = new Date(a?.createdAt).getTime();
+							const bDate = new Date(b?.createdAt).getTime();
+							return aDate - bDate;
+						}
+					}
+					return 0;
+				});
+			}
 
 			const isIncoming = filters?.transactionType?.includes('incoming');
 			const isOutgoing = filters?.transactionType?.includes('outgoing');
@@ -2778,6 +2803,24 @@ export class WalletService {
 		} catch (error) {
 			Sentry.captureException(error);
 			throw new Error(`Error fetching provider revenues: ${error.message}`);
+		}
+	}
+
+	async getProviderInfoRevenueById(id: string) {
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'ProviderRevenues',
+			Key: { Id: id },
+		};
+
+		try {
+			const result = await docClient.get(params).promise();
+			return convertToCamelCase(result?.Item);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new Error(
+				`Error fetching providerRevenues by id: ${error.message}`
+			);
 		}
 	}
 }
