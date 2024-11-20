@@ -937,9 +937,11 @@ export class WalletService {
 			},
 		};
 
+		console.log('outgoingParams', outgoingParams);
 		const dynamoOutgoingPayments = await docClient
 			.scan(outgoingParams)
 			.promise();
+		console.log('dynamoOutgoingPayments', dynamoOutgoingPayments?.Items[0]);
 
 		if (dynamoOutgoingPayments?.Items?.length > 0) {
 			const sortedArray = dynamoOutgoingPayments?.Items?.sort(

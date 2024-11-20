@@ -22,20 +22,6 @@ export const requestSigHeaders = async (
 	clientPrivate
 ) => {
 	try {
-		console.log({
-			method: 'post',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				keyId: clientKey,
-				base64Key: clientPrivate,
-				request: {
-					url,
-					method,
-					headers,
-					body: JSON.stringify(body),
-				},
-			}),
-		});
 		const response = await fetch(process.env.SIGNATURE_URL, {
 			method: 'post',
 			headers: { 'Content-Type': 'application/json' },
@@ -88,7 +74,5 @@ export const addSignatureHeaders = async (req, clientKey, clientPrivate) => {
 		clientKey,
 		clientPrivate
 	);
-	console.log('signatureHeaders', signatureHeaders);
-	req.headers = JSON.parse(JSON.stringify(signatureHeaders));
 	return signatureHeaders;
 };
