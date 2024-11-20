@@ -21,11 +21,8 @@ export class CronService implements OnModuleInit {
 
 	handleClearPayments() {
 		try {
+			this.configService.get<string>('CRON_TIME_EXPRESSION') || '1 0 1 * *';
 			this.logger.log('Init Clear Payments cron job');
-
-			const cronExpression = this.configService.get<string>(
-				'CRON_TIME_EXPRESSION'
-			);
 
 			const job = new CronJob(cronExpression, async () => {
 				await this.walletService.generateClearPayments();
