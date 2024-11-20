@@ -1247,7 +1247,7 @@
   resolved "https://registry.npmjs.org/@humanwhocodes/object-schema/-/object-schema-2.0.3.tgz"
   integrity sha512-93zYdMES/c1D69yZiKDBj0V24vqNzB/koF26KPaagAfd3P/4gUlh3Dys5ogAK+Exi9QyzlD8x/08Zt7wIKcDcA==
 
-"@interledger/http-signature-utils@2.0.2":
+"@interledger/http-signature-utils@^2.0.2", "@interledger/http-signature-utils@2.0.2":
   version "2.0.2"
   resolved "https://registry.npmjs.org/@interledger/http-signature-utils/-/http-signature-utils-2.0.2.tgz"
   integrity sha512-gTAPFMt7xwG1zv1rbrltcZTAqOw/ZJwkVdnNjQzu5G9JTfvJQzS6pcpiVUej1cblpewotbOzosgdX00f93q9zA==

@@ -65,7 +65,10 @@ import { Model } from 'dynamoose/dist/Model';
 import { Transaction } from '../entities/transactions.entity';
 import { TransactionsSchema } from '../entities/transactions.schema';
 import { UserWsGateway } from '../service/websocket-users';
-import { getGrantForIncomingPayment } from 'src/utils/helpers/openPaymentMethods';
+import {
+	getGrantForIncomingPayment,
+	unifiedProcess,
+} from 'src/utils/helpers/openPaymentMethods';
 import { toBase64 } from 'src/utils/helpers/openPaymentSignature';
 
 @ApiTags('wallet-rafiki')
@@ -441,6 +444,7 @@ export class RafikiWalletController {
 				data: { ...transactions },
 			});
 		} catch (error) {
+			console.log('error', error?.message);
 			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
@@ -1366,6 +1370,7 @@ export class RafikiWalletController {
 				},
 			});
 		} catch (error) {
+			console.log('error', error?.message);
 			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
@@ -1379,16 +1384,16 @@ export class RafikiWalletController {
 		schema: {
 			type: 'object',
 			properties: {
-				clientWalletAddress: { type: 'string', example: '0x123456789abcdef' },
-				walletId: { type: 'string', example: '0x123456789abcdef' },
+				senderWalletAddress: { type: 'string', example: '0x123456789abcdef' },
+				receiverWalletAddress: { type: 'string', example: '0x123456789abcdef' },
 			},
 		},
 		description: 'auth open payment',
 	})
 	@ApiOperation({ summary: 'Open payment - auth payment' })
 	async postAuthPayment(
-		@Body('clientWalletAddress') clientWalletAddress: string,
-		@Body('walletId') walletId: string,
+		@Body('senderWalletAddress') senderWalletAddress: string,
+		@Body('receiverWalletAddress') receiverWalletAddress: string,
 		@Req() req,
 		@Res() res
 	) {
@@ -1399,16 +1404,54 @@ export class RafikiWalletController {
 			// 	-----END PRIVATE KEY-----`);
 
 			const walletKey = await this.walletService.findWalletByUrl(
-				clientWalletAddress
+				senderWalletAddress
 			);
 
-			const response = await getGrantForIncomingPayment(
-				clientWalletAddress,
+			const privateKey = walletKey?.PrivateKey;
+			const keyId = walletKey?.KeyId;
+
+			const walletBase64 = await toBase64(privateKey);
+
+			const receiverAssetCode = 'USD';
+			const receiverAssetScale = 2;
+			const quoteDebitAmount = {
+				value: '10',
+				assetCode: 'USD',
+				assetScale: 6,
+			};
+			const quoteReceiveAmount = {
+				value: '10',
+				assetCode: 'USD',
+				assetScale: 6,
+			};
+			const expirationDate = new Date(
+				Date.now() + 24 * 60 * 60 * 1000
+			).toISOString();
+			const clientKey = keyId;
+			const clientPrivate = walletBase64;
+
+			const result = await unifiedProcess(
+				receiverWalletAddress,
+				receiverAssetCode,
+				receiverAssetScale,
+				senderWalletAddress,
+				quoteDebitAmount,
+				quoteReceiveAmount,
+				expirationDate,
 				req,
-				walletId,
-				'LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1DNENBUUF3QlFZREsyVndCQ0lFSUxwOXpCc2JCRFhzdVlIQVlmR1Y5ZkpKb1gxS3lwK3lZUWt6QTk5ZVc1UmwKLS0tLS1FTkQgUFJJVkFURSBLRVktLS0tLQ=='
+				clientKey,
+				clientPrivate
 			);
-			return response;
+
+			// const response = await getGrantForIncomingPayment(
+			// 	senderWalletAddress,
+			// 	req,
+			// 	keyId,
+			// 	walletBase64
+			// 	//walletId,
+			// 	//'LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1DNENBUUF3QlFZREsyVndCQ0lFSUxtdTZXMXM2WE5FMUNKZUVsazRValRrMFR5YmF3UGlXTWRsWElRSWRXNEEKLS0tLS1FTkQgUFJJVkFURSBLRVktLS0tLQ=='
+			// );
+			return result;
 		} catch (error) {
 			console.log('error', error?.message);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({

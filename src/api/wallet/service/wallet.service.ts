@@ -492,7 +492,7 @@ export class WalletService {
 		await this.dbInstance.update(id, {
 			PrivateKey: pairs?.privateKeyPEM,
 			PublicKey: pairs?.publicKeyPEM,
-			KeyId: keyId,
+			KeyId: 'keyid-' + keyId,
 		});
 		return pairs;
 	}
@@ -549,7 +549,7 @@ export class WalletService {
 		let createdRafikiWalletAddress;
 		const pairs = await this.generateKeys();
 		const keyId = uuidv4();
-		const jwk = await generateJwk(pairs?.privateKey, keyId);
+		const jwk = await generateJwk(pairs?.privateKey, 'keyid-' + keyId);
 
 		try {
 			createdRafikiWalletAddress = await this.createWalletAddressGraphQL(
@@ -934,9 +934,11 @@ export class WalletService {
 			},
 		};
 
+		console.log('outgoingParams', outgoingParams);
 		const dynamoOutgoingPayments = await docClient
 			.scan(outgoingParams)
 			.promise();
+		console.log('dynamoOutgoingPayments', dynamoOutgoingPayments?.Items[0]);
 
 		if (dynamoOutgoingPayments?.Items?.length > 0) {
 			const sortedArray = dynamoOutgoingPayments?.Items?.sort(
