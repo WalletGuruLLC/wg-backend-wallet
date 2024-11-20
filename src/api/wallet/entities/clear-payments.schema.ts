@@ -32,6 +32,18 @@ export const ClearPaymentsSchema = new dynamoose.Schema(
 			required: false,
 			default: '',
 		},
+		ReferenceNumber: {
+			type: String,
+			required: false,
+			default: '',
+		},
+		Fees: {
+			type: Number,
+		},
+		State: {
+			type: Boolean,
+			default: false,
+		},
 	},
 	{
 		timestamps: {
