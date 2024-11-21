@@ -2906,28 +2906,11 @@ export class WalletService {
 			const now = new Date();
 
 			const startDate = new Date(
-				Date.UTC(
-					now.getUTCFullYear(),
-					now.getUTCMonth() - 1,
-					1,
-					0,
-					0,
-					0,
-					0
-				)
+				Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1, 0, 0, 0, 0)
 			);
 
-			
 			const endDate = new Date(
-				Date.UTC(
-					now.getUTCFullYear(),
-					now.getUTCMonth(),
-					0,
-					23,
-					59,
-					59,
-					999
-				)
+				Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0, 23, 59, 59, 999)
 			);
 
 			Promise.all(
