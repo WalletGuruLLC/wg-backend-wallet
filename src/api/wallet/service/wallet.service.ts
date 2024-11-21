@@ -49,6 +49,9 @@ import { CreateWebSocketActionDto } from '../dto/create-web-socket-action.dto';
 import { ClearPayments } from '../entities/clear-payments.entity';
 import { ClearPaymentsSchema } from '../entities/clear-payments.schema';
 import { CreateClearPayment } from '../dto/clear-payment.dto';
+import { buildFilterExpression } from '../../../utils/helpers/buildFilterExpressionDynamo';
+import { getDateRangeForMonthEnum } from 'src/utils/helpers/buildMonthRanges';
+import { Month } from '../dto/month.enum';
 
 @Injectable()
 export class WalletService {
@@ -1179,6 +1182,78 @@ export class WalletService {
 		);
 
 		return convertToCamelCase(incomingSorted);
+	}
+
+	async listClearPayments(filters, provider) {
+		const docClient = new DocumentClient();
+
+		const { page, items, month, providerId, ...filterRest } = filters;
+
+		const pagedParsed = Number(filters?.page) || 1;
+		const itemsParsed = Number(filters?.items) || 10;
+
+		const expression = buildFilterExpression(filterRest);
+		const clearPaymentsParams: DocumentClient.QueryInput = {
+			TableName: 'ClearPayments',
+			IndexName: 'ServiceProviderIdIndex',
+			KeyConditionExpression: `ServiceProviderId  = :serviceProviderId`,
+
+			...(expression.filterExpression && {
+				FilterExpression: expression.filterExpression,
+			}),
+			...(Object.keys(expression.attributeNames).length && {
+				ExpressionAttributeNames: expression.attributeNames,
+			}),
+			...(Object.keys(expression?.expressionValues).length && {
+				ExpressionAttributeValues: {
+					...expression?.expressionValues,
+					':serviceProviderId': providerId,
+				},
+			}),
+		};
+
+		const currentDate = new Date();
+
+		const defaultMonth = currentDate.getMonth();
+
+		const calculatedMonth = month ? month : defaultMonth;
+
+		const monthRanges = getDateRangeForMonthEnum(calculatedMonth);
+
+		const clearPayments = await docClient.query(clearPaymentsParams).promise();
+
+		const filteredClearPayments = convertToCamelCase(
+			clearPayments?.Items
+		).filter(clearPayment => {
+			const createTimestamp = clearPayment?.createDate;
+
+			return (
+				createTimestamp >= monthRanges.startDate &&
+				createTimestamp <= monthRanges.endDate
+			);
+		});
+
+		const paginatedResults = await this.paginatedResults(
+			pagedParsed,
+			itemsParsed,
+			filteredClearPayments
+		);
+
+		const { transactions, ...paginated } = paginatedResults;
+
+		const clearPaymentsTransformed = transactions.map(transaction => {
+			return {
+				...transaction,
+				provider: provider?.name,
+				month: Month[calculatedMonth],
+			};
+		});
+		const results = {
+			clearPayments: clearPaymentsTransformed,
+			...paginated,
+		};
+
+		return convertToCamelCase(results);
 	}
 
 	async generateCsv(res, transactions: any[]) {

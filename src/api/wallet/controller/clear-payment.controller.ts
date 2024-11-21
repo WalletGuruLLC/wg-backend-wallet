@@ -8,6 +8,7 @@ import {
 	Res,
 	Get,
 	Param,
+	Query,
 } from '@nestjs/common';
 import {
 	ApiTags,
@@ -17,6 +18,7 @@ import {
 	ApiBody,
 	ApiOkResponse,
 	ApiParam,
+	ApiQuery,
 } from '@nestjs/swagger';
 
 import { WalletService } from '../service/wallet.service';
@@ -182,6 +184,101 @@ export class ClearPaymentController {
 			Sentry.captureException(error);
 			return res.status(500).send({
 				customCode: 'WGE0163',
+			});
+		}
+	}
+
+	@Get('list/payments')
+	@ApiQuery({ name: 'month', required: false, type: Number })
+	@ApiQuery({ name: 'providerId', required: false, type: String })
+	@ApiQuery({ name: 'status', required: false, type: Boolean })
+	@ApiQuery({ name: 'page', required: false, type: String })
+	@ApiQuery({ name: 'items', required: false, type: String })
+	@ApiOperation({ summary: 'List all clear payments' })
+	@ApiBearerAuth('JWT')
+	@ApiOkResponse({ description: 'Clear payments successfully retrieved.' })
+	@ApiResponse({ status: 206, description: 'Incomplete parameters.' })
+	@ApiResponse({ status: 401, description: 'Unauthorized access.' })
+	@ApiResponse({ status: 500, description: 'Server error.' })
+	async listClearPayments(
+		@Headers() headers: Record<string, string>,
+		@Res() res,
+		@Query('month') month?: number,
+		@Query('providerId') providerId?: string,
+		@Query('status') status?: string,
+		@Query('page') page?: string,
+		@Query('items') items?: string
+	) {
+		let token;
+		try {
+			token = headers.authorization ?? '';
+			const instanceVerifier = await this.verifyService.getVerifiedFactory();
+			await instanceVerifier.verify(token.toString().split(' ')[1]);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new HttpException(
+				{
+					statusCode: HttpStatus.UNAUTHORIZED,
+					customCode: 'WGE0021',
+				},
+				HttpStatus.UNAUTHORIZED
+			);
+		}
+
+		try {
+			let userInfo = await axios.get(
+				this.AUTH_MICRO_URL + '/api/v1/users/current-user',
+				{
+					headers: {
+						Authorization: token,
+					},
+				}
+			);
+			userInfo = userInfo.data;
+			const userTypeInfo = userInfo?.data?.type;
+
+			const serviceProviderId =
+				userTypeInfo === 'PROVIDER'
+					? userInfo?.data?.serviceProviderId
+					: providerId;
+
+			const provider = await this.walletService.getWalletByProviderId(
+				serviceProviderId
+			);
+
+			if (provider?.statusCode) {
+				return res.status(HttpStatus.NOT_FOUND).send({
+					statusCode: HttpStatus.NOT_FOUND,
+					customCode: 'WGE0040',
+				});
+			}
+
+			const parsedStatus =
+				status === 'false' ? false : status === 'true' ? true : undefined;
+
+			const filters = {
+				month,
+				providerId: serviceProviderId,
+				state: parsedStatus,
+				page,
+				items,
+			};
+
+			const clearPayments = await this.walletService.listClearPayments(
+				filters,
+				provider
+			);
+			return res.status(HttpStatus.OK).send({
+				statusCode: HttpStatus.OK,
+				customCode: 'WGE0161',
+				data: { ...clearPayments },
+			});
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0163',
+				message: error?.message,
 			});
 		}
 	}
