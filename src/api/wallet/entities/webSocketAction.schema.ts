@@ -14,6 +14,9 @@ export const WebSocketActionSchema = new dynamoose.Schema(
 		Nonce: {
 			type: String,
 		},
+		ClientId: {
+			type: String,
+		},
 		SessionId: {
 			type: String,
 		},

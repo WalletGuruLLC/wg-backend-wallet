@@ -25,9 +25,12 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 	async trigger(eventWebHookDTO: EventWebHookDTO, wallet): Promise<void> {
 		const docClient = new DocumentClient();
 		const userId = eventWebHookDTO?.data?.metadata?.wgUser;
+		const providerId = eventWebHookDTO?.data?.metadata?.serviceProviderId;
+
 		const credits =
 			(wallet.pendingCredits || 0) +
 			parseInt(eventWebHookDTO.data.incomingAmount.value);
+
 		const params = {
 			Key: {
 				Id: wallet.id,
@@ -44,11 +47,11 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 			const userWallet = await this.walletService.getWalletByUser(userId);
 			if (eventWebHookDTO?.data?.metadata?.type === 'PROVIDER') {
 				const debits =
-					(userWallet.pendingDebits || 0) +
+					(userWallet?.pendingDebits || 0) +
 					parseInt(eventWebHookDTO.data.incomingAmount.value);
 				const userWalletParams = {
 					Key: {
-						Id: userWallet.id,
+						Id: userWallet?.id,
 					},
 					TableName: 'Wallets',
 					UpdateExpression: 'SET PendingDebits = :pendingDebits',
@@ -66,19 +69,25 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 					postedDebit: sender.Attributes?.PostedDebits,
 				};
 
-				this.userWsGateway.sendBalance(userWallet.userId, balance);
+				this.userWsGateway.sendBalance(userWallet?.userId, balance);
 			}
 
 			const recieverWallet = await this.walletService.getWalletByRafikyId(
 				eventWebHookDTO?.data?.walletAddressId
 			);
 
+			const senderWalletValue =
+				await this.walletService.getWalletAddressByProviderId(providerId);
+
 			const transaction = {
 				Type: 'IncomingPayment',
 				IncomingPaymentId: eventWebHookDTO.data?.id,
 				WalletAddressId: eventWebHookDTO?.data?.walletAddressId,
 				ReceiverUrl: recieverWallet?.walletAddress,
-				SenderUrl: userWallet?.walletAddress,
+				SenderUrl:
+					eventWebHookDTO?.data?.metadata?.type === 'REVENUE'
+						? senderWalletValue?.walletAddress
+						: userWallet?.walletAddress,
 				State: 'PENDING',
 				Metadata: eventWebHookDTO.data?.metadata,
 				IncomingAmount: {

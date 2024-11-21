@@ -18,6 +18,7 @@ export class AuthGateway
 {
 	@WebSocketServer() server: Server;
 	private logger: Logger = new Logger('MessageGateway');
+	wsClients = [];
 
 	constructor(
 		@Inject(forwardRef(() => WalletService))
@@ -26,6 +27,24 @@ export class AuthGateway
 
 	afterInit(server: any) {
 		console.log('WebSocket server initialized');
+	}
+
+	sendDataClientId(action: string, clientId: string, data: any) {
+		for (const c of this.wsClients) {
+			if (c.clientId === clientId) {
+				c.client.emit(action, data);
+			}
+		}
+	}
+
+	sendDataSessionId(action: string, sessionId: string, data: any) {
+		for (const c of this.wsClients) {
+			if (c?.sessionId) {
+				if (c?.sessionId === sessionId) {
+					c.client.emit(action, data);
+				}
+			}
+		}
 	}
 
 	async logToDatabase(eventType: string, data: any) {
@@ -39,6 +58,45 @@ export class AuthGateway
 		} catch (error) {
 			this.logger.error(`Failed to log event: ${error.message}`);
 		}
+	}
+
+	async createOrUpdateClient(client: Socket, sessionIdData?: string) {
+		const clientId = client.id;
+
+		const existingClientIndex = this?.wsClients?.findIndex(
+			clientObj => clientObj?.clientId === clientId
+		);
+
+		if (existingClientIndex !== -1) {
+			const existingClient = this?.wsClients?.[existingClientIndex];
+			if (!existingClient?.sessionId || existingClient?.sessionId === '') {
+				this.wsClients[existingClientIndex] = {
+					...existingClient,
+					sessionId: sessionIdData || '',
+				};
+			}
+		} else {
+			this.wsClients.push({
+				clientId: clientId,
+				client: client,
+				sessionId: sessionIdData || '',
+			});
+		}
+	}
+
+	async updateClientSessionId(clientsArray, clientId, sessionIdData) {
+		return clientsArray.map(clientObj => {
+			if (
+				clientObj?.clientId === clientId &&
+				(!clientObj?.sessionId || clientObj?.sessionId === '')
+			) {
+				return {
+					...clientObj,
+					sessionId: sessionIdData || '',
+				};
+			}
+			return clientObj;
+		});
 	}
 
 	async handleConnection(client: Socket, ...args: any[]) {
@@ -81,6 +139,11 @@ export class AuthGateway
 				statusCode: 'WGS0050',
 				sessionId: '',
 			});
+			this.wsClients.push({
+				clientId: client.id,
+				client: client,
+				publicKey: publicKeyData,
+			});
 			await this.logToDatabase('connectionSuccess', {
 				ClientId: client.id,
 				PublicKey: publicKeyData,
@@ -111,6 +174,12 @@ export class AuthGateway
 			Action: 'disconnect',
 			SubscribeMessage: 'disconnect',
 		});
+		for (let i = 0; i < this.wsClients.length; i++) {
+			if (this.wsClients[i].client === client) {
+				this.wsClients.splice(i, 1);
+				break;
+			}
+		}
 		this.logger.log(`Client disconnected: ${client.id}`);
 	}
 
@@ -124,9 +193,9 @@ export class AuthGateway
 		const nonceData =
 			parsedData['x-nonce']?.toString() || headers['nonce']?.toString();
 		const sessionIdData = parsedData.sessionId?.toString();
-
+		await this.createOrUpdateClient(client, sessionIdData);
 		if (!publicKeyData) {
-			client.emit('error', {
+			this.sendDataClientId('error', client.id, {
 				message: 'Public key missing!',
 				statusCode: 'WGE0151',
 				sessionId: '',
@@ -144,7 +213,7 @@ export class AuthGateway
 		}
 
 		if (!nonceData) {
-			client.emit('error', {
+			this.sendDataClientId('error', client.id, {
 				message: 'You need send auth',
 				statusCode: 'WGE0151',
 				sessionId: '',
@@ -161,7 +230,7 @@ export class AuthGateway
 			this.logger.error(`Client ${client.id} failed to authenticate.`);
 		}
 		if (!sessionIdData) {
-			client.emit('error', {
+			this.sendDataClientId('error', client.id, {
 				message: 'You need send session id',
 				statusCode: 'WGE0152',
 				sessionId: '',
@@ -200,7 +269,7 @@ export class AuthGateway
 		if (validTokenRange.includes(nonceData)) {
 			this.logger.log(`Client ${client.id} authenticated successfully.`);
 			// TODO: Guardar sessionId en la base de datos
-			client.emit('hc', {
+			this.sendDataClientId('hc', client.id, {
 				message: 'Ok',
 				statusCode: 'WGS0053',
 				sessionId: sessionIdData,
@@ -247,7 +316,7 @@ export class AuthGateway
 		const serviceProviderId = objectSecret?.ServiceProviderId;
 		const walletAddress = await this.authService.findWalletByUserId(wgUserId);
 		if (!publicKeyData) {
-			client.emit('error', {
+			this.sendDataClientId('error', client.id, {
 				message: 'Public key missing!',
 				statusCode: 'WGE0151',
 				sessionId: '',
@@ -265,7 +334,7 @@ export class AuthGateway
 		}
 
 		if (!nonceData) {
-			client.emit('error', {
+			this.sendDataClientId('error', client.id, {
 				message: 'You need send auth',
 				statusCode: 'WGE0151',
 				sessionId: '',
@@ -284,7 +353,7 @@ export class AuthGateway
 			);
 		}
 		if (!activityId) {
-			client.emit('error', {
+			this.sendDataClientId('error', client.id, {
 				message: 'You need send activity id',
 				statusCode: 'WGE0152',
 				sessionId: '',
@@ -331,7 +400,8 @@ export class AuthGateway
 					wgUserId,
 					walletAddress?.walletUrl,
 					activityId,
-					contentName
+					contentName,
+					client?.id
 				);
 				await this.logToDatabase('activityCharge', {
 					ClientId: client.id,
@@ -343,7 +413,7 @@ export class AuthGateway
 					PublicKey: publicKeyData,
 				});
 			} else if (action == 'stop' || action == 'pause' || action == 'play') {
-				client.emit('hc', {
+				this.sendDataClientId('hc', client.id, {
 					message: 'Ok',
 					statusCode: 'WGS0053',
 					activityId: activityId,
@@ -372,7 +442,6 @@ export class AuthGateway
 				PublicKey: publicKeyData,
 			});
 		}
-		// return { event: 'response', data: 'Stop processed.' };
 	}
 
 	@SubscribeMessage('unlink')
@@ -386,7 +455,7 @@ export class AuthGateway
 			parsedData['x-nonce']?.toString() || headers['nonce']?.toString();
 		const sessionIdData = parsedData.sessionId?.toString();
 		if (!publicKeyData) {
-			client.emit('error', {
+			this.sendDataClientId('error', client.id, {
 				message: 'Public key missing!',
 				statusCode: 'WGE0151',
 				sessionId: '',
@@ -404,7 +473,7 @@ export class AuthGateway
 		}
 
 		if (!nonceData) {
-			client.emit('error', {
+			this.sendDataClientId('error', client.id, {
 				message: 'You need send auth',
 				statusCode: 'WGE0151',
 				sessionId: '',
@@ -450,6 +519,11 @@ export class AuthGateway
 				SubscribeMessage: 'unlink',
 				PublicKey: publicKeyData,
 			});
+			this.sendDataClientId('hc', client.id, {
+				message: 'Service provider unlinked successfully.',
+				statusCode: 'WGE0230',
+				sessionId: sessionIdData,
+			});
 		} else {
 			client.disconnect();
 			await this.logToDatabase('unlinkFailed', {
@@ -479,7 +553,7 @@ export class AuthGateway
 			publicKeyData
 		);
 		if (paymentParameters) {
-			client.emit('hc', {
+			this.sendDataClientId('hc', client.id, {
 				message: 'Ok',
 				statusCode: 'WGS0053',
 				data: paymentParameters,

@@ -402,4 +402,111 @@ export class WalletController {
 			});
 		}
 	}
+
+	@Get('/provider/revenues/:id?')
+	@ApiOperation({ summary: 'Retrieve provider revenues' })
+	@ApiParam({
+		name: 'id',
+		required: false,
+		description: 'Provider ID (optional)',
+	})
+	@ApiQuery({
+		name: 'createDate',
+		required: false,
+		type: String,
+		description: 'Start date for filtering (optional, ISO format)',
+	})
+	@ApiQuery({
+		name: 'endDate',
+		required: false,
+		type: String,
+		description: 'End date for filtering (optional, ISO format)',
+	})
+	@ApiBearerAuth('JWT')
+	@ApiOkResponse({ description: 'Provider revenues successfully retrieved.' })
+	@ApiResponse({ status: 401, description: 'Unauthorized access.' })
+	@ApiResponse({ status: 500, description: 'Server error.' })
+	async getProviderRevenues(
+		@Headers() headers: MapOfStringToList,
+		@Res() res,
+		@Param('id') id?: string,
+		@Query('createDate') createDate?: string,
+		@Query('endDate') endDate?: string
+	) {
+		let token;
+		try {
+			token = headers.authorization ?? '';
+			const instanceVerifier = await this.verifyService.getVerifiedFactory();
+			await instanceVerifier.verify(token.toString().split(' ')[1]);
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.UNAUTHORIZED).send({
+				statusCode: HttpStatus.UNAUTHORIZED,
+				customCode: 'WGE0001',
+			});
+		}
+
+		try {
+			const providerRevenues = await this.walletService.getProviderRevenues(
+				id,
+				createDate,
+				endDate
+			);
+			return res.status(HttpStatus.OK).send({
+				statusCode: HttpStatus.OK,
+				customCode: 'WGE0161',
+				providerRevenues,
+			});
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(500).send({
+				customCode: 'WGE0163',
+			});
+		}
+	}
+
+	@Get('/find/provider/revenues/:id')
+	@ApiOperation({ summary: 'Retrieve provider revenues by Id' })
+	@ApiParam({
+		name: 'id',
+		required: true,
+		description: 'Provider revenue ID (Required)',
+	})
+	@ApiBearerAuth('JWT')
+	@ApiOkResponse({ description: 'Provider revenues successfully retrieved.' })
+	@ApiResponse({ status: 401, description: 'Unauthorized access.' })
+	@ApiResponse({ status: 500, description: 'Server error.' })
+	async findOneProviderRevenues(
+		@Headers() headers: MapOfStringToList,
+		@Res() res,
+		@Param('id') id?: string
+	) {
+		let token;
+		try {
+			token = headers.authorization ?? '';
+			const instanceVerifier = await this.verifyService.getVerifiedFactory();
+			await instanceVerifier.verify(token.toString().split(' ')[1]);
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.UNAUTHORIZED).send({
+				statusCode: HttpStatus.UNAUTHORIZED,
+				customCode: 'WGE0001',
+			});
+		}
+
+		try {
+			const providerRevenues =
+				await this.walletService.getProviderInfoRevenueById(id);
+			return res.status(HttpStatus.OK).send({
+				statusCode: HttpStatus.OK,
+				customCode: 'WGE0161',
+				providerRevenues,
+			});
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(500).send({
+				customCode: 'WGE0163',
+			});
+		}
+	}
 }

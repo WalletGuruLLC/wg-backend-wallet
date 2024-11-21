@@ -308,6 +308,14 @@ export class RafikiWalletController {
 	@Get('list-transactions')
 	@ApiQuery({ name: 'search', required: false, type: String })
 	@ApiQuery({ name: 'type', required: false, type: String })
+	@ApiQuery({ name: 'userType', required: false, type: String })
+	@ApiQuery({
+		name: 'orderBy',
+		required: false,
+		isArray: true,
+		type: String,
+		description: 'Order by fields (e.g., providerId, date)',
+	})
 	@ApiQuery({ name: 'startDate', required: false, type: String })
 	@ApiQuery({ name: 'endDate', required: false, type: String })
 	@ApiQuery({ name: 'state', required: false, type: String })
@@ -327,6 +335,7 @@ export class RafikiWalletController {
 		@Res() res,
 		@Query('search') search?: string,
 		@Query('type') type?: string,
+		@Query('userType') userType?: string,
 		@Query('startDate') startDate?: string,
 		@Query('endDate') endDate?: string,
 		@Query('state') state?: string,
@@ -334,7 +343,8 @@ export class RafikiWalletController {
 		@Query('activityId') activityId?: string,
 		@Query('walletAddress') walletAddress?: string,
 		@Query('page') page?: string,
-		@Query('items') items?: string
+		@Query('items') items?: string,
+		@Query('orderBy') orderBy?: ('providerId' | 'date')[]
 	) {
 		let token;
 		try {
@@ -362,7 +372,7 @@ export class RafikiWalletController {
 				}
 			);
 			userInfo = userInfo.data;
-			const userType = userInfo?.data?.type;
+			const userTypeInfo = userInfo?.data?.type;
 			let parsedProviderIds: string[] = [];
 			if (typeof providerIds === 'string') {
 				try {
@@ -379,6 +389,7 @@ export class RafikiWalletController {
 
 			const filters = {
 				type,
+				userType,
 				dateRange:
 					startDate && endDate ? { start: startDate, end: endDate } : undefined,
 				state,
@@ -388,13 +399,14 @@ export class RafikiWalletController {
 				walletAddress,
 				page,
 				items,
+				orderBy,
 			};
-			if (userType === 'WALLET') {
+			if (userTypeInfo === 'WALLET') {
 				filters.transactionType = ['incoming', 'outgoing'];
-			} else if (userType === 'PROVIDER') {
+			} else if (userTypeInfo === 'PROVIDER') {
 				filters.providerIds = parsedProviderIds;
 				filters.transactionType = ['incoming', 'outgoing'];
-			} else if (userType === 'PLATFORM') {
+			} else if (userTypeInfo === 'PLATFORM') {
 				filters.transactionType = ['incoming', 'outgoing'];
 			} else {
 				return res.status(HttpStatus.UNAUTHORIZED).send({
@@ -407,7 +419,7 @@ export class RafikiWalletController {
 				token,
 				search,
 				filters,
-				userType
+				userTypeInfo
 			);
 
 			return res.status(HttpStatus.OK).send({
@@ -513,12 +525,15 @@ export class RafikiWalletController {
 				});
 			}
 
-			const transactions = await this.walletService.listTransactions(
+			const paginatedTransactions = await this.walletService.listTransactions(
 				token,
 				search,
 				filters
 			);
-			await this.walletService.generateCsv(res, transactions);
+			await this.walletService.generateCsv(
+				res,
+				paginatedTransactions?.transactions
+			);
 		} catch (error) {
 			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
@@ -601,12 +616,15 @@ export class RafikiWalletController {
 				});
 			}
 
-			const transactions = await this.walletService.listTransactions(
+			const paginatedTransactions = await this.walletService.listTransactions(
 				token,
 				search,
 				filters
 			);
-			await this.walletService.generateCsv(res, transactions);
+			await this.walletService.generateCsv(
+				res,
+				paginatedTransactions?.transactions
+			);
 		} catch (error) {
 			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
@@ -624,6 +642,9 @@ export class RafikiWalletController {
 	@ApiQuery({ name: 'state', required: false, type: String })
 	@ApiQuery({ name: 'page', required: false, type: String })
 	@ApiQuery({ name: 'items', required: false, type: String })
+	@ApiQuery({ name: 'walletAddress', required: false, type: String })
+	@ApiQuery({ name: 'activityId', required: false, type: String })
+	@ApiQuery({ name: 'providerIds', required: false, type: [String] })
 	@ApiOperation({ summary: 'Download all user transactions' })
 	@ApiBearerAuth('JWT')
 	@ApiOkResponse({ description: 'Transactions successfully downloaded.' })
@@ -639,7 +660,10 @@ export class RafikiWalletController {
 		@Query('endDate') endDate?: string,
 		@Query('state') state?: string,
 		@Query('page') page?: string,
-		@Query('items') items?: string
+		@Query('items') items?: string,
+		@Query('walletAddress') walletAddress?: string,
+		@Query('activityId') activityId?: string,
+		@Query('providerIds') providerIds?: string | string[]
 	) {
 		let token;
 		try {
@@ -667,17 +691,37 @@ export class RafikiWalletController {
 			userInfo = userInfo.data;
 			const userType = userInfo?.data?.type;
 
+			let parsedProviderIds: string[] = [];
+			if (typeof providerIds === 'string') {
+				try {
+					parsedProviderIds = JSON.parse(providerIds);
+					if (!Array.isArray(parsedProviderIds)) {
+						parsedProviderIds = providerIds?.split(',');
+					}
+				} catch {
+					parsedProviderIds = providerIds?.split(',');
+				}
+			} else if (Array.isArray(providerIds)) {
+				parsedProviderIds = providerIds;
+			}
+
 			const filters = {
 				type,
 				dateRange:
 					startDate && endDate ? { start: startDate, end: endDate } : undefined,
 				state,
+				providerIds: parsedProviderIds,
+				activityId,
 				transactionType: undefined,
+				walletAddress,
 				page,
 				items,
 			};
 
-			if (userType === 'WALLET') {
+			if (userType === 'PROVIDER') {
+				filters.providerIds = parsedProviderIds;
+				filters.transactionType = ['incoming', 'outgoing'];
+			} else if (userType === 'PLATFORM') {
 				filters.transactionType = ['incoming', 'outgoing'];
 			} else {
 				return res.status(HttpStatus.UNAUTHORIZED).send({
@@ -686,12 +730,15 @@ export class RafikiWalletController {
 				});
 			}
 
-			const transactions = await this.walletService.listTransactions(
+			const paginatedTransactions = await this.walletService.listTransactions(
 				token,
 				search,
 				filters
 			);
-			await this.walletService.generateCsv(res, transactions);
+			await this.walletService.generateCsv(
+				res,
+				paginatedTransactions?.transactions
+			);
 		} catch (error) {
 			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
@@ -779,7 +826,7 @@ export class RafikiWalletController {
 				items,
 			};
 
-			if (userType === 'WALLET') {
+			if (userType === 'PROVIDER') {
 				filters.transactionType = ['incoming', 'outgoing'];
 			} else {
 				return res.status(HttpStatus.UNAUTHORIZED).send({
@@ -788,12 +835,15 @@ export class RafikiWalletController {
 				});
 			}
 
-			const transactions = await this.walletService.listTransactions(
+			const paginatedTransactions = await this.walletService.listTransactions(
 				token,
 				search,
 				filters
 			);
-			await this.walletService.generateCsv(res, transactions);
+			await this.walletService.generateCsv(
+				res,
+				paginatedTransactions?.transactions
+			);
 		} catch (error) {
 			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
@@ -1009,7 +1059,7 @@ export class RafikiWalletController {
 				});
 			}
 
-			this.authGateway.server.emit('hc', {
+			this.authGateway.sendDataSessionId('hc', input?.sessionId, {
 				message: 'Account linked',
 				statusCode: 'WGS0051',
 				sessionId: input?.sessionId,

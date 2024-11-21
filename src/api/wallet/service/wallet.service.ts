@@ -851,6 +851,7 @@ export class WalletService {
 		search: string,
 		filters?: {
 			type?: string;
+			userType?: string;
 			dateRange?: { start: string; end: string };
 			state?: string;
 			providerIds?: string[];
@@ -859,6 +860,7 @@ export class WalletService {
 			walletAddress?: string;
 			page?: string;
 			items?: string;
+			orderBy?: ('providerId' | 'date')[];
 		},
 		type?: string
 	) {
@@ -866,7 +868,14 @@ export class WalletService {
 			search = 'all';
 		}
 		const walletDb = await this.getUserByToken(token);
-		const WalletAddress = walletDb?.WalletAddress;
+		const providerId = await this.getProviderIdByUserToken(token);
+		const walletDbProvider = await this.getWalletAddressByProviderId(
+			providerId
+		);
+		const WalletAddress =
+			type == 'PROVIDER'
+				? walletDbProvider?.walletAddress
+				: walletDb?.WalletAddress;
 		const docClient = new DocumentClient();
 
 		const pagedParsed = Number(filters?.page) || 1;
@@ -1000,9 +1009,13 @@ export class WalletService {
 
 				const matchesWalletAddress =
 					type !== 'WALLET' && filters?.walletAddress
-						? transaction?.ReceiverUrl == filters?.walletAddress ||
-						  transaction?.SenderUrl == filters?.walletAddress
+						? transaction?.ReceiverUrl?.includes(filters?.walletAddress) ||
+						  transaction?.SenderUrl?.includes(filters?.walletAddress)
 						: true;
+
+				const matchesUserType = filters?.userType
+					? transaction?.Metadata?.type === filters?.userType
+					: true;
 
 				return (
 					matchesActivityId &&
@@ -1010,9 +1023,28 @@ export class WalletService {
 					matchesState &&
 					matchesDateRange &&
 					matchesProviderId &&
-					matchesWalletAddress
+					matchesWalletAddress &&
+					matchesUserType
 				);
 			});
+
+			if (filters?.orderBy?.length) {
+				filteredTransactions?.sort((a, b) => {
+					for (const field of filters.orderBy) {
+						if (field === 'providerId') {
+							const aProviderId = a?.Metadata?.providerId || '';
+							const bProviderId = b?.Metadata?.providerId || '';
+							if (aProviderId < bProviderId) return -1;
+							if (aProviderId > bProviderId) return 1;
+						} else if (field === 'date') {
+							const aDate = new Date(a?.createdAt).getTime();
+							const bDate = new Date(b?.createdAt).getTime();
+							return aDate - bDate;
+						}
+					}
+					return 0;
+				});
+			}
 
 			const isIncoming = filters?.transactionType?.includes('incoming');
 			const isOutgoing = filters?.transactionType?.includes('outgoing');
@@ -1183,6 +1215,21 @@ export class WalletService {
 		return walletByUserId[0];
 	}
 
+	async getProviderIdByUserToken(token: string) {
+		let userInfo = await axios.get(
+			this.AUTH_MICRO_URL + '/api/v1/users/current-user',
+			{
+				headers: {
+					Authorization: token,
+				},
+			}
+		);
+		userInfo = userInfo.data;
+
+		const providerId = userInfo?.data?.serviceProviderId;
+		return providerId;
+	}
+
 	async createReceiver(input: any) {
 		try {
 			return await this.graphqlService.createReceiver(input);
@@ -1276,6 +1323,101 @@ export class WalletService {
 				incomingPaymentId
 			);
 			const userWallet = convertToCamelCase(await this.getUserByToken(token));
+
+			if (!userIncoming) {
+				return {
+					statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+					customCode: 'WGE0167',
+				};
+			}
+
+			if (!incomingPayment) {
+				return {
+					statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+					customCode: 'WGE0167',
+				};
+			}
+
+			if (userIncoming?.status && userWallet) {
+				const receivedAmount = parseInt(incomingPayment?.receivedAmount.value);
+				const incomingValue = parseInt(incomingPayment.incomingAmount.value);
+				const pendingDebits: number =
+					(userWallet?.pendingDebits || 0) - (incomingValue - receivedAmount);
+
+				const params = {
+					Key: {
+						Id: userWallet.id,
+					},
+					TableName: 'Wallets',
+					UpdateExpression: 'SET PendingDebits = :pendingDebits',
+					ExpressionAttributeValues: {
+						':pendingDebits': pendingDebits,
+					},
+					ReturnValues: 'ALL_NEW',
+				};
+
+				const userIncomingParams = {
+					Key: {
+						Id: userIncoming.id,
+					},
+					TableName: 'UserIncoming',
+					ExpressionAttributeNames: {
+						'#status': 'Status',
+					},
+					UpdateExpression: 'SET #status = :status',
+					ExpressionAttributeValues: {
+						':status': false,
+					},
+					ReturnValues: 'ALL_NEW',
+				};
+
+				if (!receivedAmount) {
+					await this.cancelIncomingPayment(incomingPaymentId);
+				}
+
+				const wallet = await docClient.update(params).promise();
+				await docClient.update(userIncomingParams).promise();
+				return wallet?.Attributes;
+			}
+		} catch (error) {
+			Sentry.captureException(error);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0167',
+			};
+		}
+	}
+
+	async getIncomingByServiceProviderAndUserId(
+		serviceProviderId: string,
+		userId: string
+	) {
+		try {
+			const resultsByServiceProvider = await this.dbIncomingUser
+				.query('ServiceProviderId')
+				.eq(serviceProviderId)
+				.exec();
+
+			const filteredResults = resultsByServiceProvider?.filter(
+				item => item?.UserId === userId
+			);
+
+			return filteredResults;
+		} catch (error) {
+			console.error('Error fetching incoming payments:', error?.message);
+		}
+	}
+
+	async cancelUserIncomingPaymentId(incomingPaymentId: string, userId: string) {
+		try {
+			const docClient = new DocumentClient();
+			const userIncoming = await this.getUserIncomingPaymentById(
+				incomingPaymentId
+			);
+			const incomingPayment = await this.getIncomingPaymentById(
+				incomingPaymentId
+			);
+			const userWallet = await this.getWalletByUser(userId);
 
 			if (!userIncoming) {
 				return {
@@ -1858,7 +2000,8 @@ export class WalletService {
 		userId,
 		senderUrl,
 		activityId,
-		itemName
+		itemName,
+		clientId
 	) {
 		const parameterExists = await this.validatePaymentParameterId(
 			parameterId,
@@ -1866,7 +2009,7 @@ export class WalletService {
 		);
 
 		if (!parameterExists?.id) {
-			this.authGateway.server.emit('error', {
+			this.authGateway.sendDataClientId('error', clientId, {
 				message: 'The specified type parameter does not exist',
 				statusCode: 'WGE0222',
 			});
@@ -1882,7 +2025,7 @@ export class WalletService {
 			.exec();
 
 		if (!incomingPayment || incomingPayment.length === 0) {
-			this.authGateway.server.emit('error', {
+			this.authGateway.sendDataClientId('error', clientId, {
 				message: 'You don’t have any incoming payments yet.',
 				statusCode: 'WGE0223',
 			});
@@ -1931,7 +2074,7 @@ export class WalletService {
 		}
 
 		if (!validIncomingPayment) {
-			this.authGateway.server.emit('error', {
+			this.authGateway.sendDataClientId('error', clientId, {
 				message: 'Insufficient funds',
 				statusCode: 'WGE0220',
 			});
@@ -1971,7 +2114,7 @@ export class WalletService {
 				(userWallet?.PendingDebits + userWallet?.PostedDebits);
 
 			if (quoteInput?.receiveAmount?.value > balance) {
-				this.authGateway.server.emit('error', {
+				this.authGateway.sendDataClientId('error', clientId, {
 					message: 'Insufficient funds',
 					statusCode: 'WGE0220',
 				});
@@ -1981,7 +2124,7 @@ export class WalletService {
 			const providerWalletId = quote?.createQuote?.quote?.receiver?.split('/');
 
 			if (!providerWalletId) {
-				this.authGateway.server.emit('error', {
+				this.authGateway.sendDataClientId('error', clientId, {
 					message: 'Invalid quote',
 					statusCode: 'WGE0221',
 				});
@@ -2005,7 +2148,7 @@ export class WalletService {
 				);
 
 				if (incomingState?.state == 'COMPLETED') {
-					this.authGateway.server.emit('error', {
+					this.authGateway.sendDataClientId('error', clientId, {
 						message: 'Missing funds',
 						statusCode: 'WGE0220',
 					});
@@ -2035,8 +2178,9 @@ export class WalletService {
 							activityId: activityId || '',
 							contentName: itemName || '---',
 							description: '',
-							type: 'USER',
+							type: 'REVENUE',
 							wgUser: userId,
+							serviceProviderId: walletProvider?.ProviderId,
 						},
 						incomingAmount: {
 							value: sendValueWalletGuru,
@@ -2067,23 +2211,22 @@ export class WalletService {
 								activityId: activityId || '',
 								contentName: itemName || '---',
 								description: '',
-								type: 'USER',
+								type: 'REVENUE',
 								wgUser: userId,
+								serviceProviderId: walletProvider?.ProviderId,
 							},
 						};
-						const outgoingValue = await this.createOutgoingPayment(
-							inputOutgoing
-						);
+						await this.createOutgoingPayment(inputOutgoing);
 
-						await this.createDepositOutgoingMutationService({
-							outgoingPaymentId:
-								outgoingValue?.createOutgoingPayment?.payment?.id,
-							idempotencyKey: uuidv4(),
-						});
+						// await this.createDepositOutgoingMutationService({
+						// 	outgoingPaymentId:
+						// 		outgoingValue?.createOutgoingPayment?.payment?.id,
+						// 	idempotencyKey: uuidv4(),
+						// });
 					}, 500);
 				}
 
-				this.authGateway.server.emit('hc', {
+				this.authGateway.sendDataClientId('hc', clientId, {
 					message: 'Ok',
 					statusCode: 'WGS0053',
 					activityId: activityId,
@@ -2166,22 +2309,26 @@ export class WalletService {
 	}
 
 	async getWalletByUser(userId: string) {
-		const docClient = new DocumentClient();
-		const params = {
-			TableName: 'Wallets',
-			IndexName: 'UserIdIndex',
-			KeyConditionExpression: `UserId  = :userId`,
-			ExpressionAttributeValues: {
-				':userId': userId,
-			},
-		};
+		if (userId) {
+			const docClient = new DocumentClient();
+			const params = {
+				TableName: 'Wallets',
+				IndexName: 'UserIdIndex',
+				KeyConditionExpression: `UserId  = :userId`,
+				ExpressionAttributeValues: {
+					':userId': userId,
+				},
+			};
 
-		try {
-			const result = await docClient.query(params).promise();
-			return convertToCamelCase(result.Items?.[0]);
-		} catch (error) {
-			Sentry.captureException(error);
-			throw new Error(`Error fetching wallet by user: ${error.message}`);
+			try {
+				const result = await docClient.query(params).promise();
+				return convertToCamelCase(result.Items?.[0]);
+			} catch (error) {
+				Sentry.captureException(error);
+				throw new Error(`Error fetching wallet by user: ${error.message}`);
+			}
+		} else {
+			return {};
 		}
 	}
 
@@ -2268,7 +2415,7 @@ export class WalletService {
 			const receiverValue = {
 				value: valueReceiverFormatted / pow,
 				asset: incomingPayment.incomingAmount.assetCode,
-				walletAddress: receiverInfo.walletAddress,
+				walletAddress: walletInfo.walletAddress,
 				date: receiverDateFormatted,
 			};
 
@@ -2301,7 +2448,7 @@ export class WalletService {
 				IndexName: 'ServiceProviderIdIndex',
 				KeyConditionExpression: `ServiceProviderId = :serviceproviderid`,
 				ExpressionAttributeValues: {
-					':serviceproviderid': socketKeys[0].ServiceProviderId,
+					':serviceproviderid': socketKeys?.[0]?.ServiceProviderId,
 				},
 			};
 			try {
@@ -2449,25 +2596,31 @@ export class WalletService {
 
 		const scanParams = {
 			TableName: 'Users',
-			FilterExpression:
-				'contains(LinkedServiceProviders.sessionId, :sessionId)',
-			ExpressionAttributeValues: {
-				':sessionId': sessionId,
-			},
 		};
 
 		const users = await docClient.scan(scanParams).promise();
-		const usersToUpdate = users?.Items ?? [];
+		const usersToUpdate =
+			users?.Items?.filter(user =>
+				user?.LinkedServiceProviders?.some(
+					provider => provider?.sessionId === sessionId
+				)
+			) ?? [];
 
-		for (let i = 0; i < usersToUpdate?.length; i++) {
-			const user = usersToUpdate[i];
+		if (usersToUpdate.length === 0) {
+			return {
+				statusCode: HttpStatus.NOT_FOUND,
+				message: 'No users found with the specified sessionId.',
+			};
+		}
+
+		for (const user of usersToUpdate) {
 			const linkedProviders = user?.LinkedServiceProviders ?? [];
 
 			const updatedProviders = linkedProviders.filter(
 				provider => provider?.sessionId !== sessionId
 			);
 
-			if (updatedProviders?.length !== linkedProviders?.length) {
+			if (updatedProviders.length !== linkedProviders.length) {
 				const updateParams = {
 					TableName: 'Users',
 					Key: { Id: user?.Id },
@@ -2479,6 +2632,17 @@ export class WalletService {
 				};
 
 				await docClient.update(updateParams).promise();
+
+				const incomingPaymentsProvider =
+					await this.getIncomingByServiceProviderAndUserId(
+						linkedProviders?.[0]?.serviceProviderId,
+						user?.Id
+					);
+
+				for (let i = 0; i < incomingPaymentsProvider?.length; i++) {
+					const incomingId = incomingPaymentsProvider?.[i]?.IncomingPaymentId;
+					await this.cancelUserIncomingPaymentId(incomingId, user?.Id);
+				}
 			}
 		}
 
@@ -2594,6 +2758,69 @@ export class WalletService {
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
 				customCode: 'WGE0229',
 			};
+		}
+	}
+
+	async getProviderRevenues(
+		serviceProviderId?: string,
+		createDate?: string,
+		endDate?: string
+	) {
+		const docClient = new DocumentClient();
+
+		try {
+			const params: DocumentClient.ScanInput = {
+				TableName: 'ProviderRevenues',
+			};
+
+			if (serviceProviderId || createDate || endDate) {
+				params.FilterExpression = '';
+				params.ExpressionAttributeValues = {};
+
+				if (serviceProviderId) {
+					params.IndexName = 'ServiceProviderIdIndex';
+					params.FilterExpression += 'ServiceProviderId = :serviceProviderId';
+					params.ExpressionAttributeValues[':serviceProviderId'] =
+						serviceProviderId;
+				}
+
+				if (createDate) {
+					params.FilterExpression +=
+						(params.FilterExpression ? ' AND ' : '') +
+						'CreateDate = :CreateDate';
+					params.ExpressionAttributeValues[':CreateDate'] = Number(createDate);
+				}
+
+				if (endDate) {
+					params.FilterExpression +=
+						(params.FilterExpression ? ' AND ' : '') + 'EndDate <= :EndDate';
+					params.ExpressionAttributeValues[':EndDate'] = Number(endDate);
+				}
+			}
+
+			const result = await docClient.scan(params).promise();
+			return result.Items.map(convertToCamelCase);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new Error(`Error fetching provider revenues: ${error.message}`);
+		}
+	}
+
+	async getProviderInfoRevenueById(id: string) {
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'ProviderRevenues',
+			Key: { Id: id },
+		};
+
+		try {
+			const result = await docClient.get(params).promise();
+			return convertToCamelCase(result?.Item);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new Error(
+				`Error fetching providerRevenues by id: ${error.message}`
+			);
 		}
 	}
 }

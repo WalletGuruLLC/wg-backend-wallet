@@ -38,7 +38,7 @@ export class IncomingPaymentCompletedEvent implements EventWebHook {
 
 				const params = {
 					Key: {
-						Id: userIncoming.id,
+						Id: userIncoming?.id,
 					},
 					TableName: 'UserIncoming',
 					UpdateExpression: 'SET Status = :status',

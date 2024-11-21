@@ -23,7 +23,10 @@ export class OutGoingPaymentCreatedEvent implements EventWebHook {
 			parseInt(eventWebHookDTO.data.receiveAmount.value);
 
 		try {
-			if (eventWebHookDTO?.data?.metadata?.type === 'USER') {
+			if (
+				eventWebHookDTO?.data?.metadata?.type === 'USER' ||
+				eventWebHookDTO?.data?.metadata?.type === 'REVENUE'
+			) {
 				const params = {
 					Key: {
 						Id: wallet.id,

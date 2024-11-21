@@ -75,6 +75,9 @@ export const TransactionsSchema = new dynamoose.Schema(
 		ReceiverUrl: {
 			type: String,
 		},
+		Pay: {
+			type: Boolean,
+		},
 	},
 	{
 		timestamps: {
