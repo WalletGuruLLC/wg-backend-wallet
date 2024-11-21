@@ -55,10 +55,6 @@ import { Month } from '../dto/month.enum';
 import { CreateRefundsDto } from '../dto/create-refunds.dto';
 import { RefundsEntity } from '../entities/refunds.entity';
 import { RefundsSchema } from '../entities/refunds.schema';
-import { ProviderRevenues } from '../entities/provider-revenues.entity';
-import { ProviderRevenuesSchema } from '../entities/provider-revenues.schema';
-import { CreateProviderRevenue } from '../dto/provider-revenue.dto';
-
 @Injectable()
 export class WalletService {
 	private dbInstance: Model<Wallet>;
