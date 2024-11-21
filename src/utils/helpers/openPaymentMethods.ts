@@ -1,4 +1,6 @@
 import axios from 'axios';
+import { wrapper } from 'axios-cookiejar-support';
+import { CookieJar } from 'tough-cookie';
 
 // Solicita encabezados firmados para una URL específica
 export const requestSigHeaders = async (
@@ -61,6 +63,25 @@ export const addSignatureHeadersGrantGrant = async (
 	);
 };
 
+// Agrega encabezados con firma
+export const addSignatureHeadersGrantOutgoing = async (
+	method,
+	body,
+	headers,
+	url,
+	clientKey,
+	clientPrivate
+) => {
+	return requestSigHeaders(
+		url,
+		method,
+		headers,
+		body,
+		clientKey,
+		clientPrivate
+	);
+};
+
 // Obtiene un grant para pagos entrantes
 export const getGrantForIncomingPayment = async (
 	clientWalletAddress,
@@ -112,7 +133,8 @@ export const createIncomingPayment = async (
 	expirationDate,
 	req,
 	clientKey,
-	clientPrivate
+	clientPrivate,
+	metadataIncoming
 ) => {
 	try {
 		const accessToken = await getGrantForIncomingPayment(
@@ -132,7 +154,7 @@ export const createIncomingPayment = async (
 				assetScale: 6,
 			},
 			expiresAt: expirationDate,
-			metadata: { description: 'Test!' },
+			metadata: metadataIncoming,
 		};
 
 		const headers = await addSignatureHeadersGrantGrant(
@@ -310,16 +332,165 @@ export const getGrantForOutgoingPayment = async (
 			clientPrivate
 		);
 
+		console.log('headers outgoing', headers);
+
 		const { data } = await axios.post(process.env.SENDER_HOST, grantPayload, {
 			headers: convertKeysToLowerCase(headers),
 		});
 
-		return data?.access_token?.value;
+		return data;
 	} catch (error) {
-		console.error('Error obtaining grant for outgoing payment:', error);
-		throw error;
+		console.log('Error obtaining grant for outgoing payment:', error?.message);
 	}
 };
+
+async function makeRequestInteractions({
+	url,
+	interactId,
+	additionalId,
+	method = 'GET',
+	params = {},
+	body = {},
+	headers = {},
+}) {
+	const fullUrl = `${url}${interactId ? `/${interactId}` : ''}${
+		additionalId ? `/${additionalId}` : ''
+	}`;
+
+	// Crea una instancia de CookieJar
+	const cookieJar = new CookieJar();
+
+	// Envuelve axios con soporte para cookies
+	const client = wrapper(
+		axios.create({ jar: cookieJar, withCredentials: true })
+	);
+
+	const options = {
+		method,
+		url: fullUrl,
+		params,
+		data: method === 'POST' || method === 'PUT' ? body : undefined,
+		headers,
+	};
+
+	console.log('options', options);
+
+	try {
+		const response = await client.request(options);
+		console.log('Response Data:', response.data);
+
+		const cookiesInfo = cookieJar.toJSON();
+
+		// Cookies almacenadas en el cookie jar
+		console.log('Cookies:', cookieJar.toJSON());
+		return cookiesInfo?.cookies;
+	} catch (error) {
+		console.log('Error:', error.response?.data || error.message);
+		throw error;
+	}
+}
+
+async function generalRequestInteractions({
+	url,
+	interactId,
+	additionalId,
+	method = 'GET',
+	params = {},
+	body = {},
+	headers = {},
+}) {
+	const fullUrl = `${url}${interactId ? `/${interactId}` : ''}${
+		additionalId ? `/${additionalId}` : ''
+	}`;
+
+	const cookieJar = new CookieJar();
+
+	const client = wrapper(
+		axios.create({ jar: cookieJar, withCredentials: true })
+	);
+
+	const options = {
+		method,
+		url: fullUrl,
+		params,
+		data: method === 'POST' || method === 'PUT' ? body : undefined,
+		headers,
+	};
+
+	console.log('options', options);
+
+	try {
+		const response = await client.request(options);
+		return response?.data;
+	} catch (error) {
+		console.log('Error:', error.response?.data || error.message);
+	}
+}
+
+function parseUrl(url) {
+	const urlObj = new URL(url);
+
+	// Obtener el interactId del path
+	const pathSegments = urlObj.pathname.split('/');
+	const interactId = pathSegments[pathSegments.length - 2];
+
+	// Obtener los parámetros clientName y clientUri
+	const clientName = urlObj.searchParams.get('clientName');
+	const clientUri = urlObj.searchParams.get('clientUri');
+
+	return {
+		interactId,
+		clientName,
+		clientUri,
+	};
+}
+
+async function sendOutgoingPayment({
+	accessToken,
+	clientKey,
+	clientPrivate,
+	senderWalletAddress,
+	quoteId,
+	metadataOutgoing,
+}) {
+	const url = `${process.env.SENDER_INT_HOST}outgoing-payments`;
+
+	const body = {
+		walletAddress: senderWalletAddress,
+		quoteId: `${senderWalletAddress}/quotes/${quoteId}`,
+		metadata: metadataOutgoing,
+	};
+
+	const additionalHeaders = await addSignatureHeadersGrantOutgoing(
+		'post',
+		body,
+		{
+			Authorization: `GNAP ${accessToken}`,
+			'content-type': 'application/json',
+		},
+		url,
+		clientKey,
+		clientPrivate
+	);
+
+	const headers = {
+		Authorization: `GNAP ${accessToken}`,
+		'content-type': 'application/json',
+		...additionalHeaders,
+	};
+
+	console.log('headers', headers);
+
+	try {
+		// Realiza la solicitud con axios
+		const response = await axios.post(url, body, { headers });
+
+		console.log('Response Data:', response.data);
+		return response.data;
+	} catch (error) {
+		console.error('Error:', error.response?.data || error.message);
+	}
+}
 
 export const createOutgoingPayment = async (
 	senderWalletAddress,
@@ -328,9 +499,11 @@ export const createOutgoingPayment = async (
 	clientKey,
 	clientPrivate,
 	quoteDebitAmount,
-	quoteReceiveAmount
+	quoteReceiveAmount,
+	metadataOutgoing
 ) => {
 	try {
+		// Obtener el token de acceso
 		const accessToken = await getGrantForOutgoingPayment(
 			senderWalletAddress,
 			senderWalletAddress,
@@ -341,55 +514,103 @@ export const createOutgoingPayment = async (
 			clientPrivate
 		);
 
-		console.log('accessToken outgoing', accessToken);
+		console.log('Access Token for Outgoing Payment:', accessToken);
 
-		// const options = {
-		// 	method: 'POST',
-		// 	url: `${process.env.SENDER_HOST}/outgoing-payments`,
-		// 	headers: {
-		// 		Authorization: `GNAP ${accessToken}`,
-		// 		'Content-Type': 'application/json',
-		// 	},
-		// 	data: {
-		// 		walletAddress: senderWalletAddress,
-		// 		quoteId: `${senderWalletAddress}/quotes/${quoteId}`,
-		// 		metadata: { description: 'Free Money!' },
-		// 	},
-		// };
+		// Parsear la URL de interacción
+		const infoRedirectInteract = parseUrl(accessToken?.interact?.redirect);
+		console.log('Redirect Interaction Info:', infoRedirectInteract);
 
-		// const { data } = await axios.request(options);
-		// console.log('Outgoing Payment Created:', data);
-		// return data;
+		// Realizar solicitud de interacción
+		const responseInteract = await makeRequestInteractions({
+			url: accessToken?.interact?.redirect,
+			interactId: '',
+			additionalId: '',
+			method: 'GET',
+			params: {},
+			headers: {
+				'x-idp-secret': 'changeme',
+				'content-type': 'application/json',
+			},
+		});
+		console.log('Interaction Response:', responseInteract);
+
+		// Aceptar interacción
+		const responseAccept = await generalRequestInteractions({
+			url: `${process.env.SENDER_INTERACTIONS_HOST}grant`,
+			interactId: infoRedirectInteract?.interactId,
+			additionalId: `${accessToken?.interact?.finish}/accept`,
+			method: 'POST',
+			headers: {
+				'x-idp-secret': 'changeme',
+				'content-type': 'application/json',
+			},
+		});
+		console.log('Interaction Accept Response:', responseAccept);
+
+		console.log(
+			`Session Cookies: sessionId=${responseInteract?.[0]?.value}; sessionId.sig=${responseInteract?.[1]?.value}`
+		);
+
+		// Finalizar interacción
+		const responseFinishInteraction = await generalRequestInteractions({
+			url: `${process.env.SENDER_HOST}interact`,
+			interactId: infoRedirectInteract?.interactId,
+			additionalId: `${accessToken?.interact?.finish}/finish`,
+			method: 'GET',
+			headers: {
+				'x-idp-secret': 'changeme',
+				'content-type': 'application/json',
+				Cookie: `sessionId=${responseInteract?.[0]?.value}; sessionId.sig=${responseInteract?.[1]?.value}`,
+			},
+		});
+		console.log('Interaction Finish Response:', responseFinishInteraction);
+
+		// Añadir cabeceras con firma
+		const headers = await addSignatureHeadersGrantGrant(
+			req,
+			{},
+			{
+				Authorization: `GNAP ${accessToken?.continue?.access_token?.value}`,
+				'content-type': 'application/json',
+			},
+			accessToken?.continue?.uri,
+			clientKey,
+			clientPrivate
+		);
+
+		// Esperar antes de continuar
+		setTimeout(async () => {
+			// Continuar con la solicitud
+			const responseContinue = await generalRequestInteractions({
+				url: accessToken?.continue?.uri,
+				interactId: '',
+				additionalId: '',
+				method: 'POST',
+				params: {},
+				headers: {
+					Authorization: `GNAP ${accessToken?.continue?.access_token?.value}`,
+					'content-type': 'application/json',
+					...headers,
+				},
+			});
+			console.log('Continue Response:', responseContinue);
+
+			// Crear el pago saliente
+			const responseCreateOutgoing = await sendOutgoingPayment({
+				accessToken: responseContinue?.access_token?.value,
+				clientKey,
+				clientPrivate,
+				senderWalletAddress,
+				quoteId,
+				metadataOutgoing,
+			});
+			console.log('Create Outgoing Payment Response:', responseCreateOutgoing);
+		}, 6000);
 	} catch (error) {
 		console.error('Error creating outgoing payment:', error);
 		throw error;
 	}
 };
-
-async function fetchRafikiDataInteraction() {
-	const url =
-		'https://dev.rafiki-auth.walletguru.co/interact/4454f141-ad39-4030-8e85-5bd7a843d31d/E5F5C20D60B65E1D?clientName=daniel4+gomez4&clientUri=https%3A%2F%2Fdev.walletguru.me%2Fd4gscrum';
-
-	try {
-		const response = await fetch(url, {
-			method: 'GET',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-		});
-
-		if (!response.ok) {
-			throw new Error(`Error: ${response.status} - ${response.statusText}`);
-		}
-
-		const data = await response.json();
-		console.log('Data fetched successfully:', data);
-		return data;
-	} catch (error) {
-		console.error('Error fetching data:', error);
-		throw error;
-	}
-}
 
 export const unifiedProcess = async (
 	receiverWalletAddress,
@@ -401,7 +622,9 @@ export const unifiedProcess = async (
 	expirationDate,
 	req,
 	clientKey,
-	clientPrivate
+	clientPrivate,
+	metadataIncoming,
+	metadataOutgoing
 ) => {
 	try {
 		// 1. Crear Incoming Payment
@@ -413,7 +636,8 @@ export const unifiedProcess = async (
 			expirationDate,
 			req,
 			clientKey,
-			clientPrivate
+			clientPrivate,
+			metadataIncoming
 		);
 		console.log('Incoming Payment:', incomingPayment);
 
@@ -435,15 +659,14 @@ export const unifiedProcess = async (
 			clientKey,
 			clientPrivate,
 			quoteDebitAmount,
-			quoteReceiveAmount
+			quoteReceiveAmount,
+			metadataOutgoing
 		);
 		console.log('Outgoing Payment:', outgoingPayment);
 
 		// Retornar el resultado final
 		return {
-			incomingPayment,
-			// quote,
-			// outgoingPayment,
+			outgoingPayment,
 		};
 	} catch (error) {
 		console.error('Error in unified process:', error);

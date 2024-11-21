@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 import { dynamoConnect } from './config/dbconfig';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as Sentry from '@sentry/nestjs';
+import * as cookieParser from 'cookie-parser';
 import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import { SecretsService } from './utils/secrets.service';
 
@@ -49,10 +50,12 @@ async function bootstrap() {
 	const document = SwaggerModule.createDocument(app, config);
 	SwaggerModule.setup('docs', app, document);
 
+	app.use(cookieParser());
 	app.enableCors({
 		allowedHeaders: '*',
 		origin: '*',
 		credentials: true,
+		methods: 'GET,POST,PUT,DELETE',
 	});
 
 	await app.listen(3000);
