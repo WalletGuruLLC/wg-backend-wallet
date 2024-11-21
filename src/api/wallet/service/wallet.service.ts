@@ -52,6 +52,12 @@ import { CreateClearPayment } from '../dto/clear-payment.dto';
 import { buildFilterExpression } from '../../../utils/helpers/buildFilterExpressionDynamo';
 import { getDateRangeForMonthEnum } from 'src/utils/helpers/buildMonthRanges';
 import { Month } from '../dto/month.enum';
+import { CreateRefundsDto } from '../dto/create-refunds.dto';
+import { RefundsEntity } from '../entities/refunds.entity';
+import { RefundsSchema } from '../entities/refunds.schema';
+import { ProviderRevenues } from '../entities/provider-revenues.entity';
+import { ProviderRevenuesSchema } from '../entities/provider-revenues.schema';
+import { CreateProviderRevenue } from '../dto/provider-revenue.dto';
 
 @Injectable()
 export class WalletService {
@@ -64,6 +70,7 @@ export class WalletService {
 	private dbRates: Model<Rates>;
 	private dbClearPayments: Model<ClearPayments>;
 	private dbUserIncoming: Model<UserIncomingPayment>;
+	private dbRefunds: Model<RefundsEntity>;
 	private readonly AUTH_MICRO_URL: string;
 	private readonly DOMAIN_WALLET_URL: string;
 	private readonly WALLET_WG_URL: string;
@@ -102,6 +109,7 @@ export class WalletService {
 			ClearPaymentsSchema
 		);
 		this.dbRates = dynamoose.model<Rates>('Rates', RatesSchema);
+		this.dbRefunds = dynamoose.model<RefundsEntity>('Refunds', RefundsSchema);
 		this.AUTH_MICRO_URL = process.env.AUTH_URL;
 		this.DOMAIN_WALLET_URL = process.env.DOMAIN_WALLET_URL;
 		this.WALLET_WG_URL = process.env.WALLET_WG_URL;
@@ -3041,6 +3049,72 @@ export class WalletService {
 				customCode: 'WGE0229',
 			};
 		}
+	}
+
+	async createRefund(createRefundsDto: CreateRefundsDto) {
+		const saveRefundsDto = {
+			ServiceProviderId: createRefundsDto.serviceProviderId,
+			Amount: createRefundsDto.amount,
+			Description: createRefundsDto.description,
+			ActivityId: createRefundsDto.activityId,
+		};
+		return convertToCamelCase(await this.dbRefunds.create(saveRefundsDto));
+	}
+
+	async getRefunds(
+		serviceProviderId: string,
+		page: string,
+		items: string,
+		startDate: string,
+		endDate: string
+	) {
+		const pageNumber = parseInt(page, 10) || 1;
+		const itemsNumber = parseInt(items, 10) || 10;
+
+		const startTimestamp = startDate ? new Date(startDate).getTime() : null;
+		const endTimestamp = endDate ? new Date(endDate).getTime() : null;
+
+		let scan = this.dbRefunds.scan();
+
+		if (serviceProviderId) {
+			scan = scan.where('ServiceProviderId').eq(serviceProviderId);
+		}
+
+		if (startTimestamp !== null && endTimestamp !== null) {
+			scan = scan.filter('CreateDate').between(startTimestamp, endTimestamp);
+		} else if (startTimestamp !== null) {
+			scan = scan.filter('CreateDate').ge(startTimestamp);
+		} else if (endTimestamp !== null) {
+			scan = scan.filter('CreateDate').le(endTimestamp);
+		}
+
+		const refundsData = await scan.exec();
+
+		const convertedRefunds = convertToCamelCase(refundsData);
+
+		if (!convertedRefunds.length) {
+			return {
+				items: [],
+				totalItems: 0,
+				currentPage: pageNumber,
+				totalPages: 0,
+			};
+		}
+
+		const startIndex = (pageNumber - 1) * itemsNumber;
+		const endIndex = Math.min(
+			startIndex + itemsNumber,
+			convertedRefunds.length
+		);
+
+		const paginatedRefunds = convertedRefunds.slice(startIndex, endIndex);
+
+		return {
+			items: paginatedRefunds,
+			totalItems: convertedRefunds.length,
+			currentPage: pageNumber,
+			totalPages: Math.ceil(convertedRefunds.length / itemsNumber),
+		};
 	}
 
 	async getProviderRevenues(
