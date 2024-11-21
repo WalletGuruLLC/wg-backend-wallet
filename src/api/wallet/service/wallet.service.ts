@@ -55,10 +55,6 @@ import { Month } from '../dto/month.enum';
 import { CreateRefundsDto } from '../dto/create-refunds.dto';
 import { RefundsEntity } from '../entities/refunds.entity';
 import { RefundsSchema } from '../entities/refunds.schema';
-import { ProviderRevenues } from '../entities/provider-revenues.entity';
-import { ProviderRevenuesSchema } from '../entities/provider-revenues.schema';
-import { CreateProviderRevenue } from '../dto/provider-revenue.dto';
-
 @Injectable()
 export class WalletService {
 	private dbInstance: Model<Wallet>;
@@ -1233,11 +1229,12 @@ export class WalletService {
 		const filteredClearPayments = convertToCamelCase(
 			clearPayments?.Items
 		).filter(clearPayment => {
-			const createTimestamp = clearPayment?.createDate;
+			const startDateTimestamp = clearPayment?.startDate;
+			const endDateTimestamp = clearPayment?.endDate;
 
 			return (
-				createTimestamp >= monthRanges.startDate &&
-				createTimestamp <= monthRanges.endDate
+				startDateTimestamp >= monthRanges.startDate &&
+				endDateTimestamp <= monthRanges.endDate
 			);
 		});
 
@@ -2907,10 +2904,15 @@ export class WalletService {
 		try {
 			const providers = await this.getProviders();
 			const now = new Date();
-			const lastMonth = new Date(now);
-			lastMonth.setMonth(now.getMonth() - 1);
-			lastMonth.setDate(1);
-			lastMonth.setHours(0, 0, 0, 0);
+
+			const startDate = new Date(
+				Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1, 0, 0, 0, 0)
+			);
+
+			const endDate = new Date(
+				Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0, 23, 59, 59, 999)
+			);
+
 			Promise.all(
 				providers.map(async provider => {
 					const providerWallet = await this.getWalletAddressByProviderId(
@@ -2958,7 +2960,8 @@ export class WalletService {
 						const createProviderRevenueDTO = {
 							ServiceProviderId: provider?.id,
 							Value: totalAmount,
-							RevenueDate: lastMonth.getTime(),
+							StartDate: startDate.getTime(),
+							EndDate: endDate.getTime(),
 							Fees: fees,
 							TransactionIds: transactionIds,
 						};

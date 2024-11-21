@@ -24,7 +24,10 @@ export const ClearPaymentsSchema = new dynamoose.Schema(
 			type: Array,
 			schema: [String],
 		},
-		RevenueDate: {
+		EndDate: {
+			type: Number,
+		},
+		StartDate: {
 			type: Number,
 		},
 		Observations: {

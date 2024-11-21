@@ -5,7 +5,8 @@ export class ClearPayments extends Document {
 	ServiceProviderId?: string;
 	TransactionIds?: string[];
 	Value?: number;
-	RevenueDate?: number;
+	StartDate?: number;
+	EndDate?: number;
 	CreateDate?: string;
 	UpdateDate?: string;
 	Fees?: number;

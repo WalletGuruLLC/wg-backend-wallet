@@ -732,7 +732,8 @@ export class RafikiWalletController {
 			const paginatedTransactions = await this.walletService.listTransactions(
 				token,
 				search,
-				filters
+				filters,
+				userType
 			);
 			await this.walletService.generateCsv(
 				res,
