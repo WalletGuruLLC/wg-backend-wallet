@@ -9,11 +9,11 @@ export const ClearPaymentsSchema = new dynamoose.Schema(
 			default: () => uuidv4(),
 			required: true,
 		},
-		ProviderId: {
+		ServiceProviderId: {
 			type: String,
 			index: {
 				global: true,
-				name: 'ProviderIdIndex',
+				name: 'ServiceProviderIdIndex',
 			},
 		},
 		Value: {
