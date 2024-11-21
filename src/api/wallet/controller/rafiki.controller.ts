@@ -936,64 +936,118 @@ export class RafikiWalletController {
 				});
 			}
 
-			await addApiSignatureHeader(req, req.body);
-			const inputReceiver = {
-				metadata: {
-					type: 'USER',
-					wgUser: userId,
-					description: '',
-				},
-				incomingAmount: {
-					assetCode: userWalletByToken?.walletAsset?.code,
-					assetScale: userWalletByToken?.walletAsset?.scale,
-					value: adjustValue(
-						input?.amount,
-						userWalletByToken?.walletAsset?.scale
-					),
-				},
-				walletAddressUrl: input.walletAddressUrl,
+			const privateKey = userWallet?.PrivateKey;
+			const keyId = userWallet?.KeyId;
+
+			const walletBase64 = await toBase64(privateKey);
+
+			const receiverAssetCode = 'USD';
+			const receiverAssetScale = 2;
+			const quoteDebitAmount = {
+				assetCode: userWalletByToken?.walletAsset?.code,
+				assetScale: userWalletByToken?.walletAsset?.scale,
+				value: adjustValue(
+					input?.amount,
+					userWalletByToken?.walletAsset?.scale
+				),
+			};
+			const quoteReceiveAmount = {
+				assetCode: userWalletByToken?.walletAsset?.code,
+				assetScale: userWalletByToken?.walletAsset?.scale,
+				value: adjustValue(
+					input?.amount,
+					userWalletByToken?.walletAsset?.scale
+				),
+			};
+			const expirationDate = new Date(
+				Date.now() + 24 * 60 * 60 * 1000
+			).toISOString();
+			const clientKey = keyId;
+			const clientPrivate = walletBase64;
+			const metadataIncoming = {
+				type: 'USER',
+				wgUser: userId,
+				description: '',
+			};
+			const metadataOutgoing = {
+				type: 'USER',
+				wgUser: userId,
+				description: '',
 			};
 
-			const receiver = await this.walletService.createReceiver(inputReceiver);
-			const quoteInput = {
-				walletAddressId: input?.walletAddressId,
-				receiver: receiver?.createReceiver?.receiver?.id,
-				receiveAmount: {
-					assetCode: userWalletByToken?.walletAsset?.code,
-					assetScale: userWalletByToken?.walletAsset?.scale,
-					value: adjustValue(
-						input?.amount,
-						userWalletByToken?.walletAsset?.scale
-					),
-				},
-			};
+			const result = await unifiedProcess(
+				input?.walletAddressUrl,
+				receiverAssetCode,
+				receiverAssetScale,
+				userWallet?.walletAddress,
+				quoteDebitAmount,
+				quoteReceiveAmount,
+				expirationDate,
+				req,
+				clientKey,
+				clientPrivate,
+				metadataIncoming,
+				metadataOutgoing
+			);
 
-			setTimeout(async () => {
-				const quote = await this.walletService.createQuote(quoteInput);
+			// await addApiSignatureHeader(req, req.body);
+			// const inputReceiver = {
+			// metadata: {
+			// 	type: 'USER',
+			// 	wgUser: userId,
+			// 	description: '',
+			// },
+			// 	incomingAmount: {
+			// 		assetCode: userWalletByToken?.walletAsset?.code,
+			// 		assetScale: userWalletByToken?.walletAsset?.scale,
+			// 		value: adjustValue(
+			// 			input?.amount,
+			// 			userWalletByToken?.walletAsset?.scale
+			// 		),
+			// 	},
+			// 	walletAddressUrl: input.walletAddressUrl,
+			// };
 
-				const inputOutgoing = {
-					walletAddressId: input?.walletAddressId,
-					quoteId: quote?.createQuote?.quote?.id,
-					metadata: {
-						type: 'USER',
-						wgUser: userId,
-						description: '',
-					},
-				};
-				const outgoingPayment = await this.walletService.createOutgoingPayment(
-					inputOutgoing
-				);
+			// const receiver = await this.walletService.createReceiver(inputReceiver);
+			// const quoteInput = {
+			// 	walletAddressId: input?.walletAddressId,
+			// 	receiver: receiver?.createReceiver?.receiver?.id,
+			// 	receiveAmount: {
+			// 		assetCode: userWalletByToken?.walletAsset?.code,
+			// 		assetScale: userWalletByToken?.walletAsset?.scale,
+			// 		value: adjustValue(
+			// 			input?.amount,
+			// 			userWalletByToken?.walletAsset?.scale
+			// 		),
+			// 	},
+			// };
 
-				await this.walletService.sendMoneyMailConfirmation(
-					inputOutgoing,
-					outgoingPayment
-				);
+			// setTimeout(async () => {
+			// 	const quote = await this.walletService.createQuote(quoteInput);
 
-				return res.status(200).send({
-					data: outgoingPayment,
-					customCode: 'WGE0150',
-				});
-			}, 500);
+			// 	const inputOutgoing = {
+			// 		walletAddressId: input?.walletAddressId,
+			// 		quoteId: quote?.createQuote?.quote?.id,
+			// metadata: {
+			// 	type: 'USER',
+			// 	wgUser: userId,
+			// 	description: '',
+			// },
+			// 	};
+			// 	const outgoingPayment = await this.walletService.createOutgoingPayment(
+			// 		inputOutgoing
+			// 	);
+
+			// 	await this.walletService.sendMoneyMailConfirmation(
+			// 		inputOutgoing,
+			// 		outgoingPayment
+			// 	);
+
+			return res.status(200).send({
+				data: result,
+				customCode: 'WGE0150',
+			});
+			//}, 500);
 		} catch (error) {
 			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
@@ -1501,6 +1555,10 @@ export class RafikiWalletController {
 				senderWalletAddress
 			);
 
+			const userInfo = await this.walletService.getWalletUserById(
+				walletKey?.UserId
+			);
+
 			const privateKey = walletKey?.PrivateKey;
 			const keyId = walletKey?.KeyId;
 
@@ -1524,6 +1582,17 @@ export class RafikiWalletController {
 			const clientKey = keyId;
 			const clientPrivate = walletBase64;
 
+			const metadataIncoming = {
+				type: 'USER',
+				wgUser: walletKey?.UserId,
+				description: '',
+			};
+			const metadataOutgoing = {
+				type: 'USER',
+				wgUser: walletKey?.UserId,
+				description: '',
+			};
+
 			const result = await unifiedProcess(
 				receiverWalletAddress,
 				receiverAssetCode,
@@ -1534,7 +1603,9 @@ export class RafikiWalletController {
 				expirationDate,
 				req,
 				clientKey,
-				clientPrivate
+				clientPrivate,
+				metadataIncoming,
+				metadataOutgoing
 			);
 
 			// const response = await getGrantForIncomingPayment(
