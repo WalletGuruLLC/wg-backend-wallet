@@ -36,6 +36,7 @@ import {
 import * as Sentry from '@sentry/nestjs';
 import { MapOfStringToList } from 'aws-sdk/clients/apigateway';
 import { convertToCamelCase } from 'src/utils/helpers/convertCamelCase';
+import { CreateRefundsDto } from '../dto/create-refunds.dto';
 
 @ApiTags('wallet')
 @Controller('api/v1/wallets')
@@ -403,6 +404,94 @@ export class WalletController {
 		}
 	}
 
+	@Post('/refunds')
+	@ApiOperation({ summary: 'Create a new wallet' })
+	@ApiCreatedResponse({ description: 'Wallet successfully created.' })
+	@ApiForbiddenResponse({ description: 'Forbidden access.' })
+	@ApiBearerAuth('JWT')
+	async createRefund(
+		@Body() createRefundsDto: CreateRefundsDto,
+		@Headers() headers: MapOfStringToList,
+		@Res() res
+	) {
+		try {
+			const token = headers.authorization ?? '';
+			const instanceVerifier = await this.verifyService.getVerifiedFactory();
+			await instanceVerifier.verify(token.toString().split(' ')[1]);
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.UNAUTHORIZED).send({
+				statusCode: HttpStatus.UNAUTHORIZED,
+				customCode: 'WGE0001',
+			});
+		}
+
+		try {
+			const result = await this.walletService.createRefund(createRefundsDto);
+			if (result) {
+				return res.status(HttpStatus.OK).send({
+					statusCode: HttpStatus.OK,
+					customCode: 'WGE0232',
+					data: { refunds: result },
+				});
+			}
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0231',
+			});
+		}
+	}
+
+	@ApiOperation({ summary: 'Get refunds' })
+	@ApiParam({
+		name: 'serviceProviderId',
+		description: 'Service Provider ID',
+		type: String,
+		required: false,
+	})
+	@ApiQuery({ name: 'page', required: false, type: String })
+	@ApiQuery({ name: 'items', required: false, type: String })
+	@ApiQuery({ name: 'startDate', required: false, type: String })
+	@ApiQuery({ name: 'endDate', required: false, type: String })
+	@ApiResponse({ status: 200, description: 'Refunds successfully retrieved.' })
+	@ApiResponse({ status: 404, description: 'Refund not found.' })
+	@ApiResponse({ status: 500, description: 'Server error.' })
+	@ApiQuery({ name: 'serviceProviderId', required: false, type: String })
+	@Get('get/refunds')
+	async getRefunds(
+		@Res() res,
+		@Query('serviceProviderId') serviceProviderId?: string,
+		@Query('page') page?: string,
+		@Query('items') items?: string,
+		@Query('startDate') startDate?: string,
+		@Query('endDate') endDate?: string
+	) {
+		try {
+			const result = await this.walletService.getRefunds(
+				serviceProviderId,
+				page,
+				items,
+				startDate,
+				endDate
+			);
+			if (result) {
+				return res.status(HttpStatus.OK).send({
+					statusCode: HttpStatus.OK,
+					customCode: 'WGE0234',
+					data: { refunds: result },
+				});
+			}
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.NOT_FOUND).send({
+				statusCode: HttpStatus.NOT_FOUND,
+				customCode: 'WGE0233',
+			});
+		}
+	}
+
 	@Get('/provider/revenues/:id?')
 	@ApiOperation({ summary: 'Retrieve provider revenues' })
 	@ApiParam({
@@ -452,51 +541,6 @@ export class WalletController {
 				createDate,
 				endDate
 			);
-			return res.status(HttpStatus.OK).send({
-				statusCode: HttpStatus.OK,
-				customCode: 'WGE0161',
-				providerRevenues,
-			});
-		} catch (error) {
-			Sentry.captureException(error);
-			return res.status(500).send({
-				customCode: 'WGE0163',
-			});
-		}
-	}
-
-	@Get('/find/provider/revenues/:id')
-	@ApiOperation({ summary: 'Retrieve provider revenues by Id' })
-	@ApiParam({
-		name: 'id',
-		required: true,
-		description: 'Provider revenue ID (Required)',
-	})
-	@ApiBearerAuth('JWT')
-	@ApiOkResponse({ description: 'Provider revenues successfully retrieved.' })
-	@ApiResponse({ status: 401, description: 'Unauthorized access.' })
-	@ApiResponse({ status: 500, description: 'Server error.' })
-	async findOneProviderRevenues(
-		@Headers() headers: MapOfStringToList,
-		@Res() res,
-		@Param('id') id?: string
-	) {
-		let token;
-		try {
-			token = headers.authorization ?? '';
-			const instanceVerifier = await this.verifyService.getVerifiedFactory();
-			await instanceVerifier.verify(token.toString().split(' ')[1]);
-		} catch (error) {
-			Sentry.captureException(error);
-			return res.status(HttpStatus.UNAUTHORIZED).send({
-				statusCode: HttpStatus.UNAUTHORIZED,
-				customCode: 'WGE0001',
-			});
-		}
-
-		try {
-			const providerRevenues =
-				await this.walletService.getProviderInfoRevenueById(id);
 			return res.status(HttpStatus.OK).send({
 				statusCode: HttpStatus.OK,
 				customCode: 'WGE0161',

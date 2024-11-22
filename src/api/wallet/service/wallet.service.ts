@@ -46,10 +46,15 @@ import { flattenObject } from 'src/utils/helpers/flattenObject';
 import { WebSocketAction } from '../entities/webSocketAction.entity';
 import { WebSocketActionSchema } from '../entities/webSocketAction.schema';
 import { CreateWebSocketActionDto } from '../dto/create-web-socket-action.dto';
-import { ProviderRevenues } from '../entities/provider-revenues.entity';
-import { ProviderRevenuesSchema } from '../entities/provider-revenues.schema';
-import { CreateProviderRevenue } from '../dto/provider-revenue.dto';
-
+import { ClearPayments } from '../entities/clear-payments.entity';
+import { ClearPaymentsSchema } from '../entities/clear-payments.schema';
+import { CreateClearPayment } from '../dto/clear-payment.dto';
+import { buildFilterExpression } from '../../../utils/helpers/buildFilterExpressionDynamo';
+import { getDateRangeForMonthEnum } from 'src/utils/helpers/buildMonthRanges';
+import { Month } from '../dto/month.enum';
+import { CreateRefundsDto } from '../dto/create-refunds.dto';
+import { RefundsEntity } from '../entities/refunds.entity';
+import { RefundsSchema } from '../entities/refunds.schema';
 @Injectable()
 export class WalletService {
 	private dbInstance: Model<Wallet>;
@@ -59,8 +64,9 @@ export class WalletService {
 	private dbTransactions: Model<Transaction>;
 	private dbUserInstance: Model<User>;
 	private dbRates: Model<Rates>;
-	private dbProviderRevenues: Model<ProviderRevenues>;
+	private dbClearPayments: Model<ClearPayments>;
 	private dbUserIncoming: Model<UserIncomingPayment>;
+	private dbRefunds: Model<RefundsEntity>;
 	private readonly AUTH_MICRO_URL: string;
 	private readonly DOMAIN_WALLET_URL: string;
 	private readonly WALLET_WG_URL: string;
@@ -94,11 +100,12 @@ export class WalletService {
 			'Transactions',
 			TransactionsSchema
 		);
-		this.dbProviderRevenues = dynamoose.model<ProviderRevenues>(
-			'ProviderRevenues',
-			ProviderRevenuesSchema
+		this.dbClearPayments = dynamoose.model<ClearPayments>(
+			'ClearPayments',
+			ClearPaymentsSchema
 		);
 		this.dbRates = dynamoose.model<Rates>('Rates', RatesSchema);
+		this.dbRefunds = dynamoose.model<RefundsEntity>('Refunds', RefundsSchema);
 		this.AUTH_MICRO_URL = process.env.AUTH_URL;
 		this.DOMAIN_WALLET_URL = process.env.DOMAIN_WALLET_URL;
 		this.WALLET_WG_URL = process.env.WALLET_WG_URL;
@@ -1096,14 +1103,31 @@ export class WalletService {
 		}
 	}
 
-	async listIncomingPayments(token: string, state?: any, userInfo?: any) {
+	async listIncomingPayments(
+		token: string,
+		state?: any,
+		userInfo?: any,
+		userId?: any,
+		serviceProviderId?: any
+	) {
 		const userWallet = await this.getUserByToken(token);
+		let userIncomingPayment: any[];
 
-		const userIncomingPayment = await this.getIncomingPaymentsByUser(
-			userWallet?.UserId,
-			state,
-			userInfo
-		);
+		if (userId) {
+			userIncomingPayment = await this.getIncomingPaymentsByUser(
+				userId,
+				state,
+				userInfo,
+				serviceProviderId
+			);
+		} else {
+			userIncomingPayment = await this.getIncomingPaymentsByUser(
+				userWallet?.UserId,
+				state,
+				userInfo,
+				serviceProviderId
+			);
+		}
 
 		if (userIncomingPayment?.[0]?.state == 'BLANK') {
 			return userIncomingPayment;
@@ -1162,6 +1186,79 @@ export class WalletService {
 		);
 
 		return convertToCamelCase(incomingSorted);
+	}
+
+	async listClearPayments(filters, provider) {
+		const docClient = new DocumentClient();
+
+		const { page, items, month, providerId, ...filterRest } = filters;
+
+		const pagedParsed = Number(filters?.page) || 1;
+		const itemsParsed = Number(filters?.items) || 10;
+
+		const expression = buildFilterExpression(filterRest);
+		const clearPaymentsParams: DocumentClient.QueryInput = {
+			TableName: 'ClearPayments',
+			IndexName: 'ServiceProviderIdIndex',
+			KeyConditionExpression: `ServiceProviderId  = :serviceProviderId`,
+
+			...(expression.filterExpression && {
+				FilterExpression: expression.filterExpression,
+			}),
+			...(Object.keys(expression.attributeNames).length && {
+				ExpressionAttributeNames: expression.attributeNames,
+			}),
+			...(Object.keys(expression?.expressionValues).length && {
+				ExpressionAttributeValues: {
+					...expression?.expressionValues,
+					':serviceProviderId': providerId,
+				},
+			}),
+		};
+
+		const currentDate = new Date();
+
+		const defaultMonth = currentDate.getMonth();
+
+		const calculatedMonth = month ? month : defaultMonth;
+
+		const monthRanges = getDateRangeForMonthEnum(calculatedMonth);
+
+		const clearPayments = await docClient.query(clearPaymentsParams).promise();
+
+		const filteredClearPayments = convertToCamelCase(
+			clearPayments?.Items
+		).filter(clearPayment => {
+			const startDateTimestamp = clearPayment?.startDate;
+			const endDateTimestamp = clearPayment?.endDate;
+
+			return (
+				startDateTimestamp >= monthRanges.startDate &&
+				endDateTimestamp <= monthRanges.endDate
+			);
+		});
+
+		const paginatedResults = await this.paginatedResults(
+			pagedParsed,
+			itemsParsed,
+			filteredClearPayments
+		);
+
+		const { transactions, ...paginated } = paginatedResults;
+
+		const clearPaymentsTransformed = transactions.map(transaction => {
+			return {
+				...transaction,
+				provider: provider?.name,
+				month: Month[calculatedMonth],
+			};
+		});
+		const results = {
+			clearPayments: clearPaymentsTransformed,
+			...paginated,
+		};
+
+		return convertToCamelCase(results);
 	}
 
 	async generateCsv(res, transactions: any[]) {
@@ -1709,7 +1806,8 @@ export class WalletService {
 	async getIncomingPaymentsByUser(
 		userId: string,
 		status?: boolean,
-		userInfo?: any
+		userInfo?: any,
+		serviceProviderId?: any
 	) {
 		const docClient = new DocumentClient();
 		const linkedProviders = await this.getLinkedProvidersUserById(userId);
@@ -1732,6 +1830,11 @@ export class WalletService {
 
 		try {
 			const result = await docClient.query(params).promise();
+			if (serviceProviderId) {
+				result.Items = result.Items.filter(
+					item => item.ServiceProviderId === serviceProviderId
+				);
+			}
 
 			if (!result?.Items?.length) {
 				const expireDate = await this.expireDate();
@@ -1809,6 +1912,35 @@ export class WalletService {
 			const result = await docClient.batchGet(params).promise();
 			const existingTransactions = result.Responses.Transactions;
 			return convertToCamelCase(existingTransactions);
+		} catch (error) {
+			Sentry.captureException(error);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0229',
+			};
+		}
+	}
+
+	async batchUpdateTransactions(transactionIds: string[]) {
+		const docClient = new DocumentClient();
+
+		try {
+			Promise.all(
+				transactionIds.map(async transactionId => {
+					const transactionParam = {
+						Key: {
+							Id: transactionId,
+						},
+						TableName: 'Transactions',
+						UpdateExpression: 'SET Pay = :pay',
+						ExpressionAttributeValues: {
+							':pay': true,
+						},
+						ReturnValues: 'ALL_NEW',
+					};
+					await docClient.update(transactionParam).promise();
+				})
+			);
 		} catch (error) {
 			Sentry.captureException(error);
 			return {
@@ -1972,6 +2104,29 @@ export class WalletService {
 			const result = await docClient.scan(params).promise();
 			const paymentParameters = convertToCamelCase(result.Items || []);
 			return paymentParameters;
+		} catch (error) {
+			Sentry.captureException(error);
+		}
+	}
+
+	async getProviders(): Promise<any> {
+		const docClient = new DocumentClient();
+
+		const params: DocumentClient.ScanInput = {
+			TableName: 'Providers',
+			FilterExpression: '#active = :active',
+			ExpressionAttributeNames: {
+				'#active': 'Active',
+			},
+			ExpressionAttributeValues: {
+				':active': true,
+			},
+		};
+
+		try {
+			const result = await docClient.scan(params).promise();
+			const providers = convertToCamelCase(result.Items || []);
+			return providers;
 		} catch (error) {
 			Sentry.captureException(error);
 		}
@@ -2305,6 +2460,33 @@ export class WalletService {
 		} catch (error) {
 			Sentry.captureException(error);
 			throw new Error(`Error fetching wallet by address: ${error.message}`);
+		}
+	}
+
+	async getProviderCompletedTransactions(receiverUrl: string) {
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'Transactions',
+			IndexName: 'ReceiverUrlIndex',
+			KeyConditionExpression: `ReceiverUrl  = :receiverUrl`,
+			FilterExpression: '#state = :state AND #pay = :pay',
+			ExpressionAttributeNames: {
+				'#state': 'State',
+				'#pay': 'Pay',
+			},
+			ExpressionAttributeValues: {
+				':state': 'COMPLETED',
+				':pay': false,
+				':receiverUrl': receiverUrl,
+			},
+		};
+
+		try {
+			const result = await docClient.query(params).promise();
+			return convertToCamelCase(result.Items);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new Error(`Error fetching provider transactions: ${error.message}`);
 		}
 	}
 
@@ -2718,40 +2900,151 @@ export class WalletService {
 		return await this.getUserByToken(token);
 	}
 
-	async createProviderRevenue(
-		createProviderRevenue: CreateProviderRevenue,
+	async generateClearPayments() {
+		try {
+			const providers = await this.getProviders();
+			const now = new Date();
+
+			const startDate = new Date(
+				Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1, 0, 0, 0, 0)
+			);
+
+			const endDate = new Date(
+				Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0, 23, 59, 59, 999)
+			);
+
+			Promise.all(
+				providers.map(async provider => {
+					const providerWallet = await this.getWalletAddressByProviderId(
+						provider?.id
+					);
+
+					const transactions = await this.getProviderCompletedTransactions(
+						providerWallet?.walletAddress
+					);
+
+					if (transactions?.length) {
+						const paymentParameters = await this.getPaymentsParameters(
+							provider?.id
+						);
+
+						const transactionIds = transactions?.map(transaction => {
+							return transaction?.id;
+						});
+
+						const totalAmount = transactions.reduce((total, transaction) => {
+							return (
+								total + parseFloat(transaction?.incomingAmount?.value || 0)
+							);
+						}, 0);
+
+						const walletInfo = await this.graphqlService.listWalletInfo(
+							providerWallet.rafikiId
+						);
+						const scale = walletInfo.data.walletAddress.asset.scale;
+						const code = walletInfo.data.walletAddress.asset.code;
+						const paymentParameter =
+							paymentParameters?.find(parameter => parameter?.asset === code) ||
+							paymentParameters?.[0];
+						const fees = adjustValue(
+							calcularTotalCostoWalletGuru(
+								paymentParameter?.base,
+								paymentParameter?.comision,
+								paymentParameter?.cost,
+								paymentParameter?.percent,
+								scale
+							),
+							scale
+						);
+
+						const createProviderRevenueDTO = {
+							ServiceProviderId: provider?.id,
+							Value: totalAmount,
+							StartDate: startDate.getTime(),
+							EndDate: endDate.getTime(),
+							Fees: fees,
+							TransactionIds: transactionIds,
+						};
+						await this.dbClearPayments.create(createProviderRevenueDTO);
+					}
+				})
+			);
+		} catch (error) {
+			Sentry.captureException(error);
+		}
+	}
+
+	async createClearPayment(
+		createProviderRevenue: CreateClearPayment,
 		providerWallet
 	) {
 		try {
-			const startDate = new Date(createProviderRevenue.startDate).getTime();
-			const endDate = new Date(createProviderRevenue.endDate).getTime();
+			let revenues;
 			const transactions = await this.getBatchTransactions(
 				createProviderRevenue.transactionIds
 			);
 
 			const completedTransactions = transactions.filter(
 				transaction =>
-					transaction?.createdAt >= startDate &&
-					transaction?.createdAt <= endDate &&
+					transaction?.createdAt >= createProviderRevenue.startDate &&
+					transaction?.createdAt <= createProviderRevenue.endDate &&
 					transaction.state === 'COMPLETED' &&
+					transaction.pay === false &&
 					transaction?.receiverUrl === providerWallet?.walletAddress
 			);
 
+			const completedTransactionIds = completedTransactions.map(
+				completedTransaction => {
+					return completedTransaction?.id;
+				}
+			);
+
 			const totalAmount = completedTransactions.reduce((total, transaction) => {
-				return total + parseFloat(transaction?.receiveAmount?.value || 0);
+				return total + parseFloat(transaction?.incomingAmount?.value || 0);
 			}, 0);
 
-			const createProviderRevenueDTO = {
-				ServiceProviderId: createProviderRevenue.serviceProviderId,
-				Value: totalAmount,
-				StartDate: startDate,
-				EndDate: endDate,
-				TransactionIds: createProviderRevenue.transactionIds,
-				...(createProviderRevenue?.observations && {
-					Observations: createProviderRevenue.observations,
-				}),
+			if (completedTransactions?.length) {
+				const paymentParameters = await this.getPaymentsParameters(
+					createProviderRevenue?.serviceProviderId
+				);
+
+				const walletInfo = await this.graphqlService.listWalletInfo(
+					providerWallet.rafikiId
+				);
+
+				const code = walletInfo.data.walletAddress.asset.code;
+				const scale = walletInfo.data.walletAddress.asset.scale;
+				const paymentParameter =
+					paymentParameters?.find(parameter => parameter?.asset === code) ||
+					paymentParameters?.[0];
+
+				const fees = adjustValue(
+					calcularTotalCostoWalletGuru(
+						paymentParameter?.base,
+						paymentParameter?.comision,
+						paymentParameter?.cost,
+						paymentParameter?.percent,
+						scale
+					),
+					scale
+				);
+
+				const createProviderRevenueDTO = {
+					ServiceProviderId: createProviderRevenue?.serviceProviderId,
+					Value: totalAmount,
+					RevenueDate: new Date().getTime(),
+					Fees: fees,
+					TransactionIds: completedTransactionIds,
+				};
+
+				revenues = await this.dbClearPayments.create(createProviderRevenueDTO);
+				return convertToCamelCase(revenues);
+			}
+
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0229',
 			};
-			return await this.dbProviderRevenues.create(createProviderRevenueDTO);
 		} catch (error) {
 			Sentry.captureException(error);
 			return {
@@ -2759,6 +3052,72 @@ export class WalletService {
 				customCode: 'WGE0229',
 			};
 		}
+	}
+
+	async createRefund(createRefundsDto: CreateRefundsDto) {
+		const saveRefundsDto = {
+			ServiceProviderId: createRefundsDto.serviceProviderId,
+			Amount: createRefundsDto.amount,
+			Description: createRefundsDto.description,
+			ActivityId: createRefundsDto.activityId,
+		};
+		return convertToCamelCase(await this.dbRefunds.create(saveRefundsDto));
+	}
+
+	async getRefunds(
+		serviceProviderId: string,
+		page: string,
+		items: string,
+		startDate: string,
+		endDate: string
+	) {
+		const pageNumber = parseInt(page, 10) || 1;
+		const itemsNumber = parseInt(items, 10) || 10;
+
+		const startTimestamp = startDate ? new Date(startDate).getTime() : null;
+		const endTimestamp = endDate ? new Date(endDate).getTime() : null;
+
+		let scan = this.dbRefunds.scan();
+
+		if (serviceProviderId) {
+			scan = scan.where('ServiceProviderId').eq(serviceProviderId);
+		}
+
+		if (startTimestamp !== null && endTimestamp !== null) {
+			scan = scan.filter('CreateDate').between(startTimestamp, endTimestamp);
+		} else if (startTimestamp !== null) {
+			scan = scan.filter('CreateDate').ge(startTimestamp);
+		} else if (endTimestamp !== null) {
+			scan = scan.filter('CreateDate').le(endTimestamp);
+		}
+
+		const refundsData = await scan.exec();
+
+		const convertedRefunds = convertToCamelCase(refundsData);
+
+		if (!convertedRefunds.length) {
+			return {
+				items: [],
+				totalItems: 0,
+				currentPage: pageNumber,
+				totalPages: 0,
+			};
+		}
+
+		const startIndex = (pageNumber - 1) * itemsNumber;
+		const endIndex = Math.min(
+			startIndex + itemsNumber,
+			convertedRefunds.length
+		);
+
+		const paginatedRefunds = convertedRefunds.slice(startIndex, endIndex);
+
+		return {
+			items: paginatedRefunds,
+			totalItems: convertedRefunds.length,
+			currentPage: pageNumber,
+			totalPages: Math.ceil(convertedRefunds.length / itemsNumber),
+		};
 	}
 
 	async getProviderRevenues(
@@ -2809,7 +3168,7 @@ export class WalletService {
 	async getProviderInfoRevenueById(id: string) {
 		const docClient = new DocumentClient();
 		const params = {
-			TableName: 'ProviderRevenues',
+			TableName: 'ClearPayments',
 			Key: { Id: id },
 		};
 
