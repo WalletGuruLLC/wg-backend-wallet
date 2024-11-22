@@ -27,7 +27,7 @@ import { VerifyService } from '../../../verify/verify.service';
 import * as Sentry from '@sentry/nestjs';
 import { MapOfStringToList } from 'aws-sdk/clients/apigateway';
 import axios from 'axios';
-import { CreateClearPayment } from '../dto/clear-payment.dto';
+import { ConfirmClearPayment } from '../dto/confirm-clear-payment.';
 
 @ApiTags('clear-payments')
 @Controller('api/v1/clear-payments')
@@ -42,27 +42,23 @@ export class ClearPaymentController {
 		this.AUTH_MICRO_URL = process.env.AUTH_URL;
 	}
 
-	@Post()
-	@ApiOperation({ summary: 'Create a new provider revenue' })
-	@ApiBody({
-		type: CreateClearPayment,
-		description: 'Data required to create a new provider revenue',
-	})
+	@Post('/confirm')
+	@ApiOperation({ summary: 'Confirm a clear payment' })
 	@ApiResponse({
-		status: 201,
-		description: 'Provider Revenue Has Been Created Successfully',
+		status: 200,
+		description: 'Clear Payment Has Been Confirmed',
 	})
 	@ApiResponse({
 		status: 400,
-		description: 'Error Creating Provider Revenue',
+		description: 'Error Confirming Clear Payment ',
 	})
 	@ApiResponse({
 		status: 500,
 		description: 'Internal Server Error',
 	})
-	async createProviderRevenue(
+	async confirm(
 		@Body()
-		createProviderRevenue: CreateClearPayment,
+		confirmClearPayment: ConfirmClearPayment,
 		@Headers() headers: MapOfStringToList,
 		@Res() res
 	) {
@@ -97,33 +93,47 @@ export class ClearPaymentController {
 				});
 			}
 
-			const providerWallet =
-				await this.walletService.getWalletAddressByProviderId(
-					createProviderRevenue.serviceProviderId
-				);
+			const clearPayment = await this.walletService.getProviderInfoRevenueById(
+				confirmClearPayment.clearPaymentId
+			);
 
-			if (!providerWallet) {
+			if (!clearPayment) {
 				return res.status(HttpStatus.NOT_FOUND).send({
 					statusCode: HttpStatus.NOT_FOUND,
-					customCode: 'WGE0074',
+					customCode: 'WGE0163',
 				});
 			}
 
-			const providerRevenue = await this.walletService.createClearPayment(
-				createProviderRevenue,
-				providerWallet
-			);
+			if (!confirmClearPayment.referenceNumber) {
+				return res.status(HttpStatus.BAD_REQUEST).send({
+					statusCode: HttpStatus.BAD_REQUEST,
+					customCode: 'WGE0229',
+				});
+			}
 
-			if (providerRevenue?.statusCode) {
-				return res.status(providerRevenue?.statusCode).send({
-					statusCode: providerRevenue?.statusCode,
-					customCode: providerRevenue?.customCode,
+			if (!confirmClearPayment.observations) {
+				return res.status(HttpStatus.BAD_REQUEST).send({
+					statusCode: HttpStatus.BAD_REQUEST,
+					customCode: 'WGE0229',
+				});
+			}
+
+			const confirmedClearPayment =
+				await this.walletService.confirmClearPayment(
+					confirmClearPayment,
+					clearPayment
+				);
+
+			if (confirmedClearPayment?.statusCode) {
+				return res.status(confirmedClearPayment?.statusCode).send({
+					statusCode: confirmedClearPayment?.statusCode,
+					customCode: confirmedClearPayment?.customCode,
 				});
 			}
 			return res.status(HttpStatus.CREATED).send({
-				statusCode: HttpStatus.CREATED,
+				statusCode: HttpStatus.OK,
 				customCode: 'WGE0227',
-				data: { providerRevenue },
+				data: { confirmedClearPayment },
 			});
 		} catch (error) {
 			Sentry.captureException(error);
@@ -135,6 +145,7 @@ export class ClearPaymentController {
 					{
 						statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
 						customCode: 'WGE0229',
+						message: error?.message,
 					},
 					HttpStatus.INTERNAL_SERVER_ERROR
 				);
