@@ -56,6 +56,11 @@ import { RefundsEntity } from '../entities/refunds.entity';
 import { RefundsSchema } from '../entities/refunds.schema';
 import { ConfirmClearPayment } from '../dto/confirm-clear-payment.';
 import { validarPermisos } from '../../../utils/helpers/getAccessServiceProviders';
+import {
+	createOutgoingPayment,
+	createQuote,
+} from 'src/utils/helpers/openPaymentMethods';
+import { toBase64 } from 'src/utils/helpers/openPaymentSignature';
 
 @Injectable()
 export class WalletService {
@@ -2488,12 +2493,6 @@ export class WalletService {
 							},
 						};
 						await this.createOutgoingPayment(inputOutgoing);
-
-						// await this.createDepositOutgoingMutationService({
-						// 	outgoingPaymentId:
-						// 		outgoingValue?.createOutgoingPayment?.payment?.id,
-						// 	idempotencyKey: uuidv4(),
-						// });
 					}, 500);
 				}
 
@@ -2505,6 +2504,200 @@ export class WalletService {
 			}
 		}
 	}
+
+	// async processParameterFlowUpdated(
+	// 	parameterId,
+	// 	walletAddressId,
+	// 	walletAsset,
+	// 	serviceProviderId,
+	// 	userId,
+	// 	senderUrl,
+	// 	activityId,
+	// 	itemName,
+	// 	clientId
+	// ) {
+	// 	const parameterExists = await this.validatePaymentParameterId(
+	// 		parameterId,
+	// 		serviceProviderId
+	// 	);
+
+	// 	if (!parameterExists?.id) {
+	// 		this.authGateway.sendDataClientId('error', clientId, {
+	// 			message: 'The specified type parameter does not exist',
+	// 			statusCode: 'WGE0222',
+	// 		});
+	// 	}
+
+	// 	const incomingPayment = await this.dbIncomingUser
+	// 		.query('ServiceProviderId')
+	// 		.eq(serviceProviderId)
+	// 		.where('SenderUrl')
+	// 		.eq(senderUrl)
+	// 		.where('Status')
+	// 		.eq(true)
+	// 		.exec();
+
+	// 	if (!incomingPayment || incomingPayment.length === 0) {
+	// 		this.authGateway.sendDataClientId('error', clientId, {
+	// 			message: 'You don’t have any incoming payments yet.',
+	// 			statusCode: 'WGE0223',
+	// 		});
+	// 	}
+
+	// 	incomingPayment.sort((a: any, b: any) => b?.createdAt - a?.createdAt);
+
+	// 	let validIncomingPayment = null;
+
+	// 	const sendValue = adjustValue(
+	// 		calcularTotalCosto(
+	// 			parameterExists?.base,
+	// 			parameterExists?.comision,
+	// 			parameterExists?.cost,
+	// 			parameterExists?.percent,
+	// 			walletAsset?.scale
+	// 		),
+	// 		walletAsset?.scale
+	// 	);
+
+	// 	for (let i = 0; i < incomingPayment.length; i++) {
+	// 		const payment = incomingPayment?.[i];
+	// 		const incomingPaymentValue = await this.getIncomingPayment(
+	// 			payment?.IncomingPaymentId
+	// 		);
+
+	// 		const incomingValue =
+	// 			parseInt(incomingPaymentValue?.incomingAmount?.value ?? '0') -
+	// 			parseInt(incomingPaymentValue?.receivedAmount?.value ?? '0');
+
+	// 		if (sendValue <= incomingValue) {
+	// 			validIncomingPayment = payment;
+	// 			break;
+	// 		}
+	// 	}
+
+	// 	if (!validIncomingPayment) {
+	// 		this.authGateway.sendDataClientId('error', clientId, {
+	// 			message: 'Insufficient funds',
+	// 			statusCode: 'WGE0220',
+	// 		});
+	// 	}
+
+	// 	if (validIncomingPayment) {
+	// 		try {
+
+	// 			const userWallet = await this.findWalletByUrl(
+	// 				senderUrl
+	// 			);
+
+	// 		const privateKey = userWallet?.PrivateKey;
+	// 		const keyId = userWallet?.KeyId;
+
+	// 		const walletBase64 = await toBase64(privateKey);
+
+	// 		const receiverAssetCode = 'USD';
+	// 		const receiverAssetScale = 2;
+	// 		const quoteDebitAmount = {
+	// 			assetCode: userWalletByToken?.walletAsset?.code,
+	// 			assetScale: userWalletByToken?.walletAsset?.scale,
+	// 			value: adjustValue(
+	// 				input?.amount,
+	// 				userWalletByToken?.walletAsset?.scale
+	// 			),
+	// 		};
+	// 		const quoteReceiveAmount = {
+	// 			assetCode: userWalletByToken?.walletAsset?.code,
+	// 			assetScale: userWalletByToken?.walletAsset?.scale,
+	// 			value: adjustValue(
+	// 				input?.amount,
+	// 				userWalletByToken?.walletAsset?.scale
+	// 			),
+	// 		};
+	// 		const expirationDate = new Date(
+	// 			Date.now() + 24 * 60 * 60 * 1000
+	// 		).toISOString();
+	// 		const clientKey = keyId;
+	// 		const clientPrivate = walletBase64;
+	// 		const metadataIncoming = {
+	// 			type: 'USER',
+	// 			wgUser: userId,
+	// 			description: '',
+	// 		};
+	// 		const metadataOutgoing = {
+	// 			type: 'USER',
+	// 			wgUser: userId,
+	// 			description: '',
+	// 		};
+
+	// 			// Crear Quote
+	// 			const quoteInput = {
+	// 				sender: walletAddressId,
+	// 				receiver: validIncomingPayment?.ReceiverId,
+	// 				receiveAmount: {
+	// 					value: sendValue,
+	// 					assetCode: walletAsset?.asset ?? 'USD',
+	// 					assetScale: walletAsset?.scale ?? 2,
+	// 				},
+	// 			};
+
+	// 			const quote = await createQuote(senderUrl,validIncomingPayment?.IncomingPaymentId,req,);
+	// 			console.log('Quote created:', quote);
+
+	// 			// Validar Quote
+	// 			const providerWalletId =
+	// 				quote?.createQuote?.quote?.receiver?.split('/');
+	// 			if (!providerWalletId) {
+	// 				this.authGateway.sendDataClientId('error', clientId, {
+	// 					message: 'Invalid quote',
+	// 					statusCode: 'WGE0221',
+	// 				});
+	// 			}
+
+	// 			// Crear Outgoing Payment
+	// 			const outgoingInput = {
+	// 				walletAddressId: walletAddressId,
+	// 				quoteId: quote?.createQuote?.quote?.id,
+	// 				metadata: {
+	// 					activityId: activityId || '',
+	// 					contentName: itemName || '---',
+	// 					description: '',
+	// 					type: 'PROVIDER',
+	// 					wgUser: userId,
+	// 				},
+	// 			};
+
+	// 			const outgoingPayment = await createOutgoingPayment(outgoingInput);
+	// 			console.log('Outgoing Payment:', outgoingPayment);
+
+	// 			// Actualizar estados y operaciones adicionales
+	// 			const docClient = new DocumentClient();
+	// 			const params = {
+	// 				TableName: 'Users',
+	// 				Key: { Id: userId },
+	// 			};
+	// 			const userDynamo = await docClient.get(params).promise();
+
+	// 			if (userDynamo?.Item?.Grant == 1) {
+	// 				await this.createDepositOutgoingMutationService({
+	// 					outgoingPaymentId:
+	// 						outgoingPayment?.createOutgoingPayment?.payment?.id,
+	// 					idempotencyKey: uuidv4(),
+	// 				});
+	// 			}
+
+	// 			this.authGateway.sendDataClientId('hc', clientId, {
+	// 				message: 'Ok',
+	// 				statusCode: 'WGS0053',
+	// 				activityId: activityId,
+	// 			});
+	// 		} catch (error) {
+	// 			console.error('Error processing payment:', error);
+	// 			this.authGateway.sendDataClientId('error', clientId, {
+	// 				message: 'Payment process failed',
+	// 				statusCode: 'WGE0224',
+	// 			});
+	// 		}
+	// 	}
+	// }
 
 	async completePayment(outgoingPaymentId, action) {
 		let response;

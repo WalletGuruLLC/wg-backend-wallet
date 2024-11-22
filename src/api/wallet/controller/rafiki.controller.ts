@@ -976,17 +976,15 @@ export class RafikiWalletController {
 
 			const result = await unifiedProcess(
 				input?.walletAddressUrl,
-				receiverAssetCode,
-				receiverAssetScale,
 				userWallet?.walletAddress,
 				quoteDebitAmount,
 				quoteReceiveAmount,
-				expirationDate,
 				req,
 				clientKey,
 				clientPrivate,
 				metadataIncoming,
-				metadataOutgoing
+				metadataOutgoing,
+				expirationDate
 			);
 
 			// await addApiSignatureHeader(req, req.body);
@@ -1471,14 +1469,14 @@ export class RafikiWalletController {
 			const walletBase64 = await toBase64(privateKey);
 
 			const receiverAssetCode = 'USD';
-			const receiverAssetScale = 2;
+			const receiverAssetScale = 6;
 			const quoteDebitAmount = {
-				value: '10',
+				value: '100',
 				assetCode: 'USD',
 				assetScale: 6,
 			};
 			const quoteReceiveAmount = {
-				value: '10',
+				value: '100',
 				assetCode: 'USD',
 				assetScale: 6,
 			};
@@ -1501,17 +1499,15 @@ export class RafikiWalletController {
 
 			const result = await unifiedProcess(
 				receiverWalletAddress,
-				receiverAssetCode,
-				receiverAssetScale,
 				senderWalletAddress,
 				quoteDebitAmount,
 				quoteReceiveAmount,
-				expirationDate,
 				req,
 				clientKey,
 				clientPrivate,
 				metadataIncoming,
-				metadataOutgoing
+				metadataOutgoing,
+				expirationDate
 			);
 
 			// const response = await getGrantForIncomingPayment(
