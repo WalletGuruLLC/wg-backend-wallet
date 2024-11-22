@@ -210,9 +210,6 @@ export const createIncomingPayment = async (
 	senderWalletAddress,
 	senderWalletAddress,
 	receiverWalletAddress,
-	receiverAssetCode,
-	receiverAssetScale,
-	expirationDate,
 	req,
 	clientKey,
 	clientPrivate,
@@ -263,7 +260,9 @@ export const createIncomingPayment = async (
 			clientPrivate
 		);
 			expiresAt: expirationDate,
-			metadata: metadataIncoming,
+			metadata: {
+				description: 'Free Money!',
+			},
 		};
 
 		const headers = await addSignatureHeadersGrantGrant(
@@ -663,7 +662,9 @@ export const createOutgoingPayment = async (
 	const body = {
 		walletAddress: senderWalletAddress,
 		quoteId: `${senderWalletAddress}/quotes/${quoteId}`,
-		metadata: metadataOutgoing,
+		metadata: {
+			description: 'Free Money!',
+		},
 	};
 
 	const additionalHeaders = await addSignatureHeadersGrantOutgoing(
@@ -687,9 +688,7 @@ export const createOutgoingPayment = async (
 
 		// Parsear la URL de interacción
 		const infoRedirectInteract = parseUrl(accessToken?.interact?.redirect);
-		console.log('Redirect Interaction Info:', infoRedirectInteract);
 
-		// Realizar solicitud de interacción
 		const responseInteract = await makeRequestInteractions({
 			url: accessToken?.interact?.redirect,
 			interactId: '',
@@ -701,10 +700,9 @@ export const createOutgoingPayment = async (
 				'content-type': 'application/json',
 			},
 		});
-		console.log('Interaction Response:', responseInteract);
 
 		// Aceptar interacción
-		const responseAccept = await generalRequestInteractions({
+		await generalRequestInteractions({
 			url: `${process.env.SENDER_INTERACTIONS_HOST}grant`,
 			interactId: infoRedirectInteract?.interactId,
 			additionalId: `${accessToken?.interact?.finish}/accept`,
@@ -714,7 +712,6 @@ export const createOutgoingPayment = async (
 				'content-type': 'application/json',
 			},
 		});
-		console.log('Interaction Accept Response:', responseAccept);
 
 	try {
 		const response = await axios.post(url, body, { headers });
@@ -728,9 +725,11 @@ export const createOutgoingPayment = async (
 				Cookie: `sessionId=${responseInteract?.[0]?.value}; sessionId.sig=${responseInteract?.[1]?.value}`,
 			},
 		});
-		console.log('Interaction Finish Response:', responseFinishInteraction);
 
-		// Añadir cabeceras con firma
+		const delay = ms => new Promise(res => setTimeout(res, ms));
+
+		await delay(10000);
+
 		const headers = await addSignatureHeadersGrantGrant(
 			req,
 			{},
@@ -743,26 +742,20 @@ export const createOutgoingPayment = async (
 			clientPrivate
 		);
 
-		// Esperar antes de continuar
-		setTimeout(async () => {
-			// Continuar con la solicitud
-			const responseContinue = await generalRequestInteractions({
-				url: accessToken?.continue?.uri,
-				interactId: '',
-				additionalId: '',
-				method: 'POST',
-				params: {},
-				headers: {
-					Authorization: `GNAP ${accessToken?.continue?.access_token?.value}`,
-					'content-type': 'application/json',
-					...headers,
-				},
-			});
-			console.log('Continue Response:', responseContinue);
-
-			// Crear el pago saliente
+		await generalRequestInteractions({
+			url: accessToken?.continue?.uri,
+			interactId: '',
+			additionalId: '',
+			method: 'POST',
+			params: {},
+			headers: {
+				Authorization: `GNAP ${accessToken?.continue?.access_token?.value}`,
+				'content-type': 'application/json',
+				...headers,
+			},
+		}).then(async data => {
 			const responseCreateOutgoing = await sendOutgoingPayment({
-				accessToken: responseContinue?.access_token?.value,
+				accessToken: data?.access_token?.value,
 				clientKey,
 				clientPrivate,
 				senderWalletAddress,
@@ -770,7 +763,7 @@ export const createOutgoingPayment = async (
 				metadataOutgoing,
 			});
 			console.log('Create Outgoing Payment Response:', responseCreateOutgoing);
-		}, 6000);
+		});
 	} catch (error) {
 		console.error(
 			'Error outgoing payment:',
@@ -887,30 +880,27 @@ export const createOutgoingPayment = async (
 
 export const unifiedProcess = async (
 	receiverWalletAddress,
-	receiverAssetCode,
-	receiverAssetScale,
 	senderWalletAddress,
 	quoteDebitAmount,
 	quoteReceiveAmount,
-	expirationDate,
 	req,
 	clientKey,
 	clientPrivate,
 	metadataIncoming,
-	metadataOutgoing
+	metadataOutgoing,
+	expirationDate
 ) => {
 	try {
 		// 1. Crear Incoming Payment
 		const incomingPayment = await createIncomingPayment(
 			senderWalletAddress,
 			receiverWalletAddress,
-			receiverAssetCode,
-			receiverAssetScale,
-			expirationDate,
 			req,
 			clientKey,
 			clientPrivate,
-			metadataIncoming
+			metadataIncoming,
+			quoteDebitAmount,
+			expirationDate
 		);
 		console.log('Incoming Payment:', incomingPayment);
 
@@ -937,7 +927,6 @@ export const unifiedProcess = async (
 		);
 		console.log('Outgoing Payment:', outgoingPayment);
 
-		// Retornar el resultado final
 		return {
 			outgoingPayment,
 		};
