@@ -2463,21 +2463,32 @@ export class WalletService {
 		}
 	}
 
-	async getProviderCompletedTransactions(receiverUrl: string) {
+	async getProviderCompletedTransactions(
+		receiverUrl: string,
+		startDate,
+		endDate
+	) {
 		const docClient = new DocumentClient();
 		const params = {
 			TableName: 'Transactions',
 			IndexName: 'ReceiverUrlIndex',
 			KeyConditionExpression: `ReceiverUrl  = :receiverUrl`,
-			FilterExpression: '#state = :state AND #pay = :pay',
+			FilterExpression: `
+			 #state = :state AND
+			 #pay = :pay AND
+			 #transactionDate BETWEEN :start AND :end
+			 `,
 			ExpressionAttributeNames: {
 				'#state': 'State',
 				'#pay': 'Pay',
+				'#transactionDate': 'createdAt',
 			},
 			ExpressionAttributeValues: {
 				':state': 'COMPLETED',
 				':pay': false,
 				':receiverUrl': receiverUrl,
+				':start': startDate,
+				':end': endDate,
 			},
 		};
 
@@ -2906,11 +2917,23 @@ export class WalletService {
 			const now = new Date();
 
 			const startDate = new Date(
-				Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1, 0, 0, 0, 0)
+				now.getFullYear(),
+				now.getMonth() - 1,
+				1,
+				0,
+				0,
+				0,
+				0
 			);
 
 			const endDate = new Date(
-				Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0, 23, 59, 59, 999)
+				now.getFullYear(),
+				now.getMonth(),
+				0,
+				23,
+				59,
+				59,
+				999
 			);
 
 			Promise.all(
@@ -2920,7 +2943,9 @@ export class WalletService {
 					);
 
 					const transactions = await this.getProviderCompletedTransactions(
-						providerWallet?.walletAddress
+						providerWallet?.walletAddress,
+						startDate.getTime(),
+						endDate.getTime()
 					);
 
 					if (transactions?.length) {
