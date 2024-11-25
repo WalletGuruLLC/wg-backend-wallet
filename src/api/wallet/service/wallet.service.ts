@@ -1945,7 +1945,7 @@ export class WalletService {
 			Sentry.captureException(error);
 			return {
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-				customCode: 'WGE0229',
+				customCode: 'WGE0236',
 			};
 		}
 	}

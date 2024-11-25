@@ -132,7 +132,7 @@ export class ClearPaymentController {
 			}
 			return res.status(HttpStatus.CREATED).send({
 				statusCode: HttpStatus.OK,
-				customCode: 'WGE0227',
+				customCode: 'WGE0235',
 				data: { confirmedClearPayment },
 			});
 		} catch (error) {
@@ -144,7 +144,7 @@ export class ClearPaymentController {
 				throw new HttpException(
 					{
 						statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-						customCode: 'WGE0229',
+						customCode: 'WGE0236',
 						message: error?.message,
 					},
 					HttpStatus.INTERNAL_SERVER_ERROR
