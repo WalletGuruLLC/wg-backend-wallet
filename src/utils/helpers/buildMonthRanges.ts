@@ -4,7 +4,7 @@ export function getDateRangeForMonthEnum(month: Month) {
 	const now = new Date();
 
 	const startDate = new Date(
-		now.getUTCFullYear(),
+		now.getFullYear(),
 		month - 1,
 		1,
 		0,
@@ -14,7 +14,7 @@ export function getDateRangeForMonthEnum(month: Month) {
 	).getTime();
 
 	const endDate = new Date(
-		now.getUTCFullYear(),
+		now.getFullYear(),
 		month,
 		0,
 		23,
