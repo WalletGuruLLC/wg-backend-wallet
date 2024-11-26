@@ -2476,12 +2476,14 @@ export class WalletService {
 			FilterExpression: `
 			 #state = :state AND
 			 #pay = :pay AND
-			 #transactionDate BETWEEN :start AND :end
+			 #transactionDate BETWEEN :start AND :end AND
+			 #type = :type
 			 `,
 			ExpressionAttributeNames: {
 				'#state': 'State',
 				'#pay': 'Pay',
 				'#transactionDate': 'createdAt',
+				'#type': 'Type',
 			},
 			ExpressionAttributeValues: {
 				':state': 'COMPLETED',
@@ -2489,6 +2491,7 @@ export class WalletService {
 				':receiverUrl': receiverUrl,
 				':start': startDate,
 				':end': endDate,
+				':type': 'OutgoingPayment',
 			},
 		};
 
