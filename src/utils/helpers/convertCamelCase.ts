@@ -11,6 +11,10 @@ export function convertToCamelCase(input) {
 		return input;
 	}
 
+	if (input instanceof Date) {
+		return input;
+	}
+
 	if (Array.isArray(input)) {
 		return input.map(item => convertToCamelCase(item));
 	}
