@@ -2495,11 +2495,8 @@ export class WalletService {
 			},
 		};
 
-		console.log('Completed transactions params:', params);
-
 		try {
 			const result = await docClient.query(params).promise();
-			console.log('Completed transactions params:', result?.Items);
 			return convertToCamelCase(result.Items);
 		} catch (error) {
 			Sentry.captureException(error);
@@ -2964,9 +2961,7 @@ export class WalletService {
 						});
 
 						const totalAmount = transactions.reduce((total, transaction) => {
-							return (
-								total + parseFloat(transaction?.incomingAmount?.value || 0)
-							);
+							return total + parseFloat(transaction?.receiveAmount?.value || 0);
 						}, 0);
 
 						const walletInfo = await this.graphqlService.listWalletInfo(
