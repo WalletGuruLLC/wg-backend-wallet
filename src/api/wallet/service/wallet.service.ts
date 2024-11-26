@@ -48,13 +48,13 @@ import { WebSocketActionSchema } from '../entities/webSocketAction.schema';
 import { CreateWebSocketActionDto } from '../dto/create-web-socket-action.dto';
 import { ClearPayments } from '../entities/clear-payments.entity';
 import { ClearPaymentsSchema } from '../entities/clear-payments.schema';
-import { CreateClearPayment } from '../dto/clear-payment.dto';
 import { buildFilterExpression } from '../../../utils/helpers/buildFilterExpressionDynamo';
 import { getDateRangeForMonthEnum } from 'src/utils/helpers/buildMonthRanges';
 import { Month } from '../dto/month.enum';
 import { CreateRefundsDto } from '../dto/create-refunds.dto';
 import { RefundsEntity } from '../entities/refunds.entity';
 import { RefundsSchema } from '../entities/refunds.schema';
+import { ConfirmClearPayment } from '../dto/confirm-clear-payment.';
 @Injectable()
 export class WalletService {
 	private dbInstance: Model<Wallet>;
@@ -1945,7 +1945,7 @@ export class WalletService {
 			Sentry.captureException(error);
 			return {
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-				customCode: 'WGE0229',
+				customCode: 'WGE0236',
 			};
 		}
 	}
@@ -2463,21 +2463,32 @@ export class WalletService {
 		}
 	}
 
-	async getProviderCompletedTransactions(receiverUrl: string) {
+	async getProviderCompletedTransactions(
+		receiverUrl: string,
+		startDate,
+		endDate
+	) {
 		const docClient = new DocumentClient();
 		const params = {
 			TableName: 'Transactions',
 			IndexName: 'ReceiverUrlIndex',
 			KeyConditionExpression: `ReceiverUrl  = :receiverUrl`,
-			FilterExpression: '#state = :state AND #pay = :pay',
+			FilterExpression: `
+			 #state = :state AND
+			 #pay = :pay AND
+			 #transactionDate BETWEEN :start AND :end
+			 `,
 			ExpressionAttributeNames: {
 				'#state': 'State',
 				'#pay': 'Pay',
+				'#transactionDate': 'createdAt',
 			},
 			ExpressionAttributeValues: {
 				':state': 'COMPLETED',
 				':pay': false,
 				':receiverUrl': receiverUrl,
+				':start': startDate,
+				':end': endDate,
 			},
 		};
 
@@ -2906,11 +2917,23 @@ export class WalletService {
 			const now = new Date();
 
 			const startDate = new Date(
-				Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1, 0, 0, 0, 0)
+				now.getFullYear(),
+				now.getMonth() - 1,
+				1,
+				0,
+				0,
+				0,
+				0
 			);
 
 			const endDate = new Date(
-				Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0, 23, 59, 59, 999)
+				now.getFullYear(),
+				now.getMonth(),
+				0,
+				23,
+				59,
+				59,
+				999
 			);
 
 			Promise.all(
@@ -2920,7 +2943,9 @@ export class WalletService {
 					);
 
 					const transactions = await this.getProviderCompletedTransactions(
-						providerWallet?.walletAddress
+						providerWallet?.walletAddress,
+						startDate.getTime(),
+						endDate.getTime()
 					);
 
 					if (transactions?.length) {
@@ -2974,83 +2999,42 @@ export class WalletService {
 		}
 	}
 
-	async createClearPayment(
-		createProviderRevenue: CreateClearPayment,
-		providerWallet
+	async confirmClearPayment(
+		confirmClearPayment: ConfirmClearPayment,
+		clearPayment
 	) {
 		try {
-			let revenues;
-			const transactions = await this.getBatchTransactions(
-				createProviderRevenue.transactionIds
-			);
+			await this.batchUpdateTransactions(clearPayment?.transactionIds);
 
-			const completedTransactions = transactions.filter(
-				transaction =>
-					transaction?.createdAt >= createProviderRevenue.startDate &&
-					transaction?.createdAt <= createProviderRevenue.endDate &&
-					transaction.state === 'COMPLETED' &&
-					transaction.pay === false &&
-					transaction?.receiverUrl === providerWallet?.walletAddress
-			);
+			const docClient = new DocumentClient();
 
-			const completedTransactionIds = completedTransactions.map(
-				completedTransaction => {
-					return completedTransaction?.id;
-				}
-			);
-
-			const totalAmount = completedTransactions.reduce((total, transaction) => {
-				return total + parseFloat(transaction?.incomingAmount?.value || 0);
-			}, 0);
-
-			if (completedTransactions?.length) {
-				const paymentParameters = await this.getPaymentsParameters(
-					createProviderRevenue?.serviceProviderId
-				);
-
-				const walletInfo = await this.graphqlService.listWalletInfo(
-					providerWallet.rafikiId
-				);
-
-				const code = walletInfo.data.walletAddress.asset.code;
-				const scale = walletInfo.data.walletAddress.asset.scale;
-				const paymentParameter =
-					paymentParameters?.find(parameter => parameter?.asset === code) ||
-					paymentParameters?.[0];
-
-				const fees = adjustValue(
-					calcularTotalCostoWalletGuru(
-						paymentParameter?.base,
-						paymentParameter?.comision,
-						paymentParameter?.cost,
-						paymentParameter?.percent,
-						scale
-					),
-					scale
-				);
-
-				const createProviderRevenueDTO = {
-					ServiceProviderId: createProviderRevenue?.serviceProviderId,
-					Value: totalAmount,
-					RevenueDate: new Date().getTime(),
-					Fees: fees,
-					TransactionIds: completedTransactionIds,
-				};
-
-				revenues = await this.dbClearPayments.create(createProviderRevenueDTO);
-				return convertToCamelCase(revenues);
-			}
-
-			return {
-				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-				customCode: 'WGE0229',
+			const clearPaymentParams = {
+				TableName: 'ClearPayments',
+				Key: {
+					Id: clearPayment?.id,
+				},
+				UpdateExpression:
+					'SET #referenceNumber= :referenceNumber, #observation= :observation, #state= :state',
+				ExpressionAttributeNames: {
+					'#referenceNumber': 'ReferenceNumber',
+					'#observation': 'Observations',
+					'#state': 'State',
+				},
+				ExpressionAttributeValues: {
+					':referenceNumber': confirmClearPayment.referenceNumber,
+					':observation': confirmClearPayment.observations,
+					':state': true,
+				},
+				ReturnValues: 'ALL_NEW',
 			};
+
+			const confirmedClearPayment = await docClient
+				.update(clearPaymentParams)
+				.promise();
+			return convertToCamelCase(confirmedClearPayment?.Attributes);
 		} catch (error) {
 			Sentry.captureException(error);
-			return {
-				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-				customCode: 'WGE0229',
-			};
+			throw new Error(error.message);
 		}
 	}
 
