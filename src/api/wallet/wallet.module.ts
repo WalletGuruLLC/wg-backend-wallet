@@ -14,10 +14,16 @@ import { WebHookController } from './controller/webhook.controller';
 import { WebHookEventService } from './service/webhook-event.service';
 import { SqsService } from './sqs/sqs.service';
 import { UserWsGateway } from './service/websocket-users';
+import { ClearPaymentController } from './controller/clear-payment.controller';
 
 @Module({
 	imports: [ConfigModule, VerifyModule],
-	controllers: [WalletController, RafikiWalletController, WebHookController],
+	controllers: [
+		WalletController,
+		RafikiWalletController,
+		WebHookController,
+		ClearPaymentController,
+	],
 	providers: [
 		WalletService,
 		VerifyService,

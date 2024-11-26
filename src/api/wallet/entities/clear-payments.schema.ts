@@ -1,7 +1,7 @@
 import * as dynamoose from 'dynamoose';
 import { v4 as uuidv4 } from 'uuid';
 
-export const ProviderRevenuesSchema = new dynamoose.Schema(
+export const ClearPaymentsSchema = new dynamoose.Schema(
 	{
 		Id: {
 			type: String,
@@ -9,11 +9,11 @@ export const ProviderRevenuesSchema = new dynamoose.Schema(
 			default: () => uuidv4(),
 			required: true,
 		},
-		ProviderId: {
+		ServiceProviderId: {
 			type: String,
 			index: {
 				global: true,
-				name: 'ProviderIdIndex',
+				name: 'ServiceProviderIdIndex',
 			},
 		},
 		Value: {
@@ -24,16 +24,28 @@ export const ProviderRevenuesSchema = new dynamoose.Schema(
 			type: Array,
 			schema: [String],
 		},
-		StartDate: {
+		EndDate: {
 			type: Number,
 		},
-		EndDate: {
+		StartDate: {
 			type: Number,
 		},
 		Observations: {
 			type: String,
 			required: false,
 			default: '',
+		},
+		ReferenceNumber: {
+			type: String,
+			required: false,
+			default: '',
+		},
+		Fees: {
+			type: Number,
+		},
+		State: {
+			type: Boolean,
+			default: false,
 		},
 	},
 	{
