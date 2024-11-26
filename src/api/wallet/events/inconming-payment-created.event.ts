@@ -79,7 +79,7 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 			const senderWalletValue =
 				await this.walletService.getWalletAddressByProviderId(providerId);
 
-			const transaction: any = {
+			const transaction = {
 				Type: 'IncomingPayment',
 				IncomingPaymentId: eventWebHookDTO.data?.id,
 				WalletAddressId: eventWebHookDTO?.data?.walletAddressId,
@@ -97,11 +97,8 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 					assetScale: eventWebHookDTO.data?.incomingAmount?.assetScale,
 				},
 				Description: '',
+				Pay: false,
 			};
-
-			if (eventWebHookDTO?.data?.metadata?.type === 'REVENUE') {
-				transaction.Pay = false;
-			}
 
 			const transactionValue = await this.dbTransactions.create(transaction);
 

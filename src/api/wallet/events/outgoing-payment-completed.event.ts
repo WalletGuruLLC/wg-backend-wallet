@@ -97,6 +97,7 @@ export class OutGoingPaymentCompletedEvent implements EventWebHook {
 					assetScale: eventWebHookDTO.data?.receiveAmount?.assetScale,
 				},
 				Description: '',
+				Pay: false,
 			};
 			const transactionValue = await this.dbTransactions.create(transaction);
 
