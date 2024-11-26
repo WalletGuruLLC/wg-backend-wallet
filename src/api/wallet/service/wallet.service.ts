@@ -2495,8 +2495,11 @@ export class WalletService {
 			},
 		};
 
+		console.log('Completed transactions params:',params)
+
 		try {
-			const result = await docClient.query(params).promise();
+			const result = await docClient.query(params).promise()
+			console.log('Completed transactions params:',result?.Items)
 			return convertToCamelCase(result.Items);
 		} catch (error) {
 			Sentry.captureException(error);
@@ -2950,6 +2953,8 @@ export class WalletService {
 						startDate.getTime(),
 						endDate.getTime()
 					);
+
+					
 
 					if (transactions?.length) {
 						const paymentParameters = await this.getPaymentsParameters(
