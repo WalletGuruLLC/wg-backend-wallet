@@ -18,7 +18,6 @@ export const requestSigHeaders = async (
 			request: { url, method, headers, body: JSON.stringify(body) },
 		};
 
-		console.log('signaturePayload', signaturePayload);
 		const response = await fetch(process.env.SIGNATURE_URL, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
@@ -37,14 +36,12 @@ export const requestSigHeaders = async (
 	}
 };
 
-// Convierte las claves de un objeto JSON a minúsculas
 const convertKeysToLowerCase = inputJson =>
 	Object.keys(inputJson).reduce((acc, key) => {
 		acc[key.toLowerCase()] = inputJson[key];
 		return acc;
 	}, {});
 
-// Agrega encabezados con firma
 export const addSignatureHeadersGrantGrant = async (
 	req,
 	body,
@@ -63,7 +60,6 @@ export const addSignatureHeadersGrantGrant = async (
 	);
 };
 
-// Agrega encabezados con firma
 export const addSignatureHeadersGrantOutgoing = async (
 	method,
 	body,
@@ -82,7 +78,6 @@ export const addSignatureHeadersGrantOutgoing = async (
 	);
 };
 
-// Obtiene un grant para pagos entrantes
 export const getGrantForIncomingPayment = async (
 	clientWalletAddress,
 	req,
@@ -111,11 +106,19 @@ export const getGrantForIncomingPayment = async (
 			clientPrivate
 		);
 
-		console.log('headers', headers);
+		console.log(
+			'grant for incoming information',
+			JSON.stringify({
+				headers: headers,
+				body: grantPayload,
+			})
+		);
 
 		const { data } = await axios.post(process.env.RECEIVER_HOST, grantPayload, {
 			headers: convertKeysToLowerCase(headers),
 		});
+
+		console.log('response grant for incoming', JSON.stringify(data));
 
 		return data?.access_token?.value;
 	} catch (error) {
@@ -164,6 +167,18 @@ export const createIncomingPayment = async (
 			clientPrivate
 		);
 
+		console.log(
+			'create incoming payment information',
+			JSON.stringify({
+				headers: {
+					Authorization: `GNAP ${accessToken}`,
+					'content-type': 'application/json',
+					...headers,
+				},
+				body: paymentPayload,
+			})
+		);
+
 		const { data } = await axios.post(
 			`${process.env.RECEIVER_INT_HOST}incoming-payments`,
 			paymentPayload,
@@ -175,6 +190,8 @@ export const createIncomingPayment = async (
 				},
 			}
 		);
+
+		console.log('incomning response', JSON.stringify(data));
 
 		return data?.id?.split('/')?.pop();
 	} catch (error) {
@@ -204,9 +221,19 @@ export const getGrantForQuote = async (
 			clientPrivate
 		);
 
+		console.log(
+			'grant quote information',
+			JSON.stringify({
+				headers: headers,
+				body: grantPayload,
+			})
+		);
+
 		const { data } = await axios.post(process.env.SENDER_HOST, grantPayload, {
 			headers: convertKeysToLowerCase(headers),
 		});
+
+		console.log('response grant quote', JSON.stringify(data));
 
 		return data?.access_token?.value;
 	} catch (error) {
@@ -265,7 +292,17 @@ export const createQuote = async (
 			data: quotePayload,
 		};
 
+		console.log(
+			'create quote',
+			JSON.stringify({
+				headers: options?.headers,
+				body: options?.data,
+			})
+		);
+
 		const { data } = await axios.request(options);
+		console.log('quote response', JSON.stringify(data));
+
 		return extractIdFromUrl(data?.id);
 	} catch (error) {
 		console.error('Error creating quote:', error);
@@ -311,11 +348,24 @@ export const getGrantForOutgoingPayment = async (
 			clientPrivate
 		);
 
-		console.log('headers outgoing', headers);
+		console.log(
+			'grant outgoing payment information',
+			JSON.stringify({
+				headers: headers,
+				body: grantPayload,
+			})
+		);
+
+		console.log(
+			'grant outgoing payment access',
+			grantPayload?.access_token?.access[0]
+		);
 
 		const { data } = await axios.post(process.env.SENDER_HOST, grantPayload, {
 			headers: convertKeysToLowerCase(headers),
 		});
+
+		console.log('respons grant outgoing', JSON.stringify(data));
 
 		return data;
 	} catch (error) {
@@ -336,10 +386,8 @@ async function makeRequestInteractions({
 		additionalId ? `/${additionalId}` : ''
 	}`;
 
-	// Crea una instancia de CookieJar
 	const cookieJar = new CookieJar();
 
-	// Envuelve axios con soporte para cookies
 	const client = wrapper(
 		axios.create({ jar: cookieJar, withCredentials: true })
 	);
@@ -352,16 +400,10 @@ async function makeRequestInteractions({
 		headers,
 	};
 
-	console.log('options', options);
-
 	try {
-		const response = await client.request(options);
-		console.log('Response Data:', response.data);
+		await client.request(options);
 
 		const cookiesInfo = cookieJar.toJSON();
-
-		// Cookies almacenadas en el cookie jar
-		console.log('Cookies:', cookieJar.toJSON());
 		return cookiesInfo?.cookies;
 	} catch (error) {
 		console.log('Error:', error.response?.data || error.message);
@@ -460,13 +502,19 @@ async function sendOutgoingPayment({
 		...additionalHeaders,
 	};
 
+	console.log('create outgoing payment', {
+		headers: headers,
+		body: body,
+	});
+
 	try {
 		const response = await axios.post(url, body, { headers });
 
-		console.log('Response Data:', response.data);
+		console.log('Response Outgoing payment request:', response.data);
 		return response.data;
 	} catch (error) {
-		console.error('Error:', error.response?.data || error.message);
+		console.log('Error outgoing payment', error);
+		//console.error('Error outgoing payment:', error.response?.data || error.message);
 	}
 }
 
@@ -504,8 +552,14 @@ export const createOutgoingPayment = async (
 			},
 		});
 
+		console.log(
+			'infoRedirectInteract',
+			accessToken?.interact?.redirect,
+			responseInteract
+		);
+
 		// Aceptar interacción
-		await generalRequestInteractions({
+		const acceptInteraction = await generalRequestInteractions({
 			url: `${process.env.SENDER_INTERACTIONS_HOST}grant`,
 			interactId: infoRedirectInteract?.interactId,
 			additionalId: `${accessToken?.interact?.finish}/accept`,
@@ -516,8 +570,10 @@ export const createOutgoingPayment = async (
 			},
 		});
 
+		console.log('acceptInteraction', acceptInteraction);
+
 		// Finalizar interacción
-		await generalRequestInteractions({
+		const finishInteraction = await generalRequestInteractions({
 			url: `${process.env.SENDER_HOST}interact`,
 			interactId: infoRedirectInteract?.interactId,
 			additionalId: `${accessToken?.interact?.finish}/finish`,
@@ -528,6 +584,8 @@ export const createOutgoingPayment = async (
 				Cookie: `sessionId=${responseInteract?.[0]?.value}; sessionId.sig=${responseInteract?.[1]?.value}`,
 			},
 		});
+
+		console.log('finishInteraction', finishInteraction);
 
 		const delay = ms => new Promise(res => setTimeout(res, ms));
 
@@ -544,6 +602,8 @@ export const createOutgoingPayment = async (
 			clientKey,
 			clientPrivate
 		);
+
+		console.log('finishInteraction', finishInteraction);
 
 		await generalRequestInteractions({
 			url: accessToken?.continue?.uri,
@@ -597,7 +657,6 @@ export const unifiedProcess = async (
 			quoteDebitAmount,
 			expirationDate
 		);
-		console.log('Incoming Payment:', incomingPayment);
 
 		// 2. Crear Quote
 		const quote = await createQuote(
@@ -607,7 +666,6 @@ export const unifiedProcess = async (
 			clientKey,
 			clientPrivate
 		);
-		console.log('Quote:', quote);
 
 		// 3. Crear Outgoing Payment
 		const outgoingPayment = await createOutgoingPayment(
@@ -620,7 +678,6 @@ export const unifiedProcess = async (
 			quoteReceiveAmount,
 			metadataOutgoing
 		);
-		console.log('Outgoing Payment:', outgoingPayment);
 
 		return {
 			outgoingPayment,

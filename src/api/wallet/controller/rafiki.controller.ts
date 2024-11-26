@@ -940,8 +940,6 @@ export class RafikiWalletController {
 
 			const walletBase64 = await toBase64(privateKey);
 
-			const receiverAssetCode = 'USD';
-			const receiverAssetScale = 2;
 			const quoteDebitAmount = {
 				assetCode: userWalletByToken?.walletAsset?.code,
 				assetScale: userWalletByToken?.walletAsset?.scale,
@@ -1046,6 +1044,7 @@ export class RafikiWalletController {
 			});
 			//}, 500);
 		} catch (error) {
+			console.log('error', error?.message);
 			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
