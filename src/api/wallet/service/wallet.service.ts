@@ -55,6 +55,8 @@ import { Month } from '../dto/month.enum';
 import { CreateRefundsDto } from '../dto/create-refunds.dto';
 import { RefundsEntity } from '../entities/refunds.entity';
 import { RefundsSchema } from '../entities/refunds.schema';
+import { validarPermisos } from '../../../utils/helpers/getAccessServiceProviders';
+
 @Injectable()
 export class WalletService {
 	private dbInstance: Model<Wallet>;
@@ -64,7 +66,7 @@ export class WalletService {
 	private dbTransactions: Model<Transaction>;
 	private dbUserInstance: Model<User>;
 	private dbRates: Model<Rates>;
-	private dbClearPayments: Model<ClearPayments>;
+  private dbClearPayments: Model<ClearPayments>;
 	private dbUserIncoming: Model<UserIncomingPayment>;
 	private dbRefunds: Model<RefundsEntity>;
 	private readonly AUTH_MICRO_URL: string;
@@ -1105,27 +1107,60 @@ export class WalletService {
 
 	async listIncomingPayments(
 		token: string,
+		startDate?: string,
+		endDate?: string,
+		walletAddress?: string,
+		serviceProviderId?: string,
 		state?: any,
-		userInfo?: any,
-		userId?: any,
-		serviceProviderId?: any
+		userInfo?: any
 	) {
 		const userWallet = await this.getUserByToken(token);
+		const userLogged = await this.getUserInfoById(userWallet?.UserId);
+		const startTimestamp = startDate ? new Date(startDate).getTime() : null;
+		const endTimestamp = endDate ? new Date(endDate).getTime() : null;
 		let userIncomingPayment: any[];
+		if (userLogged.type === 'PLATFORM') {
+			if (!serviceProviderId) {
+				serviceProviderId = userLogged.serviceProviderId;
+			}
+			const docClient = new DocumentClient();
+			const params = {
+				TableName: 'Roles',
+				Key: { Id: userLogged.roleId },
+			};
+			console.log(serviceProviderId);
+			const result = await docClient.get(params).promise();
+			const role = result.Item;
+			const permisos = validarPermisos({
+				role,
+				requestedModuleId: 'RF86',
+				requiredMethod: 'GET',
+				userId: userLogged.id,
+				serviceProviderId,
+			});
 
-		if (userId) {
-			userIncomingPayment = await this.getIncomingPaymentsByUser(
-				userId,
-				state,
-				userInfo,
-				serviceProviderId
-			);
-		} else {
+			if (!permisos.hasAccess) {
+				return { customCode: permisos.customCode };
+			}
+
 			userIncomingPayment = await this.getIncomingPaymentsByUser(
 				userWallet?.UserId,
 				state,
 				userInfo,
-				serviceProviderId
+				serviceProviderId,
+				startTimestamp,
+				endTimestamp,
+				walletAddress
+			);
+		} else if (userLogged.type === 'PROVIDER') {
+			userIncomingPayment = await this.getIncomingPaymentsByUser(
+				userWallet?.UserId,
+				state,
+				userInfo,
+				userLogged.serviceProviderId,
+				startTimestamp,
+				endTimestamp,
+				walletAddress
 			);
 		}
 
@@ -1807,7 +1842,10 @@ export class WalletService {
 		userId: string,
 		status?: boolean,
 		userInfo?: any,
-		serviceProviderId?: any
+		serviceProviderId?: string,
+		startTimestamp?: number,
+		endTimestamp?: number,
+		walletAddress?: string
 	) {
 		const docClient = new DocumentClient();
 		const linkedProviders = await this.getLinkedProvidersUserById(userId);
@@ -1819,6 +1857,7 @@ export class WalletService {
 				':userId': userId,
 			},
 		};
+
 		if (status !== undefined) {
 			params.FilterExpression = '#status = :status';
 			params.ExpressionAttributeNames = {
@@ -1828,13 +1867,40 @@ export class WalletService {
 				parseStringToBoolean(status);
 		}
 
+		if (serviceProviderId) {
+			params.FilterExpression = params.FilterExpression
+				? `${params.FilterExpression} AND ServiceProviderId = :serviceProviderId`
+				: 'ServiceProviderId = :serviceProviderId';
+			params.ExpressionAttributeValues[':serviceProviderId'] =
+				serviceProviderId;
+		}
+
+		if (startTimestamp && endTimestamp) {
+			params.FilterExpression = params.FilterExpression
+				? `${params.FilterExpression} AND createdAt BETWEEN :startTimestamp AND :endTimestamp`
+				: 'createdAt BETWEEN :startTimestamp AND :endTimestamp';
+			params.ExpressionAttributeValues[':startTimestamp'] = startTimestamp;
+			params.ExpressionAttributeValues[':endTimestamp'] = endTimestamp;
+		} else if (startTimestamp) {
+			params.FilterExpression = params.FilterExpression
+				? `${params.FilterExpression} AND createdAt >= :startTimestamp`
+				: 'createdAt >= :startTimestamp';
+			params.ExpressionAttributeValues[':startTimestamp'] = startTimestamp;
+		} else if (endTimestamp) {
+			params.FilterExpression = params.FilterExpression
+				? `${params.FilterExpression} AND createdAt <= :endTimestamp`
+				: 'createdAt <= :endTimestamp';
+			params.ExpressionAttributeValues[':endTimestamp'] = endTimestamp;
+		}
+
+		if (walletAddress) {
+			params.FilterExpression = params.FilterExpression
+				? `${params.FilterExpression} AND WalletAddress = :walletAddress`
+				: 'WalletAddress = :walletAddress';
+			params.ExpressionAttributeValues[':walletAddress'] = walletAddress;
+		}
 		try {
 			const result = await docClient.query(params).promise();
-			if (serviceProviderId) {
-				result.Items = result.Items.filter(
-					item => item.ServiceProviderId === serviceProviderId
-				);
-			}
 
 			if (!result?.Items?.length) {
 				const expireDate = await this.expireDate();
