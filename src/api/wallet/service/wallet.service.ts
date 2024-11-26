@@ -893,15 +893,16 @@ export class WalletService {
 				filters?.walletAddress
 			);
 
-			if (walletFind?.providerId) {
-				if (
-					type == 'PROVIDER' &&
-					walletFind?.walletAddress !== walletDbProvider?.walletAddress
-				) {
-					validWalletFilter = false;
-				} else {
-					validWalletFilter = true;
-				}
+			if (
+				walletFind?.providerId &&
+				type == 'PROVIDER' &&
+				walletFind?.walletAddress !== walletDbProvider?.walletAddress
+			) {
+				validWalletFilter = false;
+			} else if (type == 'WALLET' && walletFind?.providerId) {
+				validWalletFilter = false;
+			} else {
+				validWalletFilter = true;
 			}
 		}
 
