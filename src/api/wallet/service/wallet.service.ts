@@ -2961,9 +2961,7 @@ export class WalletService {
 						});
 
 						const totalAmount = transactions.reduce((total, transaction) => {
-							return (
-								total + parseFloat(transaction?.incomingAmount?.value || 0)
-							);
+							return total + parseFloat(transaction?.receiveAmount?.value || 0);
 						}, 0);
 
 						const walletInfo = await this.graphqlService.listWalletInfo(
