@@ -1292,7 +1292,7 @@ export class WalletService {
 
 		const currentDate = new Date();
 
-		const defaultMonth = currentDate.getMonth() - 1;
+		const defaultMonth = currentDate.getMonth();
 
 		const calculatedMonth = month ? month : defaultMonth;
 
