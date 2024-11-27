@@ -3,25 +3,9 @@ import { Month } from '../../api/wallet/dto/month.enum';
 export function getDateRangeForMonthEnum(month: Month) {
 	const now = new Date();
 
-	const startDate = new Date(
-		now.getFullYear(),
-		month - 1,
-		1,
-		0,
-		0,
-		0,
-		0
-	).getTime();
+	const startDate = Date.UTC(now.getUTCFullYear(), month - 1, 1, 0, 0, 0, 0);
 
-	const endDate = new Date(
-		now.getFullYear(),
-		month,
-		0,
-		23,
-		59,
-		59,
-		999
-	).getTime();
+	const endDate = Date.UTC(now.getUTCFullYear(), month, 0, 23, 59, 59, 999);
 
 	return { startDate, endDate };
 }

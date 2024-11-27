@@ -1269,6 +1269,22 @@ export class WalletService {
 			...(Object.keys(expression?.expressionValues).length && {
 				ExpressionAttributeValues: {
 					...expression?.expressionValues,
+				},
+			}),
+		};
+
+		const { ExpressionAttributeValues } = clearPaymentsParams;
+
+		const clearPaymentsParamsWithService = {
+			...clearPaymentsParams,
+			...(!ExpressionAttributeValues && {
+				ExpressionAttributeValues: {
+					':serviceProviderId': providerId,
+				},
+			}),
+			...(Object.keys(ExpressionAttributeValues).length && {
+				ExpressionAttributeValues: {
+					...ExpressionAttributeValues,
 					':serviceProviderId': providerId,
 				},
 			}),
@@ -1276,20 +1292,21 @@ export class WalletService {
 
 		const currentDate = new Date();
 
-		const defaultMonth = currentDate.getMonth();
+		const defaultMonth = currentDate.getMonth() - 1;
 
 		const calculatedMonth = month ? month : defaultMonth;
 
 		const monthRanges = getDateRangeForMonthEnum(calculatedMonth);
 
-		const clearPayments = await docClient.query(clearPaymentsParams).promise();
+		const clearPayments = await docClient
+			.query(clearPaymentsParamsWithService)
+			.promise();
 
 		const filteredClearPayments = convertToCamelCase(
 			clearPayments?.Items
 		).filter(clearPayment => {
 			const startDateTimestamp = clearPayment?.startDate;
 			const endDateTimestamp = clearPayment?.endDate;
-
 			return (
 				startDateTimestamp >= monthRanges.startDate &&
 				endDateTimestamp <= monthRanges.endDate
