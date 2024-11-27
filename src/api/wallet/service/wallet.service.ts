@@ -1950,9 +1950,9 @@ export class WalletService {
 
 		if (walletAddress) {
 			params.FilterExpression = params.FilterExpression
-				? `${params.FilterExpression} AND WalletAddress = :walletAddress`
-				: 'WalletAddress = :walletAddress';
-			params.ExpressionAttributeValues[':walletAddress'] = walletAddress;
+				? `${params.FilterExpression} AND SenderUrl = :senderUrl`
+				: 'SenderUrl = :senderUrl';
+			params.ExpressionAttributeValues[':senderUrl'] = walletAddress;
 		}
 		try {
 			const result = await docClient.query(params).promise();
