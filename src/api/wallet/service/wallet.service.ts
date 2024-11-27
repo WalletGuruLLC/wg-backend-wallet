@@ -879,11 +879,34 @@ export class WalletService {
 		const walletDbProvider = await this.getWalletAddressByProviderId(
 			providerId
 		);
+
 		const WalletAddress =
 			type == 'PROVIDER'
 				? walletDbProvider?.walletAddress
 				: walletDb?.WalletAddress;
 		const docClient = new DocumentClient();
+
+		let validWalletFilter = true;
+
+		if (filters?.walletAddress) {
+			const walletFind = await this.getWalletByAddressRegex(
+				filters.walletAddress
+			);
+
+			const isProviderType = type === 'PROVIDER';
+			const isWalletType = type === 'WALLET';
+			const hasDifferentWalletAddress =
+				walletFind?.walletAddress &&
+				walletFind.walletAddress !== walletDbProvider?.walletAddress;
+
+			if (walletFind?.providerId) {
+				if (isProviderType && hasDifferentWalletAddress) {
+					validWalletFilter = false;
+				} else if (isWalletType) {
+					validWalletFilter = false;
+				}
+			}
+		}
 
 		const pagedParsed = Number(filters?.page) || 1;
 		const itemsParsed = Number(filters?.items) || 10;
@@ -1015,7 +1038,7 @@ export class WalletService {
 						: true;
 
 				const matchesWalletAddress =
-					type !== 'WALLET' && filters?.walletAddress
+					type !== 'WALLET' && filters?.walletAddress && validWalletFilter
 						? transaction?.ReceiverUrl?.includes(filters?.walletAddress) ||
 						  transaction?.SenderUrl?.includes(filters?.walletAddress)
 						: true;
@@ -2441,6 +2464,26 @@ export class WalletService {
 		}
 
 		return response;
+	}
+
+	async getWalletByAddressRegex(walletAddress: string) {
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'Wallets',
+			IndexName: 'WalletAddressIndex',
+			FilterExpression: 'contains(WalletAddress, :walletAddress)',
+			ExpressionAttributeValues: {
+				':walletAddress': walletAddress,
+			},
+		};
+
+		try {
+			const result = await docClient.scan(params).promise();
+			return convertToCamelCase(result.Items?.[0]);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new Error(`Error fetching wallet by address: ${error.message}`);
+		}
 	}
 
 	async getWalletByAddress(walletAddress: string) {
