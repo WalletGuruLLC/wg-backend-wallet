@@ -445,12 +445,6 @@ export class WalletController {
 	}
 
 	@ApiOperation({ summary: 'Get refunds' })
-	@ApiParam({
-		name: 'serviceProviderId',
-		description: 'Service Provider ID',
-		type: String,
-		required: false,
-	})
 	@ApiQuery({ name: 'page', required: false, type: String })
 	@ApiQuery({ name: 'items', required: false, type: String })
 	@ApiQuery({ name: 'startDate', required: false, type: String })
