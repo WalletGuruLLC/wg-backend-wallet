@@ -1292,7 +1292,7 @@ export class WalletService {
 
 		const currentDate = new Date();
 
-		const calculatedMonth = month ? month : 1
+		const calculatedMonth = month ? month : currentDate.getMonth() - 1
 
 		const monthRanges = getDateRangeForMonthEnum(calculatedMonth);
 
