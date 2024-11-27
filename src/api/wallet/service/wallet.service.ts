@@ -48,13 +48,13 @@ import { WebSocketActionSchema } from '../entities/webSocketAction.schema';
 import { CreateWebSocketActionDto } from '../dto/create-web-socket-action.dto';
 import { ClearPayments } from '../entities/clear-payments.entity';
 import { ClearPaymentsSchema } from '../entities/clear-payments.schema';
-import { CreateClearPayment } from '../dto/clear-payment.dto';
 import { buildFilterExpression } from '../../../utils/helpers/buildFilterExpressionDynamo';
 import { getDateRangeForMonthEnum } from 'src/utils/helpers/buildMonthRanges';
 import { Month } from '../dto/month.enum';
 import { CreateRefundsDto } from '../dto/create-refunds.dto';
 import { RefundsEntity } from '../entities/refunds.entity';
 import { RefundsSchema } from '../entities/refunds.schema';
+import { ConfirmClearPayment } from '../dto/confirm-clear-payment.';
 import { validarPermisos } from '../../../utils/helpers/getAccessServiceProviders';
 
 @Injectable()
@@ -881,11 +881,34 @@ export class WalletService {
 		const walletDbProvider = await this.getWalletAddressByProviderId(
 			providerId
 		);
+
 		const WalletAddress =
 			type == 'PROVIDER'
 				? walletDbProvider?.walletAddress
 				: walletDb?.WalletAddress;
 		const docClient = new DocumentClient();
+
+		let validWalletFilter = true;
+
+		if (filters?.walletAddress) {
+			const walletFind = await this.getWalletByAddressRegex(
+				filters.walletAddress
+			);
+
+			const isProviderType = type === 'PROVIDER';
+			const isWalletType = type === 'WALLET';
+			const hasDifferentWalletAddress =
+				walletFind?.walletAddress &&
+				walletFind.walletAddress !== walletDbProvider?.walletAddress;
+
+			if (walletFind?.providerId) {
+				if (isProviderType && hasDifferentWalletAddress) {
+					validWalletFilter = false;
+				} else if (isWalletType) {
+					validWalletFilter = false;
+				}
+			}
+		}
 
 		const pagedParsed = Number(filters?.page) || 1;
 		const itemsParsed = Number(filters?.items) || 10;
@@ -1017,7 +1040,7 @@ export class WalletService {
 						: true;
 
 				const matchesWalletAddress =
-					type !== 'WALLET' && filters?.walletAddress
+					type !== 'WALLET' && filters?.walletAddress && validWalletFilter
 						? transaction?.ReceiverUrl?.includes(filters?.walletAddress) ||
 						  transaction?.SenderUrl?.includes(filters?.walletAddress)
 						: true;
@@ -2011,7 +2034,7 @@ export class WalletService {
 			Sentry.captureException(error);
 			return {
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-				customCode: 'WGE0229',
+				customCode: 'WGE0236',
 			};
 		}
 	}
@@ -2509,6 +2532,26 @@ export class WalletService {
 		return response;
 	}
 
+	async getWalletByAddressRegex(walletAddress: string) {
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'Wallets',
+			IndexName: 'WalletAddressIndex',
+			FilterExpression: 'contains(WalletAddress, :walletAddress)',
+			ExpressionAttributeValues: {
+				':walletAddress': walletAddress,
+			},
+		};
+
+		try {
+			const result = await docClient.scan(params).promise();
+			return convertToCamelCase(result.Items?.[0]);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new Error(`Error fetching wallet by address: ${error.message}`);
+		}
+	}
+
 	async getWalletByAddress(walletAddress: string) {
 		const docClient = new DocumentClient();
 		const params = {
@@ -2529,21 +2572,35 @@ export class WalletService {
 		}
 	}
 
-	async getProviderCompletedTransactions(receiverUrl: string) {
+	async getProviderCompletedTransactions(
+		receiverUrl: string,
+		startDate,
+		endDate
+	) {
 		const docClient = new DocumentClient();
 		const params = {
 			TableName: 'Transactions',
 			IndexName: 'ReceiverUrlIndex',
 			KeyConditionExpression: `ReceiverUrl  = :receiverUrl`,
-			FilterExpression: '#state = :state AND #pay = :pay',
+			FilterExpression: `
+			 #state = :state AND
+			 #pay = :pay AND
+			 #transactionDate BETWEEN :start AND :end AND
+			 #type = :type
+			 `,
 			ExpressionAttributeNames: {
 				'#state': 'State',
 				'#pay': 'Pay',
+				'#transactionDate': 'createdAt',
+				'#type': 'Type',
 			},
 			ExpressionAttributeValues: {
 				':state': 'COMPLETED',
 				':pay': false,
 				':receiverUrl': receiverUrl,
+				':start': startDate,
+				':end': endDate,
+				':type': 'OutgoingPayment',
 			},
 		};
 
@@ -2972,11 +3029,23 @@ export class WalletService {
 			const now = new Date();
 
 			const startDate = new Date(
-				Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1, 0, 0, 0, 0)
+				now.getFullYear(),
+				now.getMonth() - 1,
+				1,
+				0,
+				0,
+				0,
+				0
 			);
 
 			const endDate = new Date(
-				Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0, 23, 59, 59, 999)
+				now.getFullYear(),
+				now.getMonth(),
+				0,
+				23,
+				59,
+				59,
+				999
 			);
 
 			Promise.all(
@@ -2986,7 +3055,9 @@ export class WalletService {
 					);
 
 					const transactions = await this.getProviderCompletedTransactions(
-						providerWallet?.walletAddress
+						providerWallet?.walletAddress,
+						startDate.getTime(),
+						endDate.getTime()
 					);
 
 					if (transactions?.length) {
@@ -2999,9 +3070,7 @@ export class WalletService {
 						});
 
 						const totalAmount = transactions.reduce((total, transaction) => {
-							return (
-								total + parseFloat(transaction?.incomingAmount?.value || 0)
-							);
+							return total + parseFloat(transaction?.receiveAmount?.value || 0);
 						}, 0);
 
 						const walletInfo = await this.graphqlService.listWalletInfo(
@@ -3040,83 +3109,42 @@ export class WalletService {
 		}
 	}
 
-	async createClearPayment(
-		createProviderRevenue: CreateClearPayment,
-		providerWallet
+	async confirmClearPayment(
+		confirmClearPayment: ConfirmClearPayment,
+		clearPayment
 	) {
 		try {
-			let revenues;
-			const transactions = await this.getBatchTransactions(
-				createProviderRevenue.transactionIds
-			);
+			await this.batchUpdateTransactions(clearPayment?.transactionIds);
 
-			const completedTransactions = transactions.filter(
-				transaction =>
-					transaction?.createdAt >= createProviderRevenue.startDate &&
-					transaction?.createdAt <= createProviderRevenue.endDate &&
-					transaction.state === 'COMPLETED' &&
-					transaction.pay === false &&
-					transaction?.receiverUrl === providerWallet?.walletAddress
-			);
+			const docClient = new DocumentClient();
 
-			const completedTransactionIds = completedTransactions.map(
-				completedTransaction => {
-					return completedTransaction?.id;
-				}
-			);
-
-			const totalAmount = completedTransactions.reduce((total, transaction) => {
-				return total + parseFloat(transaction?.incomingAmount?.value || 0);
-			}, 0);
-
-			if (completedTransactions?.length) {
-				const paymentParameters = await this.getPaymentsParameters(
-					createProviderRevenue?.serviceProviderId
-				);
-
-				const walletInfo = await this.graphqlService.listWalletInfo(
-					providerWallet.rafikiId
-				);
-
-				const code = walletInfo.data.walletAddress.asset.code;
-				const scale = walletInfo.data.walletAddress.asset.scale;
-				const paymentParameter =
-					paymentParameters?.find(parameter => parameter?.asset === code) ||
-					paymentParameters?.[0];
-
-				const fees = adjustValue(
-					calcularTotalCostoWalletGuru(
-						paymentParameter?.base,
-						paymentParameter?.comision,
-						paymentParameter?.cost,
-						paymentParameter?.percent,
-						scale
-					),
-					scale
-				);
-
-				const createProviderRevenueDTO = {
-					ServiceProviderId: createProviderRevenue?.serviceProviderId,
-					Value: totalAmount,
-					RevenueDate: new Date().getTime(),
-					Fees: fees,
-					TransactionIds: completedTransactionIds,
-				};
-
-				revenues = await this.dbClearPayments.create(createProviderRevenueDTO);
-				return convertToCamelCase(revenues);
-			}
-
-			return {
-				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-				customCode: 'WGE0229',
+			const clearPaymentParams = {
+				TableName: 'ClearPayments',
+				Key: {
+					Id: clearPayment?.id,
+				},
+				UpdateExpression:
+					'SET #referenceNumber= :referenceNumber, #observation= :observation, #state= :state',
+				ExpressionAttributeNames: {
+					'#referenceNumber': 'ReferenceNumber',
+					'#observation': 'Observations',
+					'#state': 'State',
+				},
+				ExpressionAttributeValues: {
+					':referenceNumber': confirmClearPayment.referenceNumber,
+					':observation': confirmClearPayment.observations,
+					':state': true,
+				},
+				ReturnValues: 'ALL_NEW',
 			};
+
+			const confirmedClearPayment = await docClient
+				.update(clearPaymentParams)
+				.promise();
+			return convertToCamelCase(confirmedClearPayment?.Attributes);
 		} catch (error) {
 			Sentry.captureException(error);
-			return {
-				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-				customCode: 'WGE0229',
-			};
+			throw new Error(error.message);
 		}
 	}
 
