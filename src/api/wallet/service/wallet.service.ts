@@ -66,7 +66,7 @@ export class WalletService {
 	private dbTransactions: Model<Transaction>;
 	private dbUserInstance: Model<User>;
 	private dbRates: Model<Rates>;
-  private dbClearPayments: Model<ClearPayments>;
+	private dbClearPayments: Model<ClearPayments>;
 	private dbUserIncoming: Model<UserIncomingPayment>;
 	private dbRefunds: Model<RefundsEntity>;
 	private readonly AUTH_MICRO_URL: string;
