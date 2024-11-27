@@ -890,19 +890,21 @@ export class WalletService {
 
 		if (filters?.walletAddress) {
 			const walletFind = await this.getWalletByAddressRegex(
-				filters?.walletAddress
+				filters.walletAddress
 			);
 
-			if (
-				walletFind?.providerId &&
-				type == 'PROVIDER' &&
-				walletFind?.walletAddress !== walletDbProvider?.walletAddress
-			) {
-				validWalletFilter = false;
-			} else if (type == 'WALLET' && walletFind?.providerId) {
-				validWalletFilter = false;
-			} else {
-				validWalletFilter = true;
+			const isProviderType = type === 'PROVIDER';
+			const isWalletType = type === 'WALLET';
+			const hasDifferentWalletAddress =
+				walletFind?.walletAddress &&
+				walletFind.walletAddress !== walletDbProvider?.walletAddress;
+
+			if (walletFind?.providerId) {
+				if (isProviderType && hasDifferentWalletAddress) {
+					validWalletFilter = false;
+				} else if (isWalletType) {
+					validWalletFilter = false;
+				}
 			}
 		}
 
