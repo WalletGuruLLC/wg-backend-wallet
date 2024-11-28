@@ -144,7 +144,6 @@ export async function addHostHeader(
 ): Promise<void> {
 	const fullUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
 	const requestUrl = new URL(fullUrl);
-	//const requestUrl = url.parse(fullUrl);
 
 	if (hostVarName) {
 		const hostVarValue = `${requestUrl.protocol}//${requestUrl.host}`;

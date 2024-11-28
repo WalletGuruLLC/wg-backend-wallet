@@ -2,7 +2,6 @@ import axios from 'axios';
 import { wrapper } from 'axios-cookiejar-support';
 import { CookieJar } from 'tough-cookie';
 
-// Solicita encabezados firmados para una URL específica
 export const requestSigHeaders = async (
 	url,
 	method,
@@ -118,7 +117,6 @@ export const getGrantForIncomingPayment = async (
 	}
 };
 
-// Crea un pago entrante utilizando el access token generado
 export const createIncomingPayment = async (
 	authHost,
 	paymentHost,
