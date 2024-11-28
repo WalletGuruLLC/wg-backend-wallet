@@ -106,19 +106,16 @@ export const getGrantForIncomingPayment = async (
 			clientPrivate
 		);
 
-		console.log(
-			'grant for incoming information',
-			JSON.stringify({
-				headers: headers,
-				body: grantPayload,
-			})
-		);
+		console.log('grant for incoming information', {
+			headers: headers,
+			body: grantPayload,
+		});
 
 		const { data } = await axios.post(process.env.RECEIVER_HOST, grantPayload, {
 			headers: convertKeysToLowerCase(headers),
 		});
 
-		console.log('response grant for incoming', JSON.stringify(data));
+		console.log('response grant for incoming', data);
 
 		return data?.access_token?.value;
 	} catch (error) {
@@ -139,6 +136,8 @@ export const createIncomingPayment = async (
 	expirationDate
 ) => {
 	try {
+		console.log('quoteDebitAmount incoming payment', quoteDebitAmount);
+
 		const accessToken = await getGrantForIncomingPayment(
 			senderWalletAddress,
 			req,
@@ -150,9 +149,7 @@ export const createIncomingPayment = async (
 			walletAddress: receiverWalletAddress,
 			incomingAmount: quoteDebitAmount,
 			expiresAt: expirationDate,
-			metadata: {
-				description: 'Free Money!',
-			},
+			metadata: metadataIncoming,
 		};
 
 		const headers = await addSignatureHeadersGrantGrant(
@@ -167,17 +164,14 @@ export const createIncomingPayment = async (
 			clientPrivate
 		);
 
-		console.log(
-			'create incoming payment information',
-			JSON.stringify({
-				headers: {
-					Authorization: `GNAP ${accessToken}`,
-					'content-type': 'application/json',
-					...headers,
-				},
-				body: paymentPayload,
-			})
-		);
+		console.log('create incoming payment information', {
+			headers: {
+				Authorization: `GNAP ${accessToken}`,
+				'content-type': 'application/json',
+				...headers,
+			},
+			body: paymentPayload,
+		});
 
 		const { data } = await axios.post(
 			`${process.env.RECEIVER_INT_HOST}incoming-payments`,
@@ -191,7 +185,7 @@ export const createIncomingPayment = async (
 			}
 		);
 
-		console.log('incomning response', JSON.stringify(data));
+		console.log('incomning response', data);
 
 		return data?.id?.split('/')?.pop();
 	} catch (error) {
@@ -221,19 +215,16 @@ export const getGrantForQuote = async (
 			clientPrivate
 		);
 
-		console.log(
-			'grant quote information',
-			JSON.stringify({
-				headers: headers,
-				body: grantPayload,
-			})
-		);
+		console.log('grant quote information', {
+			headers: headers,
+			body: grantPayload,
+		});
 
 		const { data } = await axios.post(process.env.SENDER_HOST, grantPayload, {
 			headers: convertKeysToLowerCase(headers),
 		});
 
-		console.log('response grant quote', JSON.stringify(data));
+		console.log('response grant quote', data);
 
 		return data?.access_token?.value;
 	} catch (error) {
@@ -292,18 +283,15 @@ export const createQuote = async (
 			data: quotePayload,
 		};
 
-		console.log(
-			'create quote',
-			JSON.stringify({
-				headers: options?.headers,
-				body: options?.data,
-			})
-		);
+		console.log('create quote', {
+			headers: options?.headers,
+			body: options?.data,
+		});
 
 		const { data } = await axios.request(options);
-		console.log('quote response', JSON.stringify(data));
+		console.log('quote response', data);
 
-		return extractIdFromUrl(data?.id);
+		return data;
 	} catch (error) {
 		console.error('Error creating quote:', error);
 		throw error;
@@ -348,13 +336,10 @@ export const getGrantForOutgoingPayment = async (
 			clientPrivate
 		);
 
-		console.log(
-			'grant outgoing payment information',
-			JSON.stringify({
-				headers: headers,
-				body: grantPayload,
-			})
-		);
+		console.log('grant outgoing payment information', {
+			headers: headers,
+			body: grantPayload,
+		});
 
 		console.log(
 			'grant outgoing payment access',
@@ -479,9 +464,7 @@ async function sendOutgoingPayment({
 	const body = {
 		walletAddress: senderWalletAddress,
 		quoteId: `${senderWalletAddress}/quotes/${quoteId}`,
-		metadata: {
-			description: 'Free Money!',
-		},
+		metadata: metadataOutgoing,
 	};
 
 	const additionalHeaders = await addSignatureHeadersGrantOutgoing(
@@ -521,18 +504,17 @@ async function sendOutgoingPayment({
 export const createOutgoingPayment = async (
 	senderWalletAddress,
 	quoteId,
+	quoteInfo,
 	req,
 	clientKey,
 	clientPrivate,
-	quoteDebitAmount,
-	quoteReceiveAmount,
 	metadataOutgoing
 ) => {
 	try {
 		const accessToken = await getGrantForOutgoingPayment(
 			senderWalletAddress,
-			quoteDebitAmount,
-			quoteReceiveAmount,
+			quoteInfo?.debitAmount,
+			quoteInfo?.receiveAmount,
 			req,
 			clientKey,
 			clientPrivate
@@ -617,6 +599,7 @@ export const createOutgoingPayment = async (
 				...headers,
 			},
 		}).then(async data => {
+			console.log('response continuation req', data);
 			const responseCreateOutgoing = await sendOutgoingPayment({
 				accessToken: data?.access_token?.value,
 				clientKey,
@@ -634,10 +617,11 @@ export const createOutgoingPayment = async (
 };
 
 export const unifiedProcess = async (
+	authHost,
+	paymentHost,
 	receiverWalletAddress,
 	senderWalletAddress,
 	quoteDebitAmount,
-	quoteReceiveAmount,
 	req,
 	clientKey,
 	clientPrivate,
@@ -667,15 +651,16 @@ export const unifiedProcess = async (
 			clientPrivate
 		);
 
+		const quoteId = await extractIdFromUrl(quote?.id);
+
 		// 3. Crear Outgoing Payment
 		const outgoingPayment = await createOutgoingPayment(
 			senderWalletAddress,
+			quoteId,
 			quote,
 			req,
 			clientKey,
 			clientPrivate,
-			quoteDebitAmount,
-			quoteReceiveAmount,
 			metadataOutgoing
 		);
 
