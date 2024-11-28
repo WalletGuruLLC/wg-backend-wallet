@@ -1566,16 +1566,10 @@ export class RafikiWalletController {
 
 	@Get('list-incoming-payments')
 	@ApiQuery({ name: 'status', required: false, type: Boolean })
-	@ApiQuery({
-		name: 'userId',
-		required: false,
-		type: String,
-	})
-	@ApiQuery({
-		name: 'serviceProviderId',
-		required: false,
-		type: String,
-	})
+	@ApiQuery({ name: 'startDate', required: false, type: String })
+	@ApiQuery({ name: 'endDate', required: false, type: String })
+	@ApiQuery({ name: 'walletAddress', required: false, type: String })
+	@ApiQuery({ name: 'serviceProviderId', required: false, type: String })
 	@ApiOperation({ summary: 'List all incoming payments' })
 	@ApiBearerAuth('JWT')
 	@ApiOkResponse({ description: 'Incoming payments retrieved successfully.' })
@@ -1585,7 +1579,9 @@ export class RafikiWalletController {
 		@Headers() headers: MapOfStringToList,
 		@Res() res,
 		@Query('status') status?: boolean,
-		@Query('userId') userId?: string,
+		@Query('startDate') startDate?: string,
+		@Query('endDate') endDate?: string,
+		@Query('walletAddress') walletAddress?: string,
 		@Query('serviceProviderId') serviceProviderId?: string
 	) {
 		let token;
@@ -1617,10 +1613,12 @@ export class RafikiWalletController {
 
 			const incomingPayments = await this.walletService.listIncomingPayments(
 				token,
+				startDate,
+				endDate,
+				walletAddress,
+				serviceProviderId,
 				status,
-				userInfo,
-				userId,
-				serviceProviderId
+				userInfo
 			);
 
 			if (incomingPayments?.customCode) {
