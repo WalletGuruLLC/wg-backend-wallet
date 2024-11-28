@@ -79,6 +79,7 @@ export const addSignatureHeadersGrantOutgoing = async (
 };
 
 export const getGrantForIncomingPayment = async (
+	authHost,
 	clientWalletAddress,
 	req,
 	clientKey,
@@ -101,21 +102,14 @@ export const getGrantForIncomingPayment = async (
 			req,
 			grantPayload,
 			{ 'content-type': 'application/json' },
-			process.env.RECEIVER_HOST,
+			authHost,
 			clientKey,
 			clientPrivate
 		);
 
-		console.log('grant for incoming information', {
-			headers: headers,
-			body: grantPayload,
-		});
-
-		const { data } = await axios.post(process.env.RECEIVER_HOST, grantPayload, {
+		const { data } = await axios.post(authHost, grantPayload, {
 			headers: convertKeysToLowerCase(headers),
 		});
-
-		console.log('response grant for incoming', data);
 
 		return data?.access_token?.value;
 	} catch (error) {
@@ -126,6 +120,8 @@ export const getGrantForIncomingPayment = async (
 
 // Crea un pago entrante utilizando el access token generado
 export const createIncomingPayment = async (
+	authHost,
+	paymentHost,
 	senderWalletAddress,
 	receiverWalletAddress,
 	req,
@@ -136,9 +132,8 @@ export const createIncomingPayment = async (
 	expirationDate
 ) => {
 	try {
-		console.log('quoteDebitAmount incoming payment', quoteDebitAmount);
-
 		const accessToken = await getGrantForIncomingPayment(
+			authHost,
 			senderWalletAddress,
 			req,
 			clientKey,
@@ -159,22 +154,13 @@ export const createIncomingPayment = async (
 				Authorization: `GNAP ${accessToken}`,
 				'content-type': 'application/json',
 			},
-			`${process.env.RECEIVER_INT_HOST}incoming-payments`,
+			`${paymentHost}incoming-payments`,
 			clientKey,
 			clientPrivate
 		);
 
-		console.log('create incoming payment information', {
-			headers: {
-				Authorization: `GNAP ${accessToken}`,
-				'content-type': 'application/json',
-				...headers,
-			},
-			body: paymentPayload,
-		});
-
 		const { data } = await axios.post(
-			`${process.env.RECEIVER_INT_HOST}incoming-payments`,
+			`${paymentHost}incoming-payments`,
 			paymentPayload,
 			{
 				headers: {
@@ -185,14 +171,13 @@ export const createIncomingPayment = async (
 			}
 		);
 
-		console.log('incomning response', data);
-
 		return data?.id?.split('/')?.pop();
 	} catch (error) {
 		console.error('Error creating incoming payment:', error?.message);
 	}
 };
 export const getGrantForQuote = async (
+	authHost,
 	clientWalletAddress,
 	req,
 	clientKey,
@@ -210,21 +195,14 @@ export const getGrantForQuote = async (
 			req,
 			grantPayload,
 			{ 'content-type': 'application/json' },
-			process.env.SENDER_HOST,
+			authHost,
 			clientKey,
 			clientPrivate
 		);
 
-		console.log('grant quote information', {
-			headers: headers,
-			body: grantPayload,
-		});
-
-		const { data } = await axios.post(process.env.SENDER_HOST, grantPayload, {
+		const { data } = await axios.post(authHost, grantPayload, {
 			headers: convertKeysToLowerCase(headers),
 		});
-
-		console.log('response grant quote', data);
 
 		return data?.access_token?.value;
 	} catch (error) {
@@ -236,10 +214,12 @@ export const getGrantForQuote = async (
 function extractIdFromUrl(url) {
 	const regex = /\/quotes\/([a-zA-Z0-9-]+)/;
 	const match = url.match(regex);
-	return match ? match[1] : null; // Retorna el ID si existe, de lo contrario retorna null
+	return match ? match[1] : null;
 }
 
 export const createQuote = async (
+	authHost,
+	paymentHost,
 	senderWalletAddress,
 	incomingPaymentId,
 	req,
@@ -248,6 +228,7 @@ export const createQuote = async (
 ) => {
 	try {
 		const accessToken = await getGrantForQuote(
+			authHost,
 			senderWalletAddress,
 			req,
 			clientKey,
@@ -256,7 +237,7 @@ export const createQuote = async (
 
 		const quotePayload = {
 			walletAddress: senderWalletAddress,
-			receiver: `${process.env.RECEIVER_INT_HOST}incoming-payments/${incomingPaymentId}`,
+			receiver: `${paymentHost}incoming-payments/${incomingPaymentId}`,
 			method: 'ilp',
 		};
 
@@ -267,14 +248,14 @@ export const createQuote = async (
 				Authorization: `GNAP ${accessToken}`,
 				'content-type': 'application/json',
 			},
-			`${process.env.SENDER_INT_HOST}quotes`,
+			`${paymentHost}quotes`,
 			clientKey,
 			clientPrivate
 		);
 
 		const options = {
 			method: 'POST',
-			url: `${process.env.SENDER_INT_HOST}quotes`,
+			url: `${paymentHost}quotes`,
 			headers: {
 				Authorization: `GNAP ${accessToken}`,
 				'content-type': 'application/json',
@@ -283,13 +264,7 @@ export const createQuote = async (
 			data: quotePayload,
 		};
 
-		console.log('create quote', {
-			headers: options?.headers,
-			body: options?.data,
-		});
-
 		const { data } = await axios.request(options);
-		console.log('quote response', data);
 
 		return data;
 	} catch (error) {
@@ -299,6 +274,7 @@ export const createQuote = async (
 };
 
 export const getGrantForOutgoingPayment = async (
+	authHost,
 	senderWalletAddress,
 	quoteDebitAmount,
 	quoteReceiveAmount,
@@ -331,26 +307,14 @@ export const getGrantForOutgoingPayment = async (
 			req,
 			grantPayload,
 			{ 'Content-Type': 'application/json' },
-			process.env.SENDER_HOST,
+			authHost,
 			clientKey,
 			clientPrivate
 		);
 
-		console.log('grant outgoing payment information', {
-			headers: headers,
-			body: grantPayload,
-		});
-
-		console.log(
-			'grant outgoing payment access',
-			grantPayload?.access_token?.access[0]
-		);
-
-		const { data } = await axios.post(process.env.SENDER_HOST, grantPayload, {
+		const { data } = await axios.post(authHost, grantPayload, {
 			headers: convertKeysToLowerCase(headers),
 		});
-
-		console.log('respons grant outgoing', JSON.stringify(data));
 
 		return data;
 	} catch (error) {
@@ -423,8 +387,6 @@ async function generalRequestInteractions({
 		headers,
 	};
 
-	console.log('options', options);
-
 	try {
 		const response = await client.request(options);
 		return response?.data;
@@ -436,11 +398,9 @@ async function generalRequestInteractions({
 function parseUrl(url) {
 	const urlObj = new URL(url);
 
-	// Obtener el interactId del path
 	const pathSegments = urlObj.pathname.split('/');
 	const interactId = pathSegments[pathSegments.length - 2];
 
-	// Obtener los parámetros clientName y clientUri
 	const clientName = urlObj.searchParams.get('clientName');
 	const clientUri = urlObj.searchParams.get('clientUri');
 
@@ -452,6 +412,7 @@ function parseUrl(url) {
 }
 
 async function sendOutgoingPayment({
+	paymentHost,
 	accessToken,
 	clientKey,
 	clientPrivate,
@@ -459,7 +420,7 @@ async function sendOutgoingPayment({
 	quoteId,
 	metadataOutgoing,
 }) {
-	const url = `${process.env.SENDER_INT_HOST}outgoing-payments`;
+	const url = `${paymentHost}outgoing-payments`;
 
 	const body = {
 		walletAddress: senderWalletAddress,
@@ -485,23 +446,22 @@ async function sendOutgoingPayment({
 		...additionalHeaders,
 	};
 
-	console.log('create outgoing payment', {
-		headers: headers,
-		body: body,
-	});
-
 	try {
 		const response = await axios.post(url, body, { headers });
 
-		console.log('Response Outgoing payment request:', response.data);
 		return response.data;
 	} catch (error) {
-		console.log('Error outgoing payment', error);
-		//console.error('Error outgoing payment:', error.response?.data || error.message);
+		console.error(
+			'Error outgoing payment:',
+			error.response?.data || error.message
+		);
 	}
 }
 
 export const createOutgoingPayment = async (
+	authHost,
+	paymentHost,
+	interactionHost,
 	senderWalletAddress,
 	quoteId,
 	quoteInfo,
@@ -512,6 +472,7 @@ export const createOutgoingPayment = async (
 ) => {
 	try {
 		const accessToken = await getGrantForOutgoingPayment(
+			authHost,
 			senderWalletAddress,
 			quoteInfo?.debitAmount,
 			quoteInfo?.receiveAmount,
@@ -534,15 +495,8 @@ export const createOutgoingPayment = async (
 			},
 		});
 
-		console.log(
-			'infoRedirectInteract',
-			accessToken?.interact?.redirect,
-			responseInteract
-		);
-
-		// Aceptar interacción
 		const acceptInteraction = await generalRequestInteractions({
-			url: `${process.env.SENDER_INTERACTIONS_HOST}grant`,
+			url: `${interactionHost}grant`,
 			interactId: infoRedirectInteract?.interactId,
 			additionalId: `${accessToken?.interact?.finish}/accept`,
 			method: 'POST',
@@ -552,11 +506,8 @@ export const createOutgoingPayment = async (
 			},
 		});
 
-		console.log('acceptInteraction', acceptInteraction);
-
-		// Finalizar interacción
 		const finishInteraction = await generalRequestInteractions({
-			url: `${process.env.SENDER_HOST}interact`,
+			url: `${authHost}interact`,
 			interactId: infoRedirectInteract?.interactId,
 			additionalId: `${accessToken?.interact?.finish}/finish`,
 			method: 'GET',
@@ -566,8 +517,6 @@ export const createOutgoingPayment = async (
 				Cookie: `sessionId=${responseInteract?.[0]?.value}; sessionId.sig=${responseInteract?.[1]?.value}`,
 			},
 		});
-
-		console.log('finishInteraction', finishInteraction);
 
 		const delay = ms => new Promise(res => setTimeout(res, ms));
 
@@ -585,9 +534,7 @@ export const createOutgoingPayment = async (
 			clientPrivate
 		);
 
-		console.log('finishInteraction', finishInteraction);
-
-		await generalRequestInteractions({
+		const data = await generalRequestInteractions({
 			url: accessToken?.continue?.uri,
 			interactId: '',
 			additionalId: '',
@@ -598,18 +545,18 @@ export const createOutgoingPayment = async (
 				'content-type': 'application/json',
 				...headers,
 			},
-		}).then(async data => {
-			console.log('response continuation req', data);
-			const responseCreateOutgoing = await sendOutgoingPayment({
-				accessToken: data?.access_token?.value,
-				clientKey,
-				clientPrivate,
-				senderWalletAddress,
-				quoteId,
-				metadataOutgoing,
-			});
-			console.log('Create Outgoing Payment Response:', responseCreateOutgoing);
 		});
+
+		const responseCreateOutgoing = await sendOutgoingPayment({
+			paymentHost,
+			accessToken: data?.access_token?.value,
+			clientKey,
+			clientPrivate,
+			senderWalletAddress,
+			quoteId,
+			metadataOutgoing,
+		});
+		return responseCreateOutgoing;
 	} catch (error) {
 		console.error('Error creating outgoing payment:', error);
 		throw error;
@@ -619,6 +566,7 @@ export const createOutgoingPayment = async (
 export const unifiedProcess = async (
 	authHost,
 	paymentHost,
+	interactionHost,
 	receiverWalletAddress,
 	senderWalletAddress,
 	quoteDebitAmount,
@@ -630,8 +578,9 @@ export const unifiedProcess = async (
 	expirationDate
 ) => {
 	try {
-		// 1. Crear Incoming Payment
 		const incomingPayment = await createIncomingPayment(
+			authHost,
+			paymentHost,
 			senderWalletAddress,
 			receiverWalletAddress,
 			req,
@@ -642,8 +591,9 @@ export const unifiedProcess = async (
 			expirationDate
 		);
 
-		// 2. Crear Quote
 		const quote = await createQuote(
+			authHost,
+			paymentHost,
 			senderWalletAddress,
 			incomingPayment,
 			req,
@@ -653,8 +603,10 @@ export const unifiedProcess = async (
 
 		const quoteId = await extractIdFromUrl(quote?.id);
 
-		// 3. Crear Outgoing Payment
 		const outgoingPayment = await createOutgoingPayment(
+			authHost,
+			paymentHost,
+			interactionHost,
 			senderWalletAddress,
 			quoteId,
 			quote,
@@ -664,9 +616,7 @@ export const unifiedProcess = async (
 			metadataOutgoing
 		);
 
-		return {
-			outgoingPayment,
-		};
+		return outgoingPayment;
 	} catch (error) {
 		console.error('Error in unified process:', error);
 		throw error;

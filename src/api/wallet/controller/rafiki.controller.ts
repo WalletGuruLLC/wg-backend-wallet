@@ -1381,13 +1381,20 @@ export class RafikiWalletController {
 		}
 	}
 
-	@Post('auth-payment')
+	@Post('create-transaction-open-payment')
 	@ApiBody({
 		schema: {
 			type: 'object',
 			properties: {
-				senderWalletAddress: { type: 'string', example: '0x123456789abcdef' },
-				receiverWalletAddress: { type: 'string', example: '0x123456789abcdef' },
+				senderWalletAddress: { type: 'string', example: '' },
+				receiverWalletAddress: { type: 'string', example: '' },
+				amount: { type: 'string', example: '' },
+				assetCode: { type: 'string', example: '' },
+				assetScale: { type: 'string', example: '' },
+				metadata: { type: 'object', example: {} },
+				authHost: { type: 'string', example: '' },
+				paymentHost: { type: 'string', example: '' },
+				interactionHost: { type: 'string', example: '' },
 			},
 		},
 		description: 'auth open payment',
@@ -1402,6 +1409,7 @@ export class RafikiWalletController {
 		@Body('metadata') metadata: object,
 		@Body('authHost') authHost: string,
 		@Body('paymentHost') paymentHost: string,
+		@Body('interactionHost') interactionHost: string,
 		@Req() req,
 		@Res() res
 	) {
@@ -1443,6 +1451,7 @@ export class RafikiWalletController {
 			const result = await unifiedProcess(
 				authHost,
 				paymentHost,
+				interactionHost,
 				receiverWalletAddress,
 				senderWalletAddress,
 				quoteDebitAmount,
@@ -1453,7 +1462,10 @@ export class RafikiWalletController {
 				metadata ?? generalMetadata,
 				expirationDate
 			);
-			return result;
+			return res.status(200).send({
+				data: result,
+				customCode: 'WGE0150',
+			});
 		} catch (error) {
 			console.log('error', error?.message);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
