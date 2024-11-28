@@ -1175,12 +1175,22 @@ export class WalletService {
 				endTimestamp,
 				walletAddress
 			);
-		} else if (userLogged.type === 'PROVIDER' || userLogged.type === 'WALLET') {
+		} else if (userLogged.type === 'PROVIDER') {
 			userIncomingPayment = await this.getIncomingPaymentsByUser(
 				userWallet?.UserId,
 				state,
 				userInfo,
 				userLogged.serviceProviderId,
+				startTimestamp,
+				endTimestamp,
+				walletAddress
+			);
+		}else if(userLogged.type === 'WALLET'){
+			userIncomingPayment = await this.getIncomingPaymentsByUser(
+				userWallet?.UserId,
+				state,
+				userInfo,
+				null,
 				startTimestamp,
 				endTimestamp,
 				walletAddress
