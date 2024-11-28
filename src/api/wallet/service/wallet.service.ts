@@ -1175,7 +1175,7 @@ export class WalletService {
 				endTimestamp,
 				walletAddress
 			);
-		} else if (userLogged.type === 'PROVIDER') {
+		} else if (userLogged.type === 'PROVIDER' || userLogged.type === 'WALLET') {
 			userIncomingPayment = await this.getIncomingPaymentsByUser(
 				userWallet?.UserId,
 				state,
