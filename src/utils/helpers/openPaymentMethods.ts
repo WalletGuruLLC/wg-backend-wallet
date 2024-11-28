@@ -203,7 +203,6 @@ export const getGrantForIncomingPayment = async (
 	}
 };
 
-// Crea un pago entrante utilizando el access token generado
 export const createIncomingPayment = async (
 	authHost,
 	paymentHost,
