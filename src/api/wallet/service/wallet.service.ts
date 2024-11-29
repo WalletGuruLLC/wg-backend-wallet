@@ -899,19 +899,17 @@ export class WalletService {
 			const walletFind = await this.getWalletByAddressRegex(
 				filters.walletAddress
 			);
-
 			const isProviderType = type === 'PROVIDER';
-			const isWalletType = type === 'WALLET';
 			const hasDifferentWalletAddress =
 				walletFind?.walletAddress &&
 				walletFind.walletAddress !== walletDbProvider?.walletAddress;
 
-			if (walletFind?.providerId) {
-				if (isProviderType && hasDifferentWalletAddress) {
-					validWalletFilter = false;
-				} else if (isWalletType) {
-					validWalletFilter = false;
-				}
+			if (
+				isProviderType &&
+				walletFind?.providerId &&
+				hasDifferentWalletAddress
+			) {
+				validWalletFilter = false;
 			}
 		}
 
@@ -1031,10 +1029,10 @@ export class WalletService {
 					: true;
 
 				const matchesDateRange = filters?.dateRange
-					? new Date(transaction?.createdAt) >=
-							new Date(filters?.dateRange?.start) &&
-					  new Date(transaction?.createdAt) <=
-							new Date(filters?.dateRange?.end)
+					? new Date(transaction?.createdAt).toISOString() >=
+							new Date(filters?.dateRange?.start).toISOString() &&
+					  new Date(transaction?.createdAt).toISOString() <=
+							new Date(filters?.dateRange?.end).toISOString()
 					: true;
 
 				const matchesProviderId =
