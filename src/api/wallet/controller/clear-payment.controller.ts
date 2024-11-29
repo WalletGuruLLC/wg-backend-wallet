@@ -237,6 +237,7 @@ export class ClearPaymentController {
 		}
 
 		try {
+			let provider;
 			let userInfo = await axios.get(
 				this.AUTH_MICRO_URL + '/api/v1/users/current-user',
 				{
@@ -253,15 +254,17 @@ export class ClearPaymentController {
 					? userInfo?.data?.serviceProviderId
 					: providerId;
 
-			const provider = await this.walletService.getWalletByProviderId(
-				serviceProviderId
-			);
+			if (serviceProviderId) {
+				provider = await this.walletService.getWalletByProviderId(
+					serviceProviderId
+				);
 
-			if (provider?.statusCode) {
-				return res.status(HttpStatus.NOT_FOUND).send({
-					statusCode: HttpStatus.NOT_FOUND,
-					customCode: 'WGE0040',
-				});
+				if (provider?.statusCode) {
+					return res.status(HttpStatus.NOT_FOUND).send({
+						statusCode: HttpStatus.NOT_FOUND,
+						customCode: 'WGE0040',
+					});
+				}
 			}
 
 			const parsedStatus =
