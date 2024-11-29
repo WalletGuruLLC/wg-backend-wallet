@@ -272,7 +272,7 @@ export class ClearPaymentController {
 
 			const filters = {
 				month,
-				providerId: serviceProviderId,
+				serviceProviderId: serviceProviderId,
 				state: parsedStatus,
 				page,
 				items,
