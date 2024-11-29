@@ -1320,7 +1320,7 @@ export class WalletService {
 		const { transactions, ...paginated } = paginatedResults;
 
 		const clearPaymentsTransformed = transactions.map(transaction => {
-			const month = new Date(transaction?.startDate)
+			const month = new Date(transaction?.startDate);
 			return {
 				...transaction,
 				provider: provider?.name,
