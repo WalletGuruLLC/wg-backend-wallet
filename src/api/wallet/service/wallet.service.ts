@@ -1029,10 +1029,18 @@ export class WalletService {
 					: true;
 
 				const matchesDateRange = filters?.dateRange
-					? new Date(transaction?.createdAt).toISOString() >=
-							new Date(filters?.dateRange?.start).toISOString() &&
-					  new Date(transaction?.createdAt).toISOString() <=
-							new Date(filters?.dateRange?.end).toISOString()
+					? (() => {
+							const parseDate = dateString => {
+								const [month, day, year] = dateString.split('/').map(Number);
+								return new Date(year, month - 1, day);
+							};
+							const startDate = parseDate(filters?.dateRange?.start);
+							startDate.setHours(0, 0, 0, 0);
+							const endDate = parseDate(filters?.dateRange?.end);
+							endDate.setHours(23, 59, 59, 999);
+							const transactionDate = new Date(transaction?.createdAt);
+							return transactionDate >= startDate && transactionDate <= endDate;
+					  })()
 					: true;
 
 				const matchesProviderId =
