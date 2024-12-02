@@ -204,7 +204,7 @@ export class RafikiWalletController {
 	})
 	async createServiceProviderWalletAddress(
 		@Body()
-			createServiceProviderWalletAddressDto: CreateServiceProviderWalletAddressDto,
+		createServiceProviderWalletAddressDto: CreateServiceProviderWalletAddressDto,
 		@Headers() headers: MapOfStringToList,
 		@Res() res
 	) {
@@ -1848,7 +1848,7 @@ export class RafikiWalletController {
 			console.log('entro');
 			await addApiSignatureHeader(req, req.body);
 			console.log('paso signature');
-			return this.paymentService.postAuthPayment(clientWalletAddress,req.body);
+			return this.paymentService.postAuthPayment(clientWalletAddress, req.body);
 		} catch (error) {
 			console.log('error', error?.message);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({

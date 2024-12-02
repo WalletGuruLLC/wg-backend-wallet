@@ -9,6 +9,7 @@ import { Logger } from '@nestjs/common';
 @Injectable()
 export class CronService implements OnModuleInit {
 	private logger: Logger = new Logger('CronService');
+
 	constructor(
 		private readonly configService: ConfigService,
 		private readonly schedulerRegistry: SchedulerRegistry,
@@ -21,7 +22,8 @@ export class CronService implements OnModuleInit {
 
 	handleClearPayments() {
 		try {
-			const cronExpression = this.configService.get<string>('CRON_TIME_EXPRESSION') || '1 0 1 * *';
+			const cronExpression =
+				this.configService.get<string>('CRON_TIME_EXPRESSION') || '1 0 1 * *';
 			this.logger.log('Init Clear Payments cron job');
 
 			const job = new CronJob(cronExpression, async () => {

@@ -1,7 +1,6 @@
 import { createHmac } from 'crypto';
 import { canonicalize } from 'json-canonicalize';
 import fetch from 'node-fetch';
-import url from 'url';
 
 interface Request {
 	url: string;

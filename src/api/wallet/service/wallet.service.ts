@@ -368,7 +368,7 @@ export class WalletService {
 			const filteredWallets = wallets.filter(wallet => {
 				const matchesSearch = search
 					? wallet.Name.toLowerCase().includes(search.toLowerCase()) ||
-					wallet.Id.toLowerCase().includes(search.toLowerCase())
+					  wallet.Id.toLowerCase().includes(search.toLowerCase())
 					: true;
 
 				const matchesActive =
@@ -598,7 +598,7 @@ export class WalletService {
 			walletType: 'Native',
 			walletAddress: createRafikiWalletAddressInput.walletAddress,
 			rafikiId:
-			createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
+				createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
 			userId,
 		};
 		if (userInfo?.data?.first) {
@@ -721,7 +721,7 @@ export class WalletService {
 			walletType: 'Native',
 			walletAddress: createRafikiWalletAddressInput.walletAddress,
 			rafikiId:
-			createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
+				createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
 			providerId: createServiceProviderWalletAddressDto.providerId,
 		};
 		const walletCreated = await this.create(
@@ -1030,30 +1030,30 @@ export class WalletService {
 
 				const matchesDateRange = filters?.dateRange
 					? (() => {
-						const parseDate = dateString => {
-							const [month, day, year] = dateString.split('/').map(Number);
-							return new Date(year, month - 1, day);
-						};
-						const startDate = parseDate(filters?.dateRange?.start);
-						startDate.setHours(0, 0, 0, 0);
-						const endDate = parseDate(filters?.dateRange?.end);
-						endDate.setHours(23, 59, 59, 999);
-						const transactionDate = new Date(transaction?.createdAt);
-						return transactionDate >= startDate && transactionDate <= endDate;
-					})()
+							const parseDate = dateString => {
+								const [month, day, year] = dateString.split('/').map(Number);
+								return new Date(year, month - 1, day);
+							};
+							const startDate = parseDate(filters?.dateRange?.start);
+							startDate.setHours(0, 0, 0, 0);
+							const endDate = parseDate(filters?.dateRange?.end);
+							endDate.setHours(23, 59, 59, 999);
+							const transactionDate = new Date(transaction?.createdAt);
+							return transactionDate >= startDate && transactionDate <= endDate;
+					  })()
 					: true;
 
 				const matchesProviderId =
 					validWallets.length > 0
 						? validWallets.some(
-						walletAddress => walletAddress === transaction?.ReceiverUrl
-					) && transaction?.Metadata?.type === 'PROVIDER'
+								walletAddress => walletAddress === transaction?.ReceiverUrl
+						  ) && transaction?.Metadata?.type === 'PROVIDER'
 						: true;
 
 				const matchesWalletAddress =
 					type !== 'WALLET' && filters?.walletAddress && validWalletFilter
 						? transaction?.ReceiverUrl?.includes(filters?.walletAddress) ||
-						transaction?.SenderUrl?.includes(filters?.walletAddress)
+						  transaction?.SenderUrl?.includes(filters?.walletAddress)
 						: true;
 
 				const matchesUserType = filters?.userType
@@ -1132,8 +1132,8 @@ export class WalletService {
 			return search === 'credit'
 				? convertToCamelCase(incomingSorted)
 				: search === 'debit'
-					? convertToCamelCase(outgoingSorted)
-					: convertToCamelCase(combinedSorted);
+				? convertToCamelCase(outgoingSorted)
+				: convertToCamelCase(combinedSorted);
 		} else {
 			return [];
 		}
@@ -1196,7 +1196,7 @@ export class WalletService {
 				endTimestamp,
 				walletAddress
 			);
-		}else if(userLogged.type === 'WALLET'){
+		} else if (userLogged.type === 'WALLET') {
 			userIncomingPayment = await this.getIncomingPaymentsByUser(
 				userWallet?.UserId,
 				state,
@@ -1313,7 +1313,7 @@ export class WalletService {
 
 		const currentDate = new Date();
 
-		const calculatedMonth = month ? month : currentDate.getMonth()
+		const calculatedMonth = month ? month : currentDate.getMonth();
 
 		const monthRanges = getDateRangeForMonthEnum(calculatedMonth);
 
@@ -2701,7 +2701,7 @@ export class WalletService {
 			const value = {
 				value: valueFormatted / pow,
 				asset:
-				outGoingPayment.createOutgoingPayment.payment.receiveAmount.assetCode,
+					outGoingPayment.createOutgoingPayment.payment.receiveAmount.assetCode,
 				walletAddress: walletInfo.walletAddress,
 				date: formattedDate,
 			};

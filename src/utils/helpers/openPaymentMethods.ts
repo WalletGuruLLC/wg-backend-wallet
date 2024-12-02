@@ -321,14 +321,14 @@ export const getGrantForOutgoingPayment = async (
 };
 
 async function makeRequestInteractions({
-																				 url,
-																				 interactId,
-																				 additionalId,
-																				 method = 'GET',
-																				 params = {},
-																				 body = {},
-																				 headers = {},
-																			 }) {
+	url,
+	interactId,
+	additionalId,
+	method = 'GET',
+	params = {},
+	body = {},
+	headers = {},
+}) {
 	const fullUrl = `${url}${interactId ? `/${interactId}` : ''}${
 		additionalId ? `/${additionalId}` : ''
 	}`;
@@ -359,14 +359,14 @@ async function makeRequestInteractions({
 }
 
 async function generalRequestInteractions({
-																						url,
-																						interactId,
-																						additionalId,
-																						method = 'GET',
-																						params = {},
-																						body = {},
-																						headers = {},
-																					}) {
+	url,
+	interactId,
+	additionalId,
+	method = 'GET',
+	params = {},
+	body = {},
+	headers = {},
+}) {
 	const fullUrl = `${url}${interactId ? `/${interactId}` : ''}${
 		additionalId ? `/${additionalId}` : ''
 	}`;
@@ -410,14 +410,14 @@ function parseUrl(url) {
 }
 
 async function sendOutgoingPayment({
-																		 paymentHost,
-																		 accessToken,
-																		 clientKey,
-																		 clientPrivate,
-																		 senderWalletAddress,
-																		 quoteId,
-																		 metadataOutgoing,
-																	 }) {
+	paymentHost,
+	accessToken,
+	clientKey,
+	clientPrivate,
+	senderWalletAddress,
+	quoteId,
+	metadataOutgoing,
+}) {
 	const url = `${paymentHost}outgoing-payments`;
 
 	const body = {
