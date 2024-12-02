@@ -368,7 +368,7 @@ export class WalletService {
 			const filteredWallets = wallets.filter(wallet => {
 				const matchesSearch = search
 					? wallet.Name.toLowerCase().includes(search.toLowerCase()) ||
-					  wallet.Id.toLowerCase().includes(search.toLowerCase())
+					wallet.Id.toLowerCase().includes(search.toLowerCase())
 					: true;
 
 				const matchesActive =
@@ -598,7 +598,7 @@ export class WalletService {
 			walletType: 'Native',
 			walletAddress: createRafikiWalletAddressInput.walletAddress,
 			rafikiId:
-				createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
+			createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
 			userId,
 		};
 		if (userInfo?.data?.first) {
@@ -721,7 +721,7 @@ export class WalletService {
 			walletType: 'Native',
 			walletAddress: createRafikiWalletAddressInput.walletAddress,
 			rafikiId:
-				createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
+			createdRafikiWalletAddress.createWalletAddress?.walletAddress?.id,
 			providerId: createServiceProviderWalletAddressDto.providerId,
 		};
 		const walletCreated = await this.create(
@@ -937,11 +937,9 @@ export class WalletService {
 			},
 		};
 
-		console.log('outgoingParams', outgoingParams);
 		const dynamoOutgoingPayments = await docClient
 			.scan(outgoingParams)
 			.promise();
-		console.log('dynamoOutgoingPayments', dynamoOutgoingPayments?.Items[0]);
 
 		if (dynamoOutgoingPayments?.Items?.length > 0) {
 			const sortedArray = dynamoOutgoingPayments?.Items?.sort(
@@ -1032,30 +1030,30 @@ export class WalletService {
 
 				const matchesDateRange = filters?.dateRange
 					? (() => {
-							const parseDate = dateString => {
-								const [month, day, year] = dateString.split('/').map(Number);
-								return new Date(year, month - 1, day);
-							};
-							const startDate = parseDate(filters?.dateRange?.start);
-							startDate.setHours(0, 0, 0, 0);
-							const endDate = parseDate(filters?.dateRange?.end);
-							endDate.setHours(23, 59, 59, 999);
-							const transactionDate = new Date(transaction?.createdAt);
-							return transactionDate >= startDate && transactionDate <= endDate;
-					  })()
+						const parseDate = dateString => {
+							const [month, day, year] = dateString.split('/').map(Number);
+							return new Date(year, month - 1, day);
+						};
+						const startDate = parseDate(filters?.dateRange?.start);
+						startDate.setHours(0, 0, 0, 0);
+						const endDate = parseDate(filters?.dateRange?.end);
+						endDate.setHours(23, 59, 59, 999);
+						const transactionDate = new Date(transaction?.createdAt);
+						return transactionDate >= startDate && transactionDate <= endDate;
+					})()
 					: true;
 
 				const matchesProviderId =
 					validWallets.length > 0
 						? validWallets.some(
-								walletAddress => walletAddress === transaction?.ReceiverUrl
-						  ) && transaction?.Metadata?.type === 'PROVIDER'
+						walletAddress => walletAddress === transaction?.ReceiverUrl
+					) && transaction?.Metadata?.type === 'PROVIDER'
 						: true;
 
 				const matchesWalletAddress =
 					type !== 'WALLET' && filters?.walletAddress && validWalletFilter
 						? transaction?.ReceiverUrl?.includes(filters?.walletAddress) ||
-						  transaction?.SenderUrl?.includes(filters?.walletAddress)
+						transaction?.SenderUrl?.includes(filters?.walletAddress)
 						: true;
 
 				const matchesUserType = filters?.userType
@@ -1134,8 +1132,8 @@ export class WalletService {
 			return search === 'credit'
 				? convertToCamelCase(incomingSorted)
 				: search === 'debit'
-				? convertToCamelCase(outgoingSorted)
-				: convertToCamelCase(combinedSorted);
+					? convertToCamelCase(outgoingSorted)
+					: convertToCamelCase(combinedSorted);
 		} else {
 			return [];
 		}
@@ -1272,14 +1270,17 @@ export class WalletService {
 	async listClearPayments(filters, provider) {
 		const docClient = new DocumentClient();
 
-		const { page, items, month, ...filterRest } = filters;
-		let filteredClearPayments;
+		const { page, items, month, providerId, ...filterRest } = filters;
+
 		const pagedParsed = Number(filters?.page) || 1;
 		const itemsParsed = Number(filters?.items) || 10;
 
 		const expression = buildFilterExpression(filterRest);
-		const clearPaymentsParams: DocumentClient.ScanInput = {
+		const clearPaymentsParams: DocumentClient.QueryInput = {
 			TableName: 'ClearPayments',
+			IndexName: 'ServiceProviderIdIndex',
+			KeyConditionExpression: `ServiceProviderId  = :serviceProviderId`,
+
 			...(expression.filterExpression && {
 				FilterExpression: expression.filterExpression,
 			}),
@@ -1293,10 +1294,22 @@ export class WalletService {
 			}),
 		};
 
-		const clearPayments = await docClient.scan(clearPaymentsParams).promise();
+		const { ExpressionAttributeValues } = clearPaymentsParams;
 
-		if (month) {
-			const monthRanges = getDateRangeForMonthEnum(month);
+		const clearPaymentsParamsWithService = {
+			...clearPaymentsParams,
+			...(!ExpressionAttributeValues && {
+				ExpressionAttributeValues: {
+					':serviceProviderId': providerId,
+				},
+			}),
+			...(Object.keys(ExpressionAttributeValues).length && {
+				ExpressionAttributeValues: {
+					...ExpressionAttributeValues,
+					':serviceProviderId': providerId,
+				},
+			}),
+		};
 
 		const currentDate = new Date();
 
@@ -1317,22 +1330,21 @@ export class WalletService {
 				startDateTimestamp >= monthRanges.startDate &&
 				endDateTimestamp <= monthRanges.endDate
 			);
-		}
+		});
 
 		const paginatedResults = await this.paginatedResults(
 			pagedParsed,
 			itemsParsed,
-			filteredClearPayments ?? clearPayments.Items
+			filteredClearPayments
 		);
 
 		const { transactions, ...paginated } = paginatedResults;
 
 		const clearPaymentsTransformed = transactions.map(transaction => {
-			const month = new Date(transaction?.startDate)
 			return {
 				...transaction,
 				provider: provider?.name,
-				month: Month[month.getUTCMonth() + 1],
+				month: Month[calculatedMonth],
 			};
 		});
 		const results = {
@@ -2497,200 +2509,6 @@ export class WalletService {
 		}
 	}
 
-	// async processParameterFlowUpdated(
-	// 	parameterId,
-	// 	walletAddressId,
-	// 	walletAsset,
-	// 	serviceProviderId,
-	// 	userId,
-	// 	senderUrl,
-	// 	activityId,
-	// 	itemName,
-	// 	clientId
-	// ) {
-	// 	const parameterExists = await this.validatePaymentParameterId(
-	// 		parameterId,
-	// 		serviceProviderId
-	// 	);
-
-	// 	if (!parameterExists?.id) {
-	// 		this.authGateway.sendDataClientId('error', clientId, {
-	// 			message: 'The specified type parameter does not exist',
-	// 			statusCode: 'WGE0222',
-	// 		});
-	// 	}
-
-	// 	const incomingPayment = await this.dbIncomingUser
-	// 		.query('ServiceProviderId')
-	// 		.eq(serviceProviderId)
-	// 		.where('SenderUrl')
-	// 		.eq(senderUrl)
-	// 		.where('Status')
-	// 		.eq(true)
-	// 		.exec();
-
-	// 	if (!incomingPayment || incomingPayment.length === 0) {
-	// 		this.authGateway.sendDataClientId('error', clientId, {
-	// 			message: 'You don’t have any incoming payments yet.',
-	// 			statusCode: 'WGE0223',
-	// 		});
-	// 	}
-
-	// 	incomingPayment.sort((a: any, b: any) => b?.createdAt - a?.createdAt);
-
-	// 	let validIncomingPayment = null;
-
-	// 	const sendValue = adjustValue(
-	// 		calcularTotalCosto(
-	// 			parameterExists?.base,
-	// 			parameterExists?.comision,
-	// 			parameterExists?.cost,
-	// 			parameterExists?.percent,
-	// 			walletAsset?.scale
-	// 		),
-	// 		walletAsset?.scale
-	// 	);
-
-	// 	for (let i = 0; i < incomingPayment.length; i++) {
-	// 		const payment = incomingPayment?.[i];
-	// 		const incomingPaymentValue = await this.getIncomingPayment(
-	// 			payment?.IncomingPaymentId
-	// 		);
-
-	// 		const incomingValue =
-	// 			parseInt(incomingPaymentValue?.incomingAmount?.value ?? '0') -
-	// 			parseInt(incomingPaymentValue?.receivedAmount?.value ?? '0');
-
-	// 		if (sendValue <= incomingValue) {
-	// 			validIncomingPayment = payment;
-	// 			break;
-	// 		}
-	// 	}
-
-	// 	if (!validIncomingPayment) {
-	// 		this.authGateway.sendDataClientId('error', clientId, {
-	// 			message: 'Insufficient funds',
-	// 			statusCode: 'WGE0220',
-	// 		});
-	// 	}
-
-	// 	if (validIncomingPayment) {
-	// 		try {
-
-	// 			const userWallet = await this.findWalletByUrl(
-	// 				senderUrl
-	// 			);
-
-	// 		const privateKey = userWallet?.PrivateKey;
-	// 		const keyId = userWallet?.KeyId;
-
-	// 		const walletBase64 = await toBase64(privateKey);
-
-	// 		const receiverAssetCode = 'USD';
-	// 		const receiverAssetScale = 2;
-	// 		const quoteDebitAmount = {
-	// 			assetCode: userWalletByToken?.walletAsset?.code,
-	// 			assetScale: userWalletByToken?.walletAsset?.scale,
-	// 			value: adjustValue(
-	// 				input?.amount,
-	// 				userWalletByToken?.walletAsset?.scale
-	// 			),
-	// 		};
-	// 		const quoteReceiveAmount = {
-	// 			assetCode: userWalletByToken?.walletAsset?.code,
-	// 			assetScale: userWalletByToken?.walletAsset?.scale,
-	// 			value: adjustValue(
-	// 				input?.amount,
-	// 				userWalletByToken?.walletAsset?.scale
-	// 			),
-	// 		};
-	// 		const expirationDate = new Date(
-	// 			Date.now() + 24 * 60 * 60 * 1000
-	// 		).toISOString();
-	// 		const clientKey = keyId;
-	// 		const clientPrivate = walletBase64;
-	// 		const metadataIncoming = {
-	// 			type: 'USER',
-	// 			wgUser: userId,
-	// 			description: '',
-	// 		};
-	// 		const metadataOutgoing = {
-	// 			type: 'USER',
-	// 			wgUser: userId,
-	// 			description: '',
-	// 		};
-
-	// 			// Crear Quote
-	// 			const quoteInput = {
-	// 				sender: walletAddressId,
-	// 				receiver: validIncomingPayment?.ReceiverId,
-	// 				receiveAmount: {
-	// 					value: sendValue,
-	// 					assetCode: walletAsset?.asset ?? 'USD',
-	// 					assetScale: walletAsset?.scale ?? 2,
-	// 				},
-	// 			};
-
-	// 			const quote = await createQuote(senderUrl,validIncomingPayment?.IncomingPaymentId,req,);
-	// 			console.log('Quote created:', quote);
-
-	// 			// Validar Quote
-	// 			const providerWalletId =
-	// 				quote?.createQuote?.quote?.receiver?.split('/');
-	// 			if (!providerWalletId) {
-	// 				this.authGateway.sendDataClientId('error', clientId, {
-	// 					message: 'Invalid quote',
-	// 					statusCode: 'WGE0221',
-	// 				});
-	// 			}
-
-	// 			// Crear Outgoing Payment
-	// 			const outgoingInput = {
-	// 				walletAddressId: walletAddressId,
-	// 				quoteId: quote?.createQuote?.quote?.id,
-	// 				metadata: {
-	// 					activityId: activityId || '',
-	// 					contentName: itemName || '---',
-	// 					description: '',
-	// 					type: 'PROVIDER',
-	// 					wgUser: userId,
-	// 				},
-	// 			};
-
-	// 			const outgoingPayment = await createOutgoingPayment(outgoingInput);
-	// 			console.log('Outgoing Payment:', outgoingPayment);
-
-	// 			// Actualizar estados y operaciones adicionales
-	// 			const docClient = new DocumentClient();
-	// 			const params = {
-	// 				TableName: 'Users',
-	// 				Key: { Id: userId },
-	// 			};
-	// 			const userDynamo = await docClient.get(params).promise();
-
-	// 			if (userDynamo?.Item?.Grant == 1) {
-	// 				await this.createDepositOutgoingMutationService({
-	// 					outgoingPaymentId:
-	// 						outgoingPayment?.createOutgoingPayment?.payment?.id,
-	// 					idempotencyKey: uuidv4(),
-	// 				});
-	// 			}
-
-	// 			this.authGateway.sendDataClientId('hc', clientId, {
-	// 				message: 'Ok',
-	// 				statusCode: 'WGS0053',
-	// 				activityId: activityId,
-	// 			});
-	// 		} catch (error) {
-	// 			console.error('Error processing payment:', error);
-	// 			this.authGateway.sendDataClientId('error', clientId, {
-	// 				message: 'Payment process failed',
-	// 				statusCode: 'WGE0224',
-	// 			});
-	// 		}
-	// 	}
-	// }
-
 	async completePayment(outgoingPaymentId, action) {
 		let response;
 		let data;
@@ -2883,7 +2701,7 @@ export class WalletService {
 			const value = {
 				value: valueFormatted / pow,
 				asset:
-					outGoingPayment.createOutgoingPayment.payment.receiveAmount.assetCode,
+				outGoingPayment.createOutgoingPayment.payment.receiveAmount.assetCode,
 				walletAddress: walletInfo.walletAddress,
 				date: formattedDate,
 			};
