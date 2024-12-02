@@ -86,7 +86,6 @@ export class RafikiWalletController {
 		private readonly paymentService: PaymentService,
 		private readonly authGateway: AuthGateway,
 		private readonly userWsGateway: UserWsGateway,
-        private readonly paymentService: PaymentService
 		private configService: ConfigService
 	) {
 		this.AUTH_MICRO_URL = process.env.AUTH_URL;
@@ -1849,7 +1848,7 @@ export class RafikiWalletController {
 			console.log('entro');
 			await addApiSignatureHeader(req, req.body);
 			console.log('paso signature');
-			return this.paymentService.postAuthPayment(clientWalletAddress);
+			return this.paymentService.postAuthPayment(clientWalletAddress,req.body);
 		} catch (error) {
 			console.log('error', error?.message);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({

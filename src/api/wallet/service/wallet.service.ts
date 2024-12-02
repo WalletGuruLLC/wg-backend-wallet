@@ -1270,14 +1270,17 @@ export class WalletService {
 	async listClearPayments(filters, provider) {
 		const docClient = new DocumentClient();
 
-		const { page, items, month, ...filterRest } = filters;
-		let filteredClearPayments;
+		const { page, items, month, providerId, ...filterRest } = filters;
+
 		const pagedParsed = Number(filters?.page) || 1;
 		const itemsParsed = Number(filters?.items) || 10;
 
 		const expression = buildFilterExpression(filterRest);
-		const clearPaymentsParams: DocumentClient.ScanInput = {
+		const clearPaymentsParams: DocumentClient.QueryInput = {
 			TableName: 'ClearPayments',
+			IndexName: 'ServiceProviderIdIndex',
+			KeyConditionExpression: `ServiceProviderId  = :serviceProviderId`,
+
 			...(expression.filterExpression && {
 				FilterExpression: expression.filterExpression,
 			}),
@@ -1291,10 +1294,22 @@ export class WalletService {
 			}),
 		};
 
-		const clearPayments = await docClient.scan(clearPaymentsParams).promise();
+		const { ExpressionAttributeValues } = clearPaymentsParams;
 
-		if (month) {
-			const monthRanges = getDateRangeForMonthEnum(month);
+		const clearPaymentsParamsWithService = {
+			...clearPaymentsParams,
+			...(!ExpressionAttributeValues && {
+				ExpressionAttributeValues: {
+					':serviceProviderId': providerId,
+				},
+			}),
+			...(Object.keys(ExpressionAttributeValues).length && {
+				ExpressionAttributeValues: {
+					...ExpressionAttributeValues,
+					':serviceProviderId': providerId,
+				},
+			}),
+		};
 
 		const currentDate = new Date();
 
@@ -1315,22 +1330,21 @@ export class WalletService {
 				startDateTimestamp >= monthRanges.startDate &&
 				endDateTimestamp <= monthRanges.endDate
 			);
-		}
+		});
 
 		const paginatedResults = await this.paginatedResults(
 			pagedParsed,
 			itemsParsed,
-			filteredClearPayments ?? clearPayments.Items
+			filteredClearPayments
 		);
 
 		const { transactions, ...paginated } = paginatedResults;
 
 		const clearPaymentsTransformed = transactions.map(transaction => {
-			const month = new Date(transaction?.startDate);
 			return {
 				...transaction,
 				provider: provider?.name,
-				month: Month[month.getUTCMonth() + 1],
+				month: Month[calculatedMonth],
 			};
 		});
 		const results = {
