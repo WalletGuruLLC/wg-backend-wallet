@@ -9,9 +9,12 @@ import { Transaction } from '../entities/transactions.entity';
 import { TransactionsSchema } from '../entities/transactions.schema';
 import * as dynamoose from 'dynamoose';
 import { UserWsGateway } from '../service/websocket-users';
+import axios from 'axios';
 
 export class IncomingPaymentCreatedEvent implements EventWebHook {
 	private dbTransactions: Model<Transaction>;
+	private readonly API_SECRET_SERVICES: string;
+	private readonly WS_URL: string;
 
 	constructor(
 		private readonly walletService: WalletService,
@@ -21,6 +24,8 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 			'Transactions',
 			TransactionsSchema
 		);
+		this.API_SECRET_SERVICES = process.env.API_SECRET_SERVICES;
+		this.WS_URL = process.env.WS_URL;
 	}
 	async trigger(eventWebHookDTO: EventWebHookDTO, wallet): Promise<void> {
 		const docClient = new DocumentClient();
@@ -69,7 +74,20 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 					postedDebit: sender.Attributes?.PostedDebits,
 				};
 
-				this.userWsGateway.sendBalance(userWallet?.userId, balance);
+				// this.userWsGateway.sendBalance(userWallet?.userId, balance); replace send ws to send notification to service ws
+				balance['userId'] = userWallet?.userId;
+				const userInfo = await axios.post(
+					this.WS_URL + '/api/v1/wallets-rafiki/ws',
+					{
+						balance: balance,
+					},
+					{
+						headers: {
+							Authorization: this.API_SECRET_SERVICES,
+						},
+					}
+				);
+				console.log('wallets-rafiki/ws', userInfo.data);
 			}
 
 			const recieverWallet = await this.walletService.getWalletByRafikyId(
@@ -154,10 +172,24 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 				receiverName,
 			};
 
-			this.userWsGateway.sendTransaction(
-				recieverWallet?.userId || recieverWallet?.providerId,
-				transactionFormated
+			// this.userWsGateway.sendTransaction(
+			// 	recieverWallet?.userId || recieverWallet?.providerId,
+			// 	transactionFormated
+			// );
+			transactionFormated['userId'] =
+				recieverWallet?.userId || recieverWallet?.providerId;
+			const transacctionWs = await axios.post(
+				this.WS_URL + '/api/v1/wallets-rafiki/ws',
+				{
+					transacction: transactionFormated,
+				},
+				{
+					headers: {
+						Authorization: this.API_SECRET_SERVICES,
+					},
+				}
 			);
+			console.log('wallets-rafiki/ws', transacctionWs.data);
 
 			const receiver = await docClient.update(params).promise();
 
@@ -168,7 +200,20 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 				postedDebit: receiver.Attributes?.PostedDebits,
 			};
 
-			this.userWsGateway.sendBalance(receiver.Attributes?.UserId, balance);
+			// this.userWsGateway.sendBalance(receiver.Attributes?.UserId, balance);
+			balance['userId'] = receiver.Attributes?.UserId;
+			const userInfo = await axios.post(
+				this.WS_URL + '/api/v1/wallets-rafiki/ws',
+				{
+					balance: balance,
+				},
+				{
+					headers: {
+						Authorization: this.API_SECRET_SERVICES,
+					},
+				}
+			);
+			console.log('wallets-rafiki/ws', userInfo.data);
 
 			return convertToCamelCase(receiver);
 		} catch (error) {

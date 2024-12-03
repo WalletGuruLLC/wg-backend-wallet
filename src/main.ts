@@ -58,7 +58,7 @@ async function bootstrap() {
 		methods: 'GET,POST,PUT,DELETE',
 	});
 
-	await app.listen(3000);
+	await app.listen(3001);
 }
 
 bootstrap();

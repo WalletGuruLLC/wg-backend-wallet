@@ -1804,29 +1804,29 @@ export class RafikiWalletController {
 		}
 	}
 
-	@Get('test')
-	@ApiOperation({ summary: 'Test WebSocket for a user by userId' })
-	@ApiOkResponse({ description: 'WebSocket test message sent successfully.' })
-	@ApiResponse({ status: 400, description: 'Bad Request' })
-	@ApiResponse({ status: 401, description: 'Unauthorized access.' })
-	@ApiResponse({ status: 404, description: 'User not found.' })
-	@ApiResponse({ status: 500, description: 'Server error.' })
-	async testWsUser(
-		@Headers() headers: MapOfStringToList,
-		@Req() req,
-		@Res() res
-	) {
-		this.userWsGateway.sendBalance('', {
-			pendingCredit: 0,
-			pendingDebit: 0,
-			postedCredit: 0,
-			postedDebit: 0,
-		});
-		return res.status(200).send({
-			statusCode: HttpStatus.OK,
-			customCode: 'WGE0150',
-		});
-	}
+	// @Get('test')
+	// @ApiOperation({ summary: 'Test WebSocket for a user by userId' })
+	// @ApiOkResponse({ description: 'WebSocket test message sent successfully.' })
+	// @ApiResponse({ status: 400, description: 'Bad Request' })
+	// @ApiResponse({ status: 401, description: 'Unauthorized access.' })
+	// @ApiResponse({ status: 404, description: 'User not found.' })
+	// @ApiResponse({ status: 500, description: 'Server error.' })
+	// async testWsUser(
+	// 	@Headers() headers: MapOfStringToList,
+	// 	@Req() req,
+	// 	@Res() res
+	// ) {
+	// 	this.userWsGateway.sendBalance('', {
+	// 		pendingCredit: 0,
+	// 		pendingDebit: 0,
+	// 		postedCredit: 0,
+	// 		postedDebit: 0,
+	// 	});
+	// 	return res.status(200).send({
+	// 		statusCode: HttpStatus.OK,
+	// 		customCode: 'WGE0150',
+	// 	});
+	// }
 
 	@Post('auth-payment')
 	@ApiBody({
