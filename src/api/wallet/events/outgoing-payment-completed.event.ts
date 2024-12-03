@@ -161,7 +161,7 @@ export class OutGoingPaymentCompletedEvent implements EventWebHook {
 			// 	userWallet?.userId || userWallet?.providerId,
 			// 	transactionFormated
 			// );
-			transactionFormated['userId'] =
+			transactionFormated['userIdSend'] =
 				userWallet?.userId || userWallet?.providerId;
 			const transacctionWs = await axios.post(
 				this.WS_URL + '/api/v1/wallets-rafiki/ws',
@@ -187,7 +187,7 @@ export class OutGoingPaymentCompletedEvent implements EventWebHook {
 			};
 
 			// this.userWsGateway.sendBalance(wallet.userId, balance);
-			senderBalance['userId'] = wallet.userId;
+			senderBalance['userIdSend'] = wallet.userId;
 			const notificationWs = await axios.post(
 				this.WS_URL + '/api/v1/wallets-rafiki/ws',
 				{
@@ -212,7 +212,7 @@ export class OutGoingPaymentCompletedEvent implements EventWebHook {
 			// 	receiver.Attributes?.UserId,
 			// 	receiverBalance
 			// );
-			receiverBalance['userId'] = receiver.Attributes?.UserId;
+			receiverBalance['userIdSend'] = receiver.Attributes?.UserId;
 			const notificationWs2 = await axios.post(
 				this.WS_URL + '/api/v1/wallets-rafiki/ws',
 				{

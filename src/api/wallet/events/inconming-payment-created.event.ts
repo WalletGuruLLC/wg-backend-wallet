@@ -75,7 +75,7 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 				};
 
 				// this.userWsGateway.sendBalance(userWallet?.userId, balance); replace send ws to send notification to service ws
-				balance['userId'] = userWallet?.userId;
+				balance['userIdSend'] = userWallet?.userId;
 				const userInfo = await axios.post(
 					this.WS_URL + '/api/v1/wallets-rafiki/ws',
 					{
@@ -176,7 +176,7 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 			// 	recieverWallet?.userId || recieverWallet?.providerId,
 			// 	transactionFormated
 			// );
-			transactionFormated['userId'] =
+			transactionFormated['userIdSend'] =
 				recieverWallet?.userId || recieverWallet?.providerId;
 			const transacctionWs = await axios.post(
 				this.WS_URL + '/api/v1/wallets-rafiki/ws',
@@ -201,7 +201,7 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 			};
 
 			// this.userWsGateway.sendBalance(receiver.Attributes?.UserId, balance);
-			balance['userId'] = receiver.Attributes?.UserId;
+			balance['userIdSend'] = receiver.Attributes?.UserId;
 			const userInfo = await axios.post(
 				this.WS_URL + '/api/v1/wallets-rafiki/ws',
 				{
