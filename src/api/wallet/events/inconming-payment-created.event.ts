@@ -181,7 +181,7 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 			const transacctionWs = await axios.post(
 				this.WS_URL + '/api/v1/wallets-rafiki/ws',
 				{
-					transacction: transactionFormated,
+					transaction: transactionFormated,
 				},
 				{
 					headers: {
