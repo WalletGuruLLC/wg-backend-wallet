@@ -267,8 +267,7 @@ export class ClearPaymentController {
 				}
 			}
 
-			const parsedStatus =
-				status === 'false' ? false : status === 'true' ? true : undefined;
+			const parsedStatus = status === undefined ? undefined : status === 'true';
 
 			const filters = {
 				month,
@@ -277,7 +276,6 @@ export class ClearPaymentController {
 				page,
 				items,
 			};
-
 			const clearPayments = await this.walletService.listClearPayments(
 				filters,
 				provider

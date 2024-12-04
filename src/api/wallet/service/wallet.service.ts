@@ -1274,53 +1274,83 @@ export class WalletService {
 
 		const pagedParsed = Number(filters?.page) || 1;
 		const itemsParsed = Number(filters?.items) || 10;
-
 		const expression = buildFilterExpression(filterRest);
-		const clearPaymentsParams: DocumentClient.QueryInput = {
-			TableName: 'ClearPayments',
-			IndexName: 'ServiceProviderIdIndex',
-			KeyConditionExpression: `ServiceProviderId  = :serviceProviderId`,
+		let clearPaymentsParamsWithService;
+		if (providerId) {
+			const clearPaymentsParams: DocumentClient.QueryInput = {
+				TableName: 'ClearPayments',
+				IndexName: 'ServiceProviderIdIndex',
+				KeyConditionExpression: `ServiceProviderId  = :serviceProviderId`,
 
-			...(expression.filterExpression && {
-				FilterExpression: expression.filterExpression,
-			}),
-			...(Object.keys(expression.attributeNames).length && {
-				ExpressionAttributeNames: expression.attributeNames,
-			}),
-			...(Object.keys(expression?.expressionValues).length && {
-				ExpressionAttributeValues: {
-					...expression?.expressionValues,
-				},
-			}),
-		};
+				...(expression.filterExpression && {
+					FilterExpression: expression.filterExpression,
+				}),
+				...(Object.keys(expression.attributeNames).length && {
+					ExpressionAttributeNames: expression.attributeNames,
+				}),
+				...(Object.keys(expression?.expressionValues).length && {
+					ExpressionAttributeValues: {
+						...expression?.expressionValues,
+					},
+				}),
+			};
+			const { ExpressionAttributeValues } = clearPaymentsParams;
+			clearPaymentsParamsWithService = {
+				...clearPaymentsParams,
+				...(!ExpressionAttributeValues && {
+					ExpressionAttributeValues: {
+						':serviceProviderId': providerId,
+					},
+				}),
+				...(Object.keys(ExpressionAttributeValues).length && {
+					ExpressionAttributeValues: {
+						...ExpressionAttributeValues,
+						':serviceProviderId': providerId,
+					},
+				}),
+			};
+		} else {
+			const clearPaymentsParams: DocumentClient.QueryInput = {
+				TableName: 'ClearPayments',
+				...(expression.filterExpression && {
+					FilterExpression: expression.filterExpression,
+				}),
+				...(Object.keys(expression.attributeNames).length && {
+					ExpressionAttributeNames: expression.attributeNames,
+				}),
+				...(Object.keys(expression?.expressionValues).length && {
+					ExpressionAttributeValues: {
+						...expression?.expressionValues,
+					},
+				}),
+			};
 
-		const { ExpressionAttributeValues } = clearPaymentsParams;
-
-		const clearPaymentsParamsWithService = {
-			...clearPaymentsParams,
-			...(!ExpressionAttributeValues && {
-				ExpressionAttributeValues: {
-					':serviceProviderId': providerId,
-				},
-			}),
-			...(Object.keys(ExpressionAttributeValues).length && {
-				ExpressionAttributeValues: {
-					...ExpressionAttributeValues,
-					':serviceProviderId': providerId,
-				},
-			}),
-		};
+			const { ExpressionAttributeValues } = clearPaymentsParams;
+			if (ExpressionAttributeValues) {
+				clearPaymentsParamsWithService = {
+					...clearPaymentsParams,
+					...(Object.keys(ExpressionAttributeValues).length && {
+						ExpressionAttributeValues: {
+							...ExpressionAttributeValues,
+						},
+					}),
+				};
+			} else {
+				clearPaymentsParamsWithService = {
+					...clearPaymentsParams,
+					Select: 'ALL_ATTRIBUTES',
+				};
+			}
+		}
 
 		const currentDate = new Date();
 
 		const calculatedMonth = month ? month : currentDate.getMonth();
 
 		const monthRanges = getDateRangeForMonthEnum(calculatedMonth);
-
 		const clearPayments = await docClient
-			.query(clearPaymentsParamsWithService)
+			.scan(clearPaymentsParamsWithService)
 			.promise();
-
 		const filteredClearPayments = convertToCamelCase(
 			clearPayments?.Items
 		).filter(clearPayment => {
