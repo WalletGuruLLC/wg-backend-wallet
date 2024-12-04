@@ -339,6 +339,7 @@ export class RafikiWalletController {
 	@ApiQuery({ name: 'providerIds', required: false, type: [String] })
 	@ApiQuery({ name: 'activityId', required: false, type: String })
 	@ApiQuery({ name: 'walletAddress', required: false, type: String })
+	@ApiQuery({ name: 'isRevenue', required: false, type: Boolean })
 	@ApiQuery({ name: 'page', required: false, type: String })
 	@ApiQuery({ name: 'items', required: false, type: String })
 	@ApiOperation({ summary: 'List all user transactions' })
@@ -361,6 +362,7 @@ export class RafikiWalletController {
 		@Query('walletAddress') walletAddress?: string,
 		@Query('page') page?: string,
 		@Query('items') items?: string,
+		@Query('isRevenue') isRevenue?: boolean,
 		@Query('orderBy') orderBy?: ('providerId' | 'date')[]
 	) {
 		let token;
@@ -417,6 +419,7 @@ export class RafikiWalletController {
 				page,
 				items,
 				orderBy,
+				isRevenue,
 			};
 			if (userTypeInfo === 'WALLET') {
 				filters.transactionType = ['incoming', 'outgoing'];

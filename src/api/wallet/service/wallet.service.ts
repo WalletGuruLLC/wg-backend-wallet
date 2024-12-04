@@ -875,6 +875,7 @@ export class WalletService {
 			page?: string;
 			items?: string;
 			orderBy?: ('providerId' | 'date')[];
+			isRevenue?: boolean;
 		},
 		type?: string
 	) {
@@ -1018,6 +1019,9 @@ export class WalletService {
 				);
 			}
 			const filteredTransactions = transactionsWithNames.filter(transaction => {
+				const matchesRevenue = filters?.isRevenue
+					? transaction?.Metadata?.type === 'REVENUE'
+					: true;
 				const matchesActivityId = filters?.activityId
 					? transaction?.Metadata?.activityId === filters.activityId
 					: true;
@@ -1067,7 +1071,8 @@ export class WalletService {
 					matchesDateRange &&
 					matchesProviderId &&
 					matchesWalletAddress &&
-					matchesUserType
+					matchesUserType &&
+					matchesRevenue
 				);
 			});
 
