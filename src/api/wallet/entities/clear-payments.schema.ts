@@ -47,6 +47,12 @@ export const ClearPaymentsSchema = new dynamoose.Schema(
 			type: Boolean,
 			default: false,
 		},
+		Month: {
+			type: Number,
+		},
+		Year: {
+			type: Number,
+		},
 	},
 	{
 		timestamps: {

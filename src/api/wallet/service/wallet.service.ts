@@ -1275,7 +1275,7 @@ export class WalletService {
 	async listClearPayments(filters, provider) {
 		const docClient = new DocumentClient();
 
-		const { page, items, month, providerId, ...filterRest } = filters;
+		const { page, items, month, year, providerId, ...filterRest } = filters;
 
 		const pagedParsed = Number(filters?.page) || 1;
 		const itemsParsed = Number(filters?.items) || 10;
@@ -1347,25 +1347,21 @@ export class WalletService {
 				};
 			}
 		}
-
-		const currentDate = new Date();
-
-		const calculatedMonth = month ? month : currentDate.getMonth();
-
-		const monthRanges = getDateRangeForMonthEnum(calculatedMonth);
 		const clearPayments = await docClient
 			.scan(clearPaymentsParamsWithService)
 			.promise();
-		const filteredClearPayments = convertToCamelCase(
-			clearPayments?.Items
-		).filter(clearPayment => {
-			const startDateTimestamp = clearPayment?.startDate;
-			const endDateTimestamp = clearPayment?.endDate;
-			return (
-				startDateTimestamp >= monthRanges.startDate &&
-				endDateTimestamp <= monthRanges.endDate
+		let filteredClearPayments = convertToCamelCase(clearPayments?.Items);
+
+		if (month) {
+			filteredClearPayments = filteredClearPayments.filter(
+				transaction => transaction.month == month
 			);
-		});
+		}
+		if (year) {
+			filteredClearPayments = filteredClearPayments.filter(
+				transaction => transaction.year == year
+			);
+		}
 
 		const paginatedResults = await this.paginatedResults(
 			pagedParsed,
@@ -1379,7 +1375,6 @@ export class WalletService {
 			return {
 				...transaction,
 				provider: provider?.name,
-				month: Month[calculatedMonth],
 			};
 		});
 		const results = {
@@ -3089,6 +3084,7 @@ export class WalletService {
 	}
 
 	async generateClearPayments() {
+		console.log('Generate Clear Payments');
 		try {
 			const providers = await this.getProviders();
 			const now = new Date();
@@ -3164,11 +3160,14 @@ export class WalletService {
 							EndDate: endDate.getTime(),
 							Fees: fees,
 							TransactionIds: transactionIds,
+							Month: startDate.getMonth(),
+							Year: startDate.getFullYear(),
 						};
 						await this.dbClearPayments.create(createProviderRevenueDTO);
 					}
 				})
 			);
+			console.log('Clear Payments Generated');
 		} catch (error) {
 			Sentry.captureException(error);
 		}

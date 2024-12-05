@@ -215,6 +215,7 @@ export class ClearPaymentController {
 		@Headers() headers: Record<string, string>,
 		@Res() res,
 		@Query('month') month?: number,
+		@Query('year') year?: number,
 		@Query('providerId') providerId?: string,
 		@Query('status') status?: string,
 		@Query('page') page?: string,
@@ -271,6 +272,7 @@ export class ClearPaymentController {
 
 			const filters = {
 				month,
+				year,
 				serviceProviderId: serviceProviderId,
 				state: parsedStatus,
 				page,

@@ -12,4 +12,6 @@ export class ClearPayments extends Document {
 	Fees?: number;
 	ReferenceNumber?: string;
 	State?: boolean;
+	Month?: number;
+	Year?: number;
 }
