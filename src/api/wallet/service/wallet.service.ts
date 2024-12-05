@@ -2128,6 +2128,25 @@ export class WalletService {
 		}
 	}
 
+	async getTransactionById(transactionId: string) {
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'Transactions',
+			Key: { Id: transactionId },
+		};
+
+		try {
+			const result = await docClient.get(params).promise();
+			return convertToCamelCase(result?.Item);
+		} catch (error) {
+			Sentry.captureException(error);
+			return {
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0167',
+			};
+		}
+	}
+
 	async getWalletUserById(userId: string) {
 		const docClient = new DocumentClient();
 		const params = {

@@ -71,6 +71,7 @@ import {
 } from 'src/utils/helpers/openPaymentMethods';
 import { toBase64 } from 'src/utils/helpers/openPaymentSignature';
 import { GraphqlService } from 'src/graphql/graphql.service';
+import { calcularTotalCostoWalletGuru } from '../../../utils/helpers/calcularCostoWalletGuru';
 
 @ApiTags('wallet-rafiki')
 @Controller('api/v1/wallets-rafiki')
@@ -446,6 +447,175 @@ export class RafikiWalletController {
 				statusCode: HttpStatus.OK,
 				customCode: 'WGS0138',
 				data: { ...transactions },
+			});
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0137',
+			});
+		}
+	}
+
+	@Get('transaction')
+	@ApiQuery({ name: 'transacctionIds', required: false, type: [String] })
+	@ApiOperation({ summary: 'Detail transaction ids' })
+	@ApiBearerAuth('JWT')
+	@ApiOkResponse({ description: 'Transactions successfully retrieved.' })
+	@ApiResponse({ status: 401, description: 'Unauthorized access.' })
+	@ApiResponse({ status: 500, description: 'Server error.' })
+	async transactionDetailIds(
+		@Headers() headers: Record<string, string>,
+		@Res() res,
+		@Query('transacctionIds') transacctionIds?: string[]
+	) {
+		let token;
+		try {
+			token = headers.authorization ?? '';
+			const instanceVerifier = await this.verifyService.getVerifiedFactory();
+			await instanceVerifier.verify(token.toString().split(' ')[1]);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new HttpException(
+				{
+					statusCode: HttpStatus.UNAUTHORIZED,
+					customCode: 'WGE0021',
+				},
+				HttpStatus.UNAUTHORIZED
+			);
+		}
+
+		try {
+			let userInfo = await axios.get(
+				this.AUTH_MICRO_URL + '/api/v1/users/current-user',
+				{
+					headers: {
+						Authorization: token,
+					},
+				}
+			);
+			userInfo = userInfo.data;
+			const userTypeInfo = userInfo?.data?.type;
+			//TODO: Add user type validation
+
+			const transactions = await this.walletService.getBatchTransactions(
+				transacctionIds
+			);
+
+			if (!transactions) {
+				return res.status(HttpStatus.OK).send({
+					statusCode: HttpStatus.OK,
+					customCode: 'WGS0138',
+					data: transactions,
+				});
+			}
+			await Promise.all(
+				transactions.map(async transaction => {
+					transaction.fee = 0;
+					const walletInfo = await this.walletService.getWalletByAddress(
+						transaction.receiverUrl
+					);
+					const scale =
+						transaction.receiveAmount?.assetScale ||
+						transaction.incomingAmount?.assetScale ||
+						6;
+					const codeAsset =
+						transaction.receiveAmount?.assetCode ||
+						transaction.incomingAmount?.assetCode ||
+						'USD';
+					const costTransaction =
+						transaction.receiveAmount?.value ||
+						transaction.incomingAmount?.value ||
+						0;
+					if (walletInfo) {
+						if (walletInfo?.providerId) {
+							const paymentParameters =
+								await this.walletService.getPaymentsParameters(
+									walletInfo.providerId
+								);
+							if (paymentParameters) {
+								const paymentParameter =
+									paymentParameters?.find(
+										parameter =>
+											parameter?.cost === adjustValue(costTransaction, scale)
+									) || paymentParameters?.[0];
+								const fees = adjustValue(
+									calcularTotalCostoWalletGuru(
+										paymentParameter?.base,
+										paymentParameter?.comision,
+										paymentParameter?.cost,
+										paymentParameter?.percent,
+										scale
+									),
+									scale
+								);
+								transaction.fee = fees;
+							}
+						}
+					}
+				})
+			);
+
+			return res.status(HttpStatus.OK).send({
+				statusCode: HttpStatus.OK,
+				customCode: 'WGS0138',
+				data: transactions,
+			});
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0137',
+			});
+		}
+	}
+
+	@Get('transaction/:id')
+	@ApiOperation({ summary: 'Detail transaction' })
+	@ApiBearerAuth('JWT')
+	@ApiOkResponse({ description: 'Transaction successfully retrieved.' })
+	@ApiResponse({ status: 401, description: 'Unauthorized access.' })
+	@ApiResponse({ status: 500, description: 'Server error.' })
+	async transactionDetail(
+		@Headers() headers: Record<string, string>,
+		@Res() res,
+		@Param('id') id: string
+	) {
+		let token;
+		try {
+			token = headers.authorization ?? '';
+			const instanceVerifier = await this.verifyService.getVerifiedFactory();
+			await instanceVerifier.verify(token.toString().split(' ')[1]);
+		} catch (error) {
+			Sentry.captureException(error);
+			throw new HttpException(
+				{
+					statusCode: HttpStatus.UNAUTHORIZED,
+					customCode: 'WGE0021',
+				},
+				HttpStatus.UNAUTHORIZED
+			);
+		}
+
+		try {
+			let userInfo = await axios.get(
+				this.AUTH_MICRO_URL + '/api/v1/users/current-user',
+				{
+					headers: {
+						Authorization: token,
+					},
+				}
+			);
+			userInfo = userInfo.data;
+			const userTypeInfo = userInfo?.data?.type;
+			//TODO: Add user type validation
+
+			const transaction = await this.walletService.getTransactionById(id);
+
+			return res.status(HttpStatus.OK).send({
+				statusCode: HttpStatus.OK,
+				customCode: 'WGS0138',
+				data: { ...transaction },
 			});
 		} catch (error) {
 			Sentry.captureException(error);
