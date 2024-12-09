@@ -411,24 +411,22 @@ export class RafikiWalletController {
 				rangeDate = { start: startDate, end: endDate };
 			} else {
 				if (startDate) {
-					const endAxu = new Date()
-						.toISOString()
-						.split('T')[0]
-						.replace('-', '/')
-						.toString();
-					rangeDate = { start: startDate, end: endAxu };
-				} else {
-					const startAxu = new Date(2024, 10, 1)
-						.toISOString()
-						.split('T')[0]
-						.replace('-', '/')
-						.toString();
+					const endAxu = new Date();
 					rangeDate = {
-						start: startAxu,
+						start: startDate,
+						end: `${
+							endAxu.getMonth() + 1
+						}/${endAxu.getDate()}/${endAxu.getFullYear()}`,
+					};
+				} else if (endDate) {
+					const startAxu = new Date(2024, 1, 10);
+					rangeDate = {
+						start: `${startAxu.getMonth()}/${startAxu.getDate()}/${startAxu.getFullYear()}`,
 						end: endDate,
 					};
 				}
 			}
+			console.log('rangeDate', rangeDate);
 			const filters = {
 				type,
 				userType,
@@ -470,6 +468,7 @@ export class RafikiWalletController {
 				data: { ...transactions },
 			});
 		} catch (error) {
+			console.log('error', error);
 			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
