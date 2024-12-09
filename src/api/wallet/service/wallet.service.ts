@@ -3258,7 +3258,8 @@ export class WalletService {
 		page: string,
 		items: string,
 		startDate: string,
-		endDate: string
+		endDate: string,
+		walletAddress: string
 	) {
 		const pageNumber = parseInt(page, 10) || 1;
 		const itemsNumber = parseInt(items, 10) || 10;
@@ -3270,6 +3271,10 @@ export class WalletService {
 
 		if (serviceProviderId) {
 			scan = scan.where('ServiceProviderId').eq(serviceProviderId);
+		}
+
+		if (walletAddress) {
+			scan = scan.where('WalletAddress').eq(walletAddress);
 		}
 
 		if (startTimestamp !== null && endTimestamp !== null) {

@@ -426,7 +426,7 @@ export class RafikiWalletController {
 					};
 				}
 			}
-			console.log('rangeDate', rangeDate);
+			// console.log('rangeDate', rangeDate);
 			const filters = {
 				type,
 				userType,
@@ -714,11 +714,30 @@ export class RafikiWalletController {
 			} else if (Array.isArray(providerIds)) {
 				parsedProviderIds = providerIds;
 			}
+			let rangeDate = undefined;
+			if (startDate && endDate) {
+				rangeDate = { start: startDate, end: endDate };
+			} else {
+				if (startDate) {
+					const endAxu = new Date();
+					rangeDate = {
+						start: startDate,
+						end: `${
+							endAxu.getMonth() + 1
+						}/${endAxu.getDate()}/${endAxu.getFullYear()}`,
+					};
+				} else if (endDate) {
+					const startAxu = new Date(2024, 1, 10);
+					rangeDate = {
+						start: `${startAxu.getMonth()}/${startAxu.getDate()}/${startAxu.getFullYear()}`,
+						end: endDate,
+					};
+				}
+			}
 
 			const filters = {
 				type,
-				dateRange:
-					startDate && endDate ? { start: startDate, end: endDate } : undefined,
+				dateRange: rangeDate,
 				state,
 				providerIds: parsedProviderIds,
 				transactionType: undefined,
@@ -805,11 +824,30 @@ export class RafikiWalletController {
 			);
 			userInfo = userInfo.data;
 			const userType = userInfo?.data?.type;
+			let rangeDate = undefined;
+			if (startDate && endDate) {
+				rangeDate = { start: startDate, end: endDate };
+			} else {
+				if (startDate) {
+					const endAxu = new Date();
+					rangeDate = {
+						start: startDate,
+						end: `${
+							endAxu.getMonth() + 1
+						}/${endAxu.getDate()}/${endAxu.getFullYear()}`,
+					};
+				} else if (endDate) {
+					const startAxu = new Date(2024, 1, 10);
+					rangeDate = {
+						start: `${startAxu.getMonth()}/${startAxu.getDate()}/${startAxu.getFullYear()}`,
+						end: endDate,
+					};
+				}
+			}
 
 			const filters = {
 				type,
-				dateRange:
-					startDate && endDate ? { start: startDate, end: endDate } : undefined,
+				dateRange: rangeDate,
 				state,
 				transactionType: undefined,
 				activityId,
@@ -915,10 +953,30 @@ export class RafikiWalletController {
 				parsedProviderIds = providerIds;
 			}
 
+			let rangeDate = undefined;
+			if (startDate && endDate) {
+				rangeDate = { start: startDate, end: endDate };
+			} else {
+				if (startDate) {
+					const endAxu = new Date();
+					rangeDate = {
+						start: startDate,
+						end: `${
+							endAxu.getMonth() + 1
+						}/${endAxu.getDate()}/${endAxu.getFullYear()}`,
+					};
+				} else if (endDate) {
+					const startAxu = new Date(2024, 1, 10);
+					rangeDate = {
+						start: `${startAxu.getMonth()}/${startAxu.getDate()}/${startAxu.getFullYear()}`,
+						end: endDate,
+					};
+				}
+			}
+
 			const filters = {
 				type,
-				dateRange:
-					startDate && endDate ? { start: startDate, end: endDate } : undefined,
+				dateRange: rangeDate,
 				state,
 				providerIds: parsedProviderIds,
 				activityId,
@@ -1025,11 +1083,30 @@ export class RafikiWalletController {
 			} else if (Array.isArray(providerIds)) {
 				parsedProviderIds = providerIds;
 			}
+			let rangeDate = undefined;
+			if (startDate && endDate) {
+				rangeDate = { start: startDate, end: endDate };
+			} else {
+				if (startDate) {
+					const endAxu = new Date();
+					rangeDate = {
+						start: startDate,
+						end: `${
+							endAxu.getMonth() + 1
+						}/${endAxu.getDate()}/${endAxu.getFullYear()}`,
+					};
+				} else if (endDate) {
+					const startAxu = new Date(2024, 1, 10);
+					rangeDate = {
+						start: `${startAxu.getMonth()}/${startAxu.getDate()}/${startAxu.getFullYear()}`,
+						end: endDate,
+					};
+				}
+			}
 
 			const filters = {
 				type,
-				dateRange:
-					startDate && endDate ? { start: startDate, end: endDate } : undefined,
+				dateRange: rangeDate,
 				state,
 				providerIds: parsedProviderIds,
 				transactionType: undefined,

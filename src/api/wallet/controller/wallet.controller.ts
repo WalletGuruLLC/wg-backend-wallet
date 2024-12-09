@@ -449,13 +449,15 @@ export class WalletController {
 	@ApiQuery({ name: 'items', required: false, type: String })
 	@ApiQuery({ name: 'startDate', required: false, type: String })
 	@ApiQuery({ name: 'endDate', required: false, type: String })
+	@ApiQuery({ name: 'serviceProviderId', required: false, type: String })
+	@ApiQuery({ name: 'walletAddress', required: false, type: String })
 	@ApiResponse({ status: 200, description: 'Refunds successfully retrieved.' })
 	@ApiResponse({ status: 404, description: 'Refund not found.' })
 	@ApiResponse({ status: 500, description: 'Server error.' })
-	@ApiQuery({ name: 'serviceProviderId', required: false, type: String })
 	@Get('get/refunds')
 	async getRefunds(
 		@Res() res,
+		@Query('walletAddress') walletAddress?: string,
 		@Query('serviceProviderId') serviceProviderId?: string,
 		@Query('page') page?: string,
 		@Query('items') items?: string,
@@ -468,7 +470,8 @@ export class WalletController {
 				page,
 				items,
 				startDate,
-				endDate
+				endDate,
+				walletAddress
 			);
 			if (result) {
 				return res.status(HttpStatus.OK).send({

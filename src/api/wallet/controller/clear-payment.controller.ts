@@ -189,7 +189,7 @@ export class ClearPaymentController {
 			return res.status(HttpStatus.OK).send({
 				statusCode: HttpStatus.OK,
 				customCode: 'WGE0161',
-				providerRevenues,
+				data: { ...providerRevenues },
 			});
 		} catch (error) {
 			Sentry.captureException(error);

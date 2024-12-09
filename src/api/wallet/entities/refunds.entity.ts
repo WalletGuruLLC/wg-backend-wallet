@@ -8,4 +8,5 @@ export class RefundsEntity extends Document {
 	ServiceProviderId?: string;
 	CreateDate?: string;
 	UpdateDate?: string;
+	walletAddress?: string;
 }

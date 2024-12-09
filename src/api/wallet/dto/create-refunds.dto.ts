@@ -20,4 +20,8 @@ export class CreateRefundsDto {
 	@IsString()
 	@IsNotEmpty()
 	serviceProviderId: string;
+
+	@IsString()
+	@IsNotEmpty()
+	walletAddress: string;
 }
