@@ -406,7 +406,7 @@ export class RafikiWalletController {
 			} else if (Array.isArray(providerIds)) {
 				parsedProviderIds = providerIds;
 			}
-			let rangeDate = {};
+			let rangeDate = undefined;
 			if (startDate && endDate) {
 				rangeDate = { start: startDate, end: endDate };
 			} else {
@@ -414,13 +414,15 @@ export class RafikiWalletController {
 					const endAxu = new Date()
 						.toISOString()
 						.split('T')[0]
-						.replace('-', '/');
+						.replace('-', '/')
+						.toString();
 					rangeDate = { start: startDate, end: endAxu };
 				} else {
 					const startAxu = new Date(2024, 10, 1)
 						.toISOString()
 						.split('T')[0]
-						.replace('-', '/');
+						.replace('-', '/')
+						.toString();
 					rangeDate = {
 						start: startAxu,
 						end: endDate,
