@@ -35,7 +35,7 @@ async function bootstrap() {
 		.setDescription(
 			'Comprehensive documentation for the Wallet Guru API, detailing the wallet service and its endpoints'
 		)
-		.addServer('http://localhost:3001/', 'Local environment')
+		.addServer('http://localhost:3000/', 'Local environment')
 		.addServer('https://dev.wallet.walletguru.co/', 'Dev environment')
 		.addServer('https://qa.wallet.walletguru.co/', 'QA environment')
 		.addServer('https://stg.wallet.walletguru.co/', 'Stg environment')
@@ -58,7 +58,7 @@ async function bootstrap() {
 		methods: 'GET,POST,PUT,DELETE',
 	});
 
-	await app.listen(3001);
+	await app.listen(3000);
 }
 
 bootstrap();

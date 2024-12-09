@@ -1018,10 +1018,8 @@ export class WalletService {
 					walletAddress => walletAddress != null
 				);
 			}
+			// console.log(validWallets);
 			const filteredTransactions = transactionsWithNames.filter(transaction => {
-				const matchesRevenue = filters?.isRevenue
-					? transaction?.Metadata?.type === 'REVENUE'
-					: true;
 				const matchesActivityId = filters?.activityId
 					? transaction?.Metadata?.activityId === filters.activityId
 					: true;
@@ -1071,10 +1069,18 @@ export class WalletService {
 					matchesDateRange &&
 					matchesProviderId &&
 					matchesWalletAddress &&
-					matchesUserType &&
-					matchesRevenue
+					matchesUserType
 				);
 			});
+			if (filters?.isRevenue) {
+				filteredTransactions.filter(
+					transaction => transaction?.Metadata?.type === 'REVENUE'
+				);
+			} else if (filters?.isRevenue === false) {
+				filteredTransactions.filter(
+					transaction => transaction?.Metadata?.type !== 'REVENUE'
+				);
+			}
 
 			if (filters?.orderBy?.length) {
 				filteredTransactions?.sort((a, b) => {
