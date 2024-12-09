@@ -406,12 +406,31 @@ export class RafikiWalletController {
 			} else if (Array.isArray(providerIds)) {
 				parsedProviderIds = providerIds;
 			}
-
+			let rangeDate = {};
+			if (startDate && endDate) {
+				rangeDate = { start: startDate, end: endDate };
+			} else {
+				if (startDate) {
+					const endAxu = new Date()
+						.toISOString()
+						.split('T')[0]
+						.replace('-', '/');
+					rangeDate = { start: startDate, end: endAxu };
+				} else {
+					const startAxu = new Date(2024, 10, 1)
+						.toISOString()
+						.split('T')[0]
+						.replace('-', '/');
+					rangeDate = {
+						start: startAxu,
+						end: endDate,
+					};
+				}
+			}
 			const filters = {
 				type,
 				userType,
-				dateRange:
-					startDate && endDate ? { start: startDate, end: endDate } : undefined,
+				dateRange: rangeDate,
 				state,
 				providerIds: parsedProviderIds,
 				activityId,
