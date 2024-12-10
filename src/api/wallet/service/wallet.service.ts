@@ -947,7 +947,7 @@ export class WalletService {
 			':WalletAddress': WalletAddress,
 		};
 		if (filters?.isRevenue) {
-			if (filters.isRevenue && filters.isRevenue.toString() === 'true') {
+			if (filters.isRevenue.toString() === 'true') {
 				filterExpression = '(#Type = :TypeOutgoing OR #Type = :TypeIncoming)';
 				expressionAttributeNames = {
 					'#Type': 'Type',
@@ -956,6 +956,9 @@ export class WalletService {
 					':TypeIncoming': 'IncomingPayment',
 					':TypeOutgoing': 'OutgoingPayment',
 				};
+			} else if (filters.isRevenue.toString() === 'false') {
+				// filterExpression =
+				// 	'(#ReceiverUrl = :WalletAddress AND #Type = :TypeOutgoing) OR (#SenderUrl = :WalletAddress AND #Type = :TypeIncoming)';
 			}
 		}
 
@@ -971,7 +974,8 @@ export class WalletService {
 			console.log(outgoingParams);
 			dynamoOutgoingPayments = await docClient.scan(outgoingParams).promise();
 		} catch (error) {
-			console.log('dynamoOutgoingPayments', error);
+			Sentry.captureException(error);
+			// console.log('dynamoOutgoingPayments', error);
 			return {
 				transactions: [],
 				currentPage: 1,
