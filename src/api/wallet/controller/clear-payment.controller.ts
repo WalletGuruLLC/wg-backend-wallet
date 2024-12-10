@@ -57,8 +57,7 @@ export class ClearPaymentController {
 		description: 'Internal Server Error',
 	})
 	async confirm(
-		@Body()
-		confirmClearPayment: ConfirmClearPayment,
+		@Body() confirmClearPayment: ConfirmClearPayment,
 		@Headers() headers: MapOfStringToList,
 		@Res() res
 	) {

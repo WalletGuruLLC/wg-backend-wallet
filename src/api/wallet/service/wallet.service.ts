@@ -1019,7 +1019,7 @@ export class WalletService {
 				);
 			}
 			// console.log(validWallets);
-			const filteredTransactions = transactionsWithNames.filter(transaction => {
+			let filteredTransactions = transactionsWithNames.filter(transaction => {
 				const matchesActivityId = filters?.activityId
 					? transaction?.Metadata?.activityId === filters.activityId
 					: true;
@@ -1072,15 +1072,6 @@ export class WalletService {
 					matchesUserType
 				);
 			});
-			if (filters?.isRevenue) {
-				filteredTransactions.filter(
-					transaction => transaction?.Metadata?.type === 'REVENUE'
-				);
-			} else if (filters?.isRevenue === false) {
-				filteredTransactions.filter(
-					transaction => transaction?.Metadata?.type !== 'REVENUE'
-				);
-			}
 
 			if (filters?.orderBy?.length) {
 				filteredTransactions?.sort((a, b) => {
@@ -1104,6 +1095,17 @@ export class WalletService {
 			const isOutgoing = filters?.transactionType?.includes('outgoing');
 
 			let sortedTransactions;
+			// eslint-disable-next-line no-unsafe-optional-chaining
+			if ((filters?.isRevenue).toString() === 'true') {
+				filteredTransactions = filteredTransactions.filter(transaction => {
+					return transaction?.Metadata?.type === 'REVENUE';
+				});
+				// eslint-disable-next-line no-unsafe-optional-chaining
+			} else if ((filters?.isRevenue).toString() === 'false') {
+				filteredTransactions = filteredTransactions.filter(transaction => {
+					return transaction?.Metadata?.type !== 'REVENUE';
+				});
+			}
 
 			if (isIncoming && isOutgoing) {
 				sortedTransactions = this.paginatedResults(
@@ -1135,6 +1137,7 @@ export class WalletService {
 			const outgoingSorted = filteredTransactions.filter(
 				item => item?.Type === 'OutgoingPayment'
 			);
+
 			const combinedSorted = [...incomingSorted, ...outgoingSorted].sort(
 				(a: any, b: any) =>
 					new Date(b?.createdAt).getTime() - new Date(a?.createdAt).getTime()
