@@ -876,6 +876,7 @@ export class WalletService {
 			items?: string;
 			orderBy?: ('providerId' | 'date')[];
 			isRevenue?: boolean;
+			report?: ('user' | 'period' | 'revenue' | 'dispute' | 'reserved')[];
 		},
 		type?: string
 	) {
@@ -932,6 +933,7 @@ export class WalletService {
 
 		const pagedParsed = Number(filters?.page) || 1;
 		const itemsParsed = Number(filters?.items) || 10;
+		// config for report user
 		let filterExpression =
 			type == 'WALLET' || type == 'PLATFORM'
 				? '(#ReceiverUrl = :WalletAddress AND #Type = :TypeIncoming) OR (#SenderUrl = :WalletAddress AND #Type = :TypeOutgoing)'
@@ -946,8 +948,19 @@ export class WalletService {
 			':TypeOutgoing': 'OutgoingPayment',
 			':WalletAddress': WalletAddress,
 		};
-		if (filters?.isRevenue) {
-			if (filters.isRevenue.toString() === 'true') {
+		if (filters.report?.includes('period')) {
+			filterExpression =
+				'(#ReceiverUrl = :WalletAddress AND #Type = :TypeOutgoing) OR (#SenderUrl = :WalletAddress AND #Type = :TypeIncoming)';
+		} else if (filters.report?.includes('revenue')) {
+			if (WalletAddress) {
+				filterExpression = '#SenderUrl = :WalletAddress';
+				expressionAttributeNames = {
+					'#SenderUrl': 'SenderUrl',
+				};
+				expressionAttributeValues = {
+					':WalletAddress': WalletAddress,
+				};
+			} else {
 				filterExpression = '(#Type = :TypeOutgoing OR #Type = :TypeIncoming)';
 				expressionAttributeNames = {
 					'#Type': 'Type',
@@ -956,9 +969,6 @@ export class WalletService {
 					':TypeIncoming': 'IncomingPayment',
 					':TypeOutgoing': 'OutgoingPayment',
 				};
-			} else if (filters.isRevenue.toString() === 'false') {
-				// filterExpression =
-				// 	'(#ReceiverUrl = :WalletAddress AND #Type = :TypeOutgoing) OR (#SenderUrl = :WalletAddress AND #Type = :TypeIncoming)';
 			}
 		}
 
@@ -971,11 +981,10 @@ export class WalletService {
 				ExpressionAttributeNames: expressionAttributeNames,
 				ExpressionAttributeValues: expressionAttributeValues,
 			};
-			console.log(outgoingParams);
+			// console.log(outgoingParams);
 			dynamoOutgoingPayments = await docClient.scan(outgoingParams).promise();
 		} catch (error) {
 			Sentry.captureException(error);
-			// console.log('dynamoOutgoingPayments', error);
 			return {
 				transactions: [],
 				currentPage: 1,
@@ -983,7 +992,7 @@ export class WalletService {
 				totalPages: 1,
 			};
 		}
-
+		// console.log(dynamoOutgoingPayments?.Items?.length);
 		if (dynamoOutgoingPayments?.Items?.length > 0) {
 			const sortedArray = dynamoOutgoingPayments?.Items?.sort(
 				(a: any, b: any) =>
@@ -1060,6 +1069,8 @@ export class WalletService {
 					walletAddress => walletAddress != null
 				);
 			}
+			// console.log(validWallets, filters?.type);
+
 			let filteredTransactions = transactionsWithNames.filter(transaction => {
 				const matchesActivityId = filters?.activityId
 					? transaction?.Metadata?.activityId === filters.activityId
@@ -1089,8 +1100,10 @@ export class WalletService {
 				const matchesProviderId =
 					validWallets.length > 0
 						? validWallets.some(
-								walletAddress => walletAddress === transaction?.ReceiverUrl
-						  ) && transaction?.Metadata?.type === 'PROVIDER'
+								walletAddress =>
+									walletAddress === transaction?.ReceiverUrl ||
+									walletAddress === transaction?.SenderUrl
+						  )
 						: true;
 
 				const matchesWalletAddress =
@@ -1102,7 +1115,15 @@ export class WalletService {
 				const matchesUserType = filters?.userType
 					? transaction?.Metadata?.type === filters?.userType
 					: true;
-
+				// console.log(
+				// 	matchesActivityId,
+				// 	matchesType,
+				// 	matchesState,
+				// 	matchesDateRange,
+				// 	matchesProviderId,
+				// 	matchesWalletAddress,
+				// 	matchesUserType
+				// );
 				return (
 					matchesActivityId &&
 					matchesType &&
@@ -1131,6 +1152,7 @@ export class WalletService {
 					return 0;
 				});
 			}
+			// console.log(filteredTransactions.length);
 
 			const isIncoming = filters?.transactionType?.includes('incoming');
 			const isOutgoing = filters?.transactionType?.includes('outgoing');
