@@ -1095,8 +1095,8 @@ export class WalletService {
 			const isOutgoing = filters?.transactionType?.includes('outgoing');
 
 			let sortedTransactions;
-			// eslint-disable-next-line no-unsafe-optional-chaining
 			if (filters?.isRevenue !== undefined) {
+				// eslint-disable-next-line no-unsafe-optional-chaining
 				if ((filters?.isRevenue).toString() === 'true') {
 					filteredTransactions = filteredTransactions.filter(transaction => {
 						return transaction?.Metadata?.type === 'REVENUE';
