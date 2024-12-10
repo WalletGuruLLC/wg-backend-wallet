@@ -3303,18 +3303,18 @@ export class WalletService {
 	}
 
 	async createRefund(createRefundsDto: CreateRefundsDto) {
-		if (createRefundsDto.amount < 1) {
-			throw new Error(`Error creating refunds invalid Amount`);
-		}
-		if (createRefundsDto.serviceProviderId) {
-			const uuidRegex =
-				/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-			const idTest = uuidRegex.test(createRefundsDto.serviceProviderId);
-			console.log(idTest);
-			if (idTest === false) {
-				throw new Error(`Error creating refunds invalid Service Provider Id`);
-			}
-		}
+		// if (createRefundsDto.amount < 1) {
+		// 	throw new Error(`Error creating refunds invalid Amount`);
+		// }
+		// if (createRefundsDto.serviceProviderId) {
+		// 	const uuidRegex =
+		// 		/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+		// 	const idTest = uuidRegex.test(createRefundsDto.serviceProviderId);
+		// 	console.log(idTest);
+		// 	if (idTest === false) {
+		// 		throw new Error(`Error creating refunds invalid Service Provider Id`);
+		// 	}
+		// }
 		const saveRefundsDto = {
 			ServiceProviderId: createRefundsDto.serviceProviderId,
 			Amount: createRefundsDto.amount,
