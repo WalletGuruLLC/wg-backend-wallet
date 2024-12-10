@@ -917,29 +917,26 @@ export class WalletService {
 		const pagedParsed = Number(filters?.page) || 1;
 		const itemsParsed = Number(filters?.items) || 10;
 		const filterExpression =
-			// type == 'PLATFORM'
-			// 	? '#Type = :TypeIncoming OR #Type = :TypeOutgoing'
-			// 	: '(#ReceiverUrl = :WalletAddress AND #Type = :TypeIncoming) OR (#SenderUrl = :WalletAddress AND #Type = :TypeOutgoing)';
-			'#Type = :TypeIncoming OR #Type = :TypeOutgoing';
+			type == 'WALLET'
+				? '(#ReceiverUrl = :WalletAddress AND #Type = :TypeIncoming) OR (#SenderUrl = :WalletAddress AND #Type = :TypeOutgoing)'
+				: '#Type = :TypeIncoming OR #Type = :TypeOutgoing';
 
 		const outgoingParams: DocumentClient.ScanInput = {
 			TableName: 'Transactions',
 			FilterExpression: filterExpression,
 			ExpressionAttributeNames: {
 				'#Type': 'Type',
-				// ...(type !== 'PLATFORM' && {
-				// 	'#SenderUrl': 'SenderUrl',
-				// 	'#ReceiverUrl': 'ReceiverUrl',
-				// }),
+				...(type === 'WALLET' && {
+					'#SenderUrl': 'SenderUrl',
+					'#ReceiverUrl': 'ReceiverUrl',
+				}),
 			},
 			ExpressionAttributeValues: {
 				':TypeIncoming': 'IncomingPayment',
 				':TypeOutgoing': 'OutgoingPayment',
-				// ...(type !== 'PLATFORM' && { ':WalletAddress': WalletAddress }),
+				...(type === 'WALLET' && { ':WalletAddress': WalletAddress }),
 			},
 		};
-
-		console.log(outgoingParams);
 
 		const dynamoOutgoingPayments = await docClient
 			.scan(outgoingParams)
@@ -1109,8 +1106,6 @@ export class WalletService {
 				}
 			}
 
-			console.log('lo que sea 0', filters?.transactionType);
-
 			if (isIncoming && isOutgoing) {
 				sortedTransactions = this.paginatedResults(
 					pagedParsed,
@@ -1134,8 +1129,6 @@ export class WalletService {
 			if (filters?.transactionType) {
 				return sortedTransactions;
 			}
-
-			console.log('lo que sea');
 
 			const incomingSorted = filteredTransactions.filter(
 				item => item?.Type === 'IncomingPayment'
