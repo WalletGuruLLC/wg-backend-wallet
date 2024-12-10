@@ -913,55 +913,68 @@ export class WalletService {
 				validWalletFilter = false;
 			}
 		} else if (filters?.providerIds && WalletAddress === undefined) {
-			if (
-				type === 'PLATFORM' &&
-				filters?.providerIds.length === 1 &&
-				!filters.isRevenue
-			) {
-				const walletFindProvider = await this.getWalletByProviderId(
-					filters?.providerIds[0]
-				);
-				const walletFind = await this.getWalletByAddressRegex(
-					walletFindProvider.walletAddress
-				);
-				WalletAddress = walletFind.walletAddress;
+			if (type === 'PLATFORM' && filters?.providerIds.length === 1) {
+				try {
+					const walletFindProvider = await this.getWalletByProviderId(
+						filters?.providerIds[0]
+					);
+					const walletFind = await this.getWalletByAddressRegex(
+						walletFindProvider.walletAddress
+					);
+					WalletAddress = walletFind.walletAddress;
+				} catch (error) {
+					/* empty */
+				}
 			}
 		}
 
 		const pagedParsed = Number(filters?.page) || 1;
 		const itemsParsed = Number(filters?.items) || 10;
-		let filterExpression =
+		const filterExpression =
 			type == 'WALLET' || type == 'PLATFORM'
 				? '(#ReceiverUrl = :WalletAddress AND #Type = :TypeIncoming) OR (#SenderUrl = :WalletAddress AND #Type = :TypeOutgoing)'
 				: '(#ReceiverUrl = :WalletAddress AND #Type = :TypeOutgoing) OR (#SenderUrl = :WalletAddress AND #Type = :TypeIncoming)';
-
-		if (filters.isRevenue.toString() === 'true') {
-			filterExpression = '#Type = :TypeIncoming OR #Type = :TypeOutgoing';
-		}
-
-		const outgoingParams: DocumentClient.ScanInput = {
-			TableName: 'Transactions',
-			FilterExpression: filterExpression,
-			ExpressionAttributeNames: {
-				'#Type': 'Type',
-				...(filters.isRevenue.toString() === 'false' && {
+		let dynamoOutgoingPayments = null;
+		try {
+			const outgoingParams: DocumentClient.ScanInput = {
+				TableName: 'Transactions',
+				FilterExpression: filterExpression,
+				ExpressionAttributeNames: {
+					'#Type': 'Type',
 					'#SenderUrl': 'SenderUrl',
 					'#ReceiverUrl': 'ReceiverUrl',
-				}),
-			},
-			ExpressionAttributeValues: {
-				':TypeIncoming': 'IncomingPayment',
-				':TypeOutgoing': 'OutgoingPayment',
-				...(filters.isRevenue.toString() === 'false' && {
+				},
+				ExpressionAttributeValues: {
+					':TypeIncoming': 'IncomingPayment',
+					':TypeOutgoing': 'OutgoingPayment',
 					':WalletAddress': WalletAddress,
-				}),
-			},
-		};
-		console.log(outgoingParams);
+				},
+			};
+			dynamoOutgoingPayments = await docClient.scan(outgoingParams).promise();
+		} catch (error) {
+			if (filters.isRevenue.toString() === 'false' && type == 'PLATFORM') {
+				return {
+					transactions: [],
+					currentPage: pagedParsed,
+					total: 0,
+					totalPages: 0,
+				};
+			}
+			const outgoingParams: DocumentClient.ScanInput = {
+				TableName: 'Transactions',
+				FilterExpression: '(#Type = :TypeIncoming) OR (#Type = :TypeOutgoing)',
+				ExpressionAttributeNames: {
+					'#Type': 'Type',
+				},
+				ExpressionAttributeValues: {
+					':TypeIncoming': 'IncomingPayment',
+					':TypeOutgoing': 'OutgoingPayment',
+				},
+			};
 
-		const dynamoOutgoingPayments = await docClient
-			.scan(outgoingParams)
-			.promise();
+			dynamoOutgoingPayments = await docClient.scan(outgoingParams).promise();
+		}
+
 		if (dynamoOutgoingPayments?.Items?.length > 0) {
 			const sortedArray = dynamoOutgoingPayments?.Items?.sort(
 				(a: any, b: any) =>
