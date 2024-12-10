@@ -946,20 +946,17 @@ export class WalletService {
 			':TypeOutgoing': 'OutgoingPayment',
 			':WalletAddress': WalletAddress,
 		};
-
-		if (filters.isRevenue && filters.isRevenue.toString() === 'true') {
-			filterExpression = '(#Type = :TypeOutgoing OR #Type = :TypeIncoming)';
-			expressionAttributeNames = {
-				'#Type': 'Type',
-			};
-			expressionAttributeValues = {
-				':TypeIncoming': 'IncomingPayment',
-				':TypeOutgoing': 'OutgoingPayment',
-			};
-		}
-		if (filters.isRevenue.toString() === 'false') {
-			filterExpression =
-				'(#ReceiverUrl = :WalletAddress AND #Type = :TypeOutgoing) OR (#SenderUrl = :WalletAddress AND #Type = :TypeIncoming)';
+		if (filters?.isRevenue) {
+			if (filters.isRevenue && filters.isRevenue.toString() === 'true') {
+				filterExpression = '(#Type = :TypeOutgoing OR #Type = :TypeIncoming)';
+				expressionAttributeNames = {
+					'#Type': 'Type',
+				};
+				expressionAttributeValues = {
+					':TypeIncoming': 'IncomingPayment',
+					':TypeOutgoing': 'OutgoingPayment',
+				};
+			}
 		}
 
 		let dynamoOutgoingPayments = null;
@@ -971,6 +968,7 @@ export class WalletService {
 				ExpressionAttributeNames: expressionAttributeNames,
 				ExpressionAttributeValues: expressionAttributeValues,
 			};
+			console.log(outgoingParams);
 			dynamoOutgoingPayments = await docClient.scan(outgoingParams).promise();
 		} catch (error) {
 			console.log('dynamoOutgoingPayments', error);
