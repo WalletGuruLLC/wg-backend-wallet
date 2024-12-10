@@ -888,15 +888,15 @@ export class WalletService {
 			providerId
 		);
 
-		const WalletAddress =
+		let WalletAddress =
 			type == 'PROVIDER'
 				? walletDbProvider?.walletAddress
 				: walletDb?.WalletAddress;
 		const docClient = new DocumentClient();
-		console.log(WalletAddress);
+
 		let validWalletFilter = true;
 
-		if (filters?.walletAddress) {
+		if (filters?.walletAddress && WalletAddress === undefined) {
 			const walletFind = await this.getWalletByAddressRegex(
 				filters.walletAddress
 			);
@@ -904,7 +904,7 @@ export class WalletService {
 			const hasDifferentWalletAddress =
 				walletFind?.walletAddress &&
 				walletFind.walletAddress !== walletDbProvider?.walletAddress;
-
+			WalletAddress = walletFind?.walletAddress;
 			if (
 				isProviderType &&
 				walletFind?.providerId &&
@@ -912,29 +912,37 @@ export class WalletService {
 			) {
 				validWalletFilter = false;
 			}
+		} else if (filters?.providerIds && WalletAddress === undefined) {
+			if (type === 'PLATFORM' && filters?.providerIds.length === 1) {
+				const walletFindProvider = await this.getWalletByProviderId(
+					filters?.providerIds[0]
+				);
+				const walletFind = await this.getWalletByAddressRegex(
+					walletFindProvider.walletAddress
+				);
+				WalletAddress = walletFind.walletAddress;
+			}
 		}
 
 		const pagedParsed = Number(filters?.page) || 1;
 		const itemsParsed = Number(filters?.items) || 10;
 		const filterExpression =
-			type == 'WALLET'
+			type == 'WALLET' || type == 'PLATFORM'
 				? '(#ReceiverUrl = :WalletAddress AND #Type = :TypeIncoming) OR (#SenderUrl = :WalletAddress AND #Type = :TypeOutgoing)'
-				: '#Type = :TypeIncoming OR #Type = :TypeOutgoing';
+				: '(#ReceiverUrl = :WalletAddress AND #Type = :TypeOutgoing) OR (#SenderUrl = :WalletAddress AND #Type = :TypeIncoming)';
 
 		const outgoingParams: DocumentClient.ScanInput = {
 			TableName: 'Transactions',
 			FilterExpression: filterExpression,
 			ExpressionAttributeNames: {
 				'#Type': 'Type',
-				...(type === 'WALLET' && {
-					'#SenderUrl': 'SenderUrl',
-					'#ReceiverUrl': 'ReceiverUrl',
-				}),
+				'#SenderUrl': 'SenderUrl',
+				'#ReceiverUrl': 'ReceiverUrl',
 			},
 			ExpressionAttributeValues: {
 				':TypeIncoming': 'IncomingPayment',
 				':TypeOutgoing': 'OutgoingPayment',
-				...(type === 'WALLET' && { ':WalletAddress': WalletAddress }),
+				':WalletAddress': WalletAddress,
 			},
 		};
 
