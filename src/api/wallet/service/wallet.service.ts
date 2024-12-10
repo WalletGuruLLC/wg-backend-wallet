@@ -915,64 +915,71 @@ export class WalletService {
 		} else if (filters?.providerIds && WalletAddress === undefined) {
 			if (type === 'PLATFORM' && filters?.providerIds.length === 1) {
 				try {
-					const walletFindProvider = await this.getWalletByProviderId(
-						filters?.providerIds[0]
-					);
-					const walletFind = await this.getWalletByAddressRegex(
-						walletFindProvider.walletAddress
-					);
-					WalletAddress = walletFind.walletAddress;
+					if (filters?.providerIds[0] !== '') {
+						const walletFindProvider = await this.getWalletByProviderId(
+							filters?.providerIds[0]
+						);
+						const walletFind = await this.getWalletByAddressRegex(
+							walletFindProvider.walletAddress
+						);
+						WalletAddress = walletFind.walletAddress;
+					}
 				} catch (error) {
-					/* empty */
+					console.log(error);
 				}
 			}
 		}
 
 		const pagedParsed = Number(filters?.page) || 1;
 		const itemsParsed = Number(filters?.items) || 10;
-		const filterExpression =
+		let filterExpression =
 			type == 'WALLET' || type == 'PLATFORM'
 				? '(#ReceiverUrl = :WalletAddress AND #Type = :TypeIncoming) OR (#SenderUrl = :WalletAddress AND #Type = :TypeOutgoing)'
 				: '(#ReceiverUrl = :WalletAddress AND #Type = :TypeOutgoing) OR (#SenderUrl = :WalletAddress AND #Type = :TypeIncoming)';
+		let expressionAttributeNames: any = {
+			'#Type': 'Type',
+			'#SenderUrl': 'SenderUrl',
+			'#ReceiverUrl': 'ReceiverUrl',
+		};
+		let expressionAttributeValues: any = {
+			':TypeIncoming': 'IncomingPayment',
+			':TypeOutgoing': 'OutgoingPayment',
+			':WalletAddress': WalletAddress,
+		};
+
+		if (filters.isRevenue && filters.isRevenue.toString() === 'true') {
+			filterExpression = '(#Type = :TypeOutgoing OR #Type = :TypeIncoming)';
+			expressionAttributeNames = {
+				'#Type': 'Type',
+			};
+			expressionAttributeValues = {
+				':TypeIncoming': 'IncomingPayment',
+				':TypeOutgoing': 'OutgoingPayment',
+			};
+		}
+		if (filters.isRevenue.toString() === 'false') {
+			filterExpression =
+				'(#ReceiverUrl = :WalletAddress AND #Type = :TypeOutgoing) OR (#SenderUrl = :WalletAddress AND #Type = :TypeIncoming)';
+		}
+
 		let dynamoOutgoingPayments = null;
+
 		try {
 			const outgoingParams: DocumentClient.ScanInput = {
 				TableName: 'Transactions',
 				FilterExpression: filterExpression,
-				ExpressionAttributeNames: {
-					'#Type': 'Type',
-					'#SenderUrl': 'SenderUrl',
-					'#ReceiverUrl': 'ReceiverUrl',
-				},
-				ExpressionAttributeValues: {
-					':TypeIncoming': 'IncomingPayment',
-					':TypeOutgoing': 'OutgoingPayment',
-					':WalletAddress': WalletAddress,
-				},
+				ExpressionAttributeNames: expressionAttributeNames,
+				ExpressionAttributeValues: expressionAttributeValues,
 			};
 			dynamoOutgoingPayments = await docClient.scan(outgoingParams).promise();
 		} catch (error) {
-			if (filters.isRevenue.toString() === 'false' && type == 'PLATFORM') {
-				return {
-					transactions: [],
-					currentPage: pagedParsed,
-					total: 0,
-					totalPages: 0,
-				};
-			}
-			const outgoingParams: DocumentClient.ScanInput = {
-				TableName: 'Transactions',
-				FilterExpression: '(#Type = :TypeIncoming) OR (#Type = :TypeOutgoing)',
-				ExpressionAttributeNames: {
-					'#Type': 'Type',
-				},
-				ExpressionAttributeValues: {
-					':TypeIncoming': 'IncomingPayment',
-					':TypeOutgoing': 'OutgoingPayment',
-				},
+			console.log('dynamoOutgoingPayments', error);
+			return {
+				transactions: [],
+				currentPage: 1,
+				total: 0,
+				totalPages: 1,
 			};
-
-			dynamoOutgoingPayments = await docClient.scan(outgoingParams).promise();
 		}
 
 		if (dynamoOutgoingPayments?.Items?.length > 0) {
@@ -1209,7 +1216,7 @@ export class WalletService {
 				TableName: 'Roles',
 				Key: { Id: userLogged.roleId },
 			};
-			console.log(serviceProviderId);
+
 			const result = await docClient.get(params).promise();
 			const role = result.Item;
 			const permisos = validarPermisos({
