@@ -15,7 +15,6 @@ import {
 	ApiOperation,
 	ApiResponse,
 	ApiBearerAuth,
-	ApiBody,
 	ApiOkResponse,
 	ApiParam,
 	ApiQuery,
@@ -27,7 +26,7 @@ import { VerifyService } from '../../../verify/verify.service';
 import * as Sentry from '@sentry/nestjs';
 import { MapOfStringToList } from 'aws-sdk/clients/apigateway';
 import axios from 'axios';
-import { ConfirmClearPayment } from '../dto/confirm-clear-payment.';
+import { ConfirmClearPaymentDto } from '../dto/confirm-clear-payment.dto';
 
 @ApiTags('clear-payments')
 @Controller('api/v1/clear-payments')
@@ -44,6 +43,7 @@ export class ClearPaymentController {
 
 	@Post('/confirm')
 	@ApiOperation({ summary: 'Confirm a clear payment' })
+	@ApiBearerAuth('JWT')
 	@ApiResponse({
 		status: 200,
 		description: 'Clear Payment Has Been Confirmed',
@@ -56,9 +56,9 @@ export class ClearPaymentController {
 		status: 500,
 		description: 'Internal Server Error',
 	})
-	async confirm(
-		@Body() confirmClearPayment: ConfirmClearPayment,
+	async confirmClearPayment(
 		@Headers() headers: MapOfStringToList,
+		@Body() confirmClear: ConfirmClearPaymentDto,
 		@Res() res
 	) {
 		let token;
@@ -93,7 +93,7 @@ export class ClearPaymentController {
 			}
 
 			const clearPayment = await this.walletService.getProviderInfoRevenueById(
-				confirmClearPayment.clearPaymentId
+				confirmClear.clearPaymentId
 			);
 
 			if (!clearPayment) {
@@ -103,14 +103,14 @@ export class ClearPaymentController {
 				});
 			}
 
-			if (!confirmClearPayment.referenceNumber) {
+			if (!confirmClear.referenceNumber) {
 				return res.status(HttpStatus.BAD_REQUEST).send({
 					statusCode: HttpStatus.BAD_REQUEST,
 					customCode: 'WGE0229',
 				});
 			}
 
-			if (!confirmClearPayment.observations) {
+			if (!confirmClear.observations) {
 				return res.status(HttpStatus.BAD_REQUEST).send({
 					statusCode: HttpStatus.BAD_REQUEST,
 					customCode: 'WGE0229',
@@ -119,7 +119,7 @@ export class ClearPaymentController {
 
 			const confirmedClearPayment =
 				await this.walletService.confirmClearPayment(
-					confirmClearPayment,
+					confirmClear,
 					clearPayment
 				);
 

@@ -49,12 +49,10 @@ import { CreateWebSocketActionDto } from '../dto/create-web-socket-action.dto';
 import { ClearPayments } from '../entities/clear-payments.entity';
 import { ClearPaymentsSchema } from '../entities/clear-payments.schema';
 import { buildFilterExpression } from '../../../utils/helpers/buildFilterExpressionDynamo';
-import { getDateRangeForMonthEnum } from 'src/utils/helpers/buildMonthRanges';
-import { Month } from '../dto/month.enum';
 import { CreateRefundsDto } from '../dto/create-refunds.dto';
 import { RefundsEntity } from '../entities/refunds.entity';
 import { RefundsSchema } from '../entities/refunds.schema';
-import { ConfirmClearPayment } from '../dto/confirm-clear-payment.';
+import { ConfirmClearPaymentDto } from '../dto/confirm-clear-payment.dto';
 import { validarPermisos } from '../../../utils/helpers/getAccessServiceProviders';
 import {
 	createOutgoingPayment,
@@ -3266,7 +3264,7 @@ export class WalletService {
 	}
 
 	async confirmClearPayment(
-		confirmClearPayment: ConfirmClearPayment,
+		confirmClearPayment: ConfirmClearPaymentDto,
 		clearPayment
 	) {
 		try {
