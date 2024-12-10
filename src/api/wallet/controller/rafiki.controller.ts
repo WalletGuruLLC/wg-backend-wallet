@@ -426,7 +426,6 @@ export class RafikiWalletController {
 					};
 				}
 			}
-			console.log('isRevenue', isRevenue);
 			const filters = {
 				type,
 				userType,

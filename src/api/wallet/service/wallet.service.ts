@@ -1096,15 +1096,17 @@ export class WalletService {
 
 			let sortedTransactions;
 			// eslint-disable-next-line no-unsafe-optional-chaining
-			if ((filters?.isRevenue).toString() === 'true') {
-				filteredTransactions = filteredTransactions.filter(transaction => {
-					return transaction?.Metadata?.type === 'REVENUE';
-				});
-				// eslint-disable-next-line no-unsafe-optional-chaining
-			} else if ((filters?.isRevenue).toString() === 'false') {
-				filteredTransactions = filteredTransactions.filter(transaction => {
-					return transaction?.Metadata?.type !== 'REVENUE';
-				});
+			if (filters?.isRevenue !== undefined) {
+				if ((filters?.isRevenue).toString() === 'true') {
+					filteredTransactions = filteredTransactions.filter(transaction => {
+						return transaction?.Metadata?.type === 'REVENUE';
+					});
+					// eslint-disable-next-line no-unsafe-optional-chaining
+				} else if ((filters?.isRevenue).toString() === 'false') {
+					filteredTransactions = filteredTransactions.filter(transaction => {
+						return transaction?.Metadata?.type !== 'REVENUE';
+					});
+				}
 			}
 
 			if (isIncoming && isOutgoing) {
