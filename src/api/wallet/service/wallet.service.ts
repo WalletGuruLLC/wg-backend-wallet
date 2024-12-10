@@ -893,7 +893,7 @@ export class WalletService {
 				? walletDbProvider?.walletAddress
 				: walletDb?.WalletAddress;
 		const docClient = new DocumentClient();
-
+		console.log(WalletAddress);
 		let validWalletFilter = true;
 
 		if (filters?.walletAddress) {
@@ -917,31 +917,33 @@ export class WalletService {
 		const pagedParsed = Number(filters?.page) || 1;
 		const itemsParsed = Number(filters?.items) || 10;
 		const filterExpression =
-			type == 'PLATFORM'
-				? '#Type = :TypeIncoming OR #Type = :TypeOutgoing'
-				: '(#ReceiverUrl = :WalletAddress AND #Type = :TypeIncoming) OR (#SenderUrl = :WalletAddress AND #Type = :TypeOutgoing)';
+			// type == 'PLATFORM'
+			// 	? '#Type = :TypeIncoming OR #Type = :TypeOutgoing'
+			// 	: '(#ReceiverUrl = :WalletAddress AND #Type = :TypeIncoming) OR (#SenderUrl = :WalletAddress AND #Type = :TypeOutgoing)';
+			'#Type = :TypeIncoming OR #Type = :TypeOutgoing';
 
 		const outgoingParams: DocumentClient.ScanInput = {
 			TableName: 'Transactions',
 			FilterExpression: filterExpression,
 			ExpressionAttributeNames: {
 				'#Type': 'Type',
-				...(type !== 'PLATFORM' && {
-					'#SenderUrl': 'SenderUrl',
-					'#ReceiverUrl': 'ReceiverUrl',
-				}),
+				// ...(type !== 'PLATFORM' && {
+				// 	'#SenderUrl': 'SenderUrl',
+				// 	'#ReceiverUrl': 'ReceiverUrl',
+				// }),
 			},
 			ExpressionAttributeValues: {
 				':TypeIncoming': 'IncomingPayment',
 				':TypeOutgoing': 'OutgoingPayment',
-				...(type !== 'PLATFORM' && { ':WalletAddress': WalletAddress }),
+				// ...(type !== 'PLATFORM' && { ':WalletAddress': WalletAddress }),
 			},
 		};
+
+		console.log(outgoingParams);
 
 		const dynamoOutgoingPayments = await docClient
 			.scan(outgoingParams)
 			.promise();
-
 		if (dynamoOutgoingPayments?.Items?.length > 0) {
 			const sortedArray = dynamoOutgoingPayments?.Items?.sort(
 				(a: any, b: any) =>
@@ -1018,7 +1020,6 @@ export class WalletService {
 					walletAddress => walletAddress != null
 				);
 			}
-			// console.log(validWallets);
 			let filteredTransactions = transactionsWithNames.filter(transaction => {
 				const matchesActivityId = filters?.activityId
 					? transaction?.Metadata?.activityId === filters.activityId
@@ -1093,7 +1094,6 @@ export class WalletService {
 
 			const isIncoming = filters?.transactionType?.includes('incoming');
 			const isOutgoing = filters?.transactionType?.includes('outgoing');
-
 			let sortedTransactions;
 			if (filters?.isRevenue !== undefined) {
 				// eslint-disable-next-line no-unsafe-optional-chaining
@@ -1108,6 +1108,8 @@ export class WalletService {
 					});
 				}
 			}
+
+			console.log('lo que sea 0', filters?.transactionType);
 
 			if (isIncoming && isOutgoing) {
 				sortedTransactions = this.paginatedResults(
@@ -1132,6 +1134,8 @@ export class WalletService {
 			if (filters?.transactionType) {
 				return sortedTransactions;
 			}
+
+			console.log('lo que sea');
 
 			const incomingSorted = filteredTransactions.filter(
 				item => item?.Type === 'IncomingPayment'
