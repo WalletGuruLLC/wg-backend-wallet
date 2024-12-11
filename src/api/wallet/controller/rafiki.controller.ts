@@ -1190,31 +1190,26 @@ export class RafikiWalletController {
 				}
 			);
 			userInfo = userInfo.data;
-
 			const userId = userInfo?.data?.id;
 
 			const userWallet = await this.walletService.getWalletByRafikyId(
 				input.walletAddressId
 			);
-
 			if (!userWallet) {
 				return res.status(HttpStatus.NOT_FOUND).send({
 					statusCode: HttpStatus.NOT_FOUND,
 					customCode: 'WGE0074',
 				});
 			}
-
 			const userWalletByToken = convertToCamelCase(
 				await this.walletService.getWalletByToken(token)
 			);
-
 			if (userWalletByToken?.walletDb?.userId !== userWallet?.userId) {
 				return res.status(HttpStatus.UNAUTHORIZED).send({
 					statusCode: HttpStatus.UNAUTHORIZED,
 					customCode: 'WGE0021',
 				});
 			}
-
 			await addApiSignatureHeader(req, req.body);
 			const inputReceiver = {
 				metadata: {
@@ -1232,7 +1227,6 @@ export class RafikiWalletController {
 				},
 				walletAddressUrl: input.walletAddressUrl,
 			};
-
 			const receiver = await this.walletService.createReceiver(inputReceiver);
 			const quoteInput = {
 				walletAddressId: input?.walletAddressId,
@@ -1246,7 +1240,6 @@ export class RafikiWalletController {
 					),
 				},
 			};
-
 			setTimeout(async () => {
 				const quote = await this.walletService.createQuote(quoteInput);
 

@@ -53,12 +53,18 @@ import { CreateRefundsDto } from '../dto/create-refunds.dto';
 import { RefundsEntity } from '../entities/refunds.entity';
 import { RefundsSchema } from '../entities/refunds.schema';
 import { ConfirmClearPaymentDto } from '../dto/confirm-clear-payment.dto';
-import { validarPermisos } from '../../../utils/helpers/getAccessServiceProviders';
+import {
+	validarPermisos,
+	validatePermisionssSp,
+	validatePermissionsPl,
+} from '../../../utils/helpers/getAccessServiceProviders';
 import {
 	createOutgoingPayment,
 	createQuote,
 } from 'src/utils/helpers/openPaymentMethods';
 import { toBase64 } from 'src/utils/helpers/openPaymentSignature';
+import { transaction } from 'dynamoose';
+import { addApiSignatureHeader } from '../../../utils/helpers/signatureHelper';
 
 @Injectable()
 export class WalletService {
@@ -1505,6 +1511,19 @@ export class WalletService {
 			])
 			.exec();
 		return walletByUserId[0];
+	}
+
+	async getUserWithToken(token: string) {
+		let userInfo = await axios.get(
+			this.AUTH_MICRO_URL + '/api/v1/users/current-user',
+			{ headers: { Authorization: token } }
+		);
+		userInfo = userInfo.data;
+		const userByUserId = await this.dbUserInstance
+			.scan('Id')
+			.eq(userInfo.data.id)
+			.exec();
+		return userByUserId[0];
 	}
 
 	async getProviderIdByUserToken(token: string) {
@@ -3302,26 +3321,192 @@ export class WalletService {
 		}
 	}
 
-	async createRefund(createRefundsDto: CreateRefundsDto) {
-		// if (createRefundsDto.amount < 1) {
-		// 	throw new Error(`Error creating refunds invalid Amount`);
-		// }
-		// if (createRefundsDto.serviceProviderId) {
-		// 	const uuidRegex =
-		// 		/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-		// 	const idTest = uuidRegex.test(createRefundsDto.serviceProviderId);
-		// 	console.log(idTest);
-		// 	if (idTest === false) {
-		// 		throw new Error(`Error creating refunds invalid Service Provider Id`);
-		// 	}
-		// }
+	async createRefund(createRefundsDto: CreateRefundsDto, token: string) {
+		const amount = createRefundsDto.amount;
+		let walletAddressUrl = '';
+		let walletAddressId = '';
+		let userIdSend = '';
+		const resultTransaction = await this.transacctionByActivityId(
+			createRefundsDto.activityId
+		);
+		if (resultTransaction.length === 0) {
+			return {
+				statusCode: HttpStatus.BAD_REQUEST,
+				customCode: 'WGE0239',
+			};
+		}
+		let total = 0;
+		let scaleAsset = 6;
+		let serviceProviderId = '';
+		resultTransaction.map(transaction => {
+			if (
+				transaction.Type === 'OutgoingPayment' &&
+				transaction.Metadata.type === 'PROVIDER'
+			) {
+				const scale = transaction.ReceiveAmount.assetScale;
+				// const amountUpdated =
+				// 	transaction.ReceiveAmount.value * Math.pow(10, scale);
+				total += parseInt(transaction.ReceiveAmount.value);
+				scaleAsset = scale;
+				serviceProviderId = transaction.ReceiverUrl;
+				walletAddressUrl = transaction.SenderUrl;
+			}
+		});
+		const getWalletProvider = await this.getWalletByAddress(serviceProviderId);
+		if (!getWalletProvider) {
+			return {
+				statusCode: HttpStatus.BAD_REQUEST,
+				customCode: 'WGE0237',
+			};
+		}
+		walletAddressId = getWalletProvider.rafikiId;
+		userIdSend = getWalletProvider.providerId;
+		const amountUpdated = amount * Math.pow(10, scaleAsset);
+		if (amountUpdated > total) {
+			return {
+				statusCode: HttpStatus.BAD_REQUEST,
+				customCode: 'WGE0238',
+			};
+		}
+		const userWg = await this.getUserWithToken(token);
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'Roles',
+			Key: { Id: userWg.RoleId },
+		};
+		const resultRol = await docClient.get(params).promise();
+		const role = resultRol.Item;
+		let permissions;
+		if (userWg.Type === 'PROVIDER') {
+			permissions = validatePermisionssSp({
+				role,
+				requestedModuleId: 'RFSP',
+				requiredMethod: 'POST',
+				userId: userWg.Id,
+				serviceProviderId: userWg.ServiceProviderId,
+			});
+		} else if (userWg.Type === 'PLATFORM') {
+			permissions = validatePermissionsPl({
+				role,
+				requestedModuleId: 'DWG2',
+				requiredMethod: 'POST',
+				userId: userWg.Id,
+				serviceProviderId: getWalletProvider.providerId,
+			});
+		}
+		if (permissions.hasAccess !== true) {
+			return {
+				statusCode: HttpStatus.FORBIDDEN,
+				customCode: 'WGE0038',
+			};
+		}
 		const saveRefundsDto = {
-			ServiceProviderId: createRefundsDto.serviceProviderId,
-			Amount: createRefundsDto.amount,
+			ServiceProviderId: getWalletProvider.providerId,
+			Amount: amountUpdated,
 			Description: createRefundsDto.description,
 			ActivityId: createRefundsDto.activityId,
 		};
-		return convertToCamelCase(await this.dbRefunds.create(saveRefundsDto));
+		const refund = convertToCamelCase(
+			await this.dbRefunds.create(saveRefundsDto)
+		);
+
+		await this.createTransactionUser(
+			walletAddressId,
+			walletAddressUrl,
+			amountUpdated,
+			userIdSend,
+			'USD',
+			scaleAsset,
+			false
+		);
+
+		return refund;
+	}
+
+	async transacctionByActivityId(activityId: string) {
+		const params = {
+			TableName: 'Transactions',
+			FilterExpression: '#metadata.#activityId = :activityId',
+			ExpressionAttributeNames: {
+				'#metadata': 'Metadata',
+				'#activityId': 'activityId',
+			},
+			ExpressionAttributeValues: {
+				':activityId': activityId,
+			},
+		};
+
+		try {
+			const docClient = new DocumentClient();
+			const result = await docClient.scan(params).promise();
+			return result.Items;
+		} catch (error) {
+			console.error('Error fetching row:', error);
+			throw new Error(`Error fetching row: ${error.message}`);
+		}
+	}
+
+	async createTransactionUser(
+		walletAddressId: string,
+		walletAddressUrl: string,
+		amount: number,
+		userIdSend: string,
+		code: string,
+		scale: number,
+		sendEmail = true
+	) {
+		const userWallet = await this.getWalletByRafikyId(walletAddressId);
+		if (!userWallet) {
+			return {
+				statusCode: HttpStatus.NOT_FOUND,
+				customCode: 'WGE0074',
+			};
+		}
+		// await addApiSignatureHeader(req, req.body);
+		const inputReceiver = {
+			metadata: {
+				type: 'USER',
+				wgUser: userIdSend,
+				description: '',
+			},
+			incomingAmount: {
+				assetCode: code,
+				assetScale: scale,
+				value: adjustValue(amount, scale),
+			},
+			walletAddressUrl: walletAddressUrl,
+		};
+		const receiver = await this.createReceiver(inputReceiver);
+		const quoteInput = {
+			walletAddressId: walletAddressId,
+			receiver: receiver?.createReceiver?.receiver?.id,
+			receiveAmount: {
+				assetCode: code,
+				assetScale: scale,
+				value: adjustValue(amount, scale),
+			},
+		};
+		setTimeout(async () => {
+			const quote = await this.createQuote(quoteInput);
+
+			const inputOutgoing = {
+				walletAddressId: walletAddressId,
+				quoteId: quote?.createQuote?.quote?.id,
+				metadata: {
+					type: 'USER',
+					wgUser: userIdSend,
+					description: '',
+				},
+			};
+			const outgoingPayment = await this.createOutgoingPayment(inputOutgoing);
+			if (sendEmail) {
+				await this.sendMoneyMailConfirmation(inputOutgoing, outgoingPayment);
+			}
+			return {
+				data: outgoingPayment,
+				customCode: 'WGE0150',
+			};
+		}, 500);
 	}
 
 	async getRefunds(

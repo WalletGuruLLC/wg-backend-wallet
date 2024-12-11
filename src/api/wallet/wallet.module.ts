@@ -1,4 +1,9 @@
-import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
+import {
+	Module,
+	MiddlewareConsumer,
+	NestModule,
+	RequestMethod,
+} from '@nestjs/common';
 import { WalletController } from './controller/wallet.controller';
 import { WalletService } from './service/wallet.service';
 import { ConfigModule } from '@nestjs/config';
@@ -40,6 +45,9 @@ import { PaymentService } from './service/payments.service';
 })
 export class WalletModule implements NestModule {
 	configure(consumer: MiddlewareConsumer) {
-		consumer.apply(AccessControlMiddleware).forRoutes(WalletController);
+		consumer
+			.apply(AccessControlMiddleware)
+			.exclude({ path: 'api/v1/wallets/refunds', method: RequestMethod.POST })
+			.forRoutes(WalletController);
 	}
 }

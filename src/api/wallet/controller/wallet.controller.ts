@@ -37,6 +37,8 @@ import * as Sentry from '@sentry/nestjs';
 import { MapOfStringToList } from 'aws-sdk/clients/apigateway';
 import { convertToCamelCase } from 'src/utils/helpers/convertCamelCase';
 import { CreateRefundsDto } from '../dto/create-refunds.dto';
+import { DocumentClient } from 'aws-sdk/clients/dynamodb';
+import { validarPermisos } from '../../../utils/helpers/getAccessServiceProviders';
 
 @ApiTags('wallet')
 @Controller('api/v1/wallets')
@@ -414,8 +416,9 @@ export class WalletController {
 		@Headers() headers: MapOfStringToList,
 		@Res() res
 	) {
+		let token;
 		try {
-			const token = headers.authorization ?? '';
+			token = headers.authorization ?? '';
 			const instanceVerifier = await this.verifyService.getVerifiedFactory();
 			await instanceVerifier.verify(token.toString().split(' ')[1]);
 		} catch (error) {
@@ -427,16 +430,30 @@ export class WalletController {
 		}
 
 		try {
-			const result = await this.walletService.createRefund(createRefundsDto);
+			const result = await this.walletService.createRefund(
+				createRefundsDto,
+				token
+			);
 			if (result) {
+				if (result.statusCode) {
+					return res.status(result.statusCode).send({
+						statusCode: result.statusCode,
+						customCode: result.customCode,
+					});
+				}
 				return res.status(HttpStatus.OK).send({
 					statusCode: HttpStatus.OK,
 					customCode: 'WGE0232',
 					data: { refunds: result },
 				});
 			}
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.BAD_REQUEST,
+				customCode: 'WGE0231',
+			});
 		} catch (error) {
-			Sentry.captureException(error);
+			// Sentry.captureException(error);
+			console.log('Error in createRefund:', error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
 				customCode: 'WGE0231',
