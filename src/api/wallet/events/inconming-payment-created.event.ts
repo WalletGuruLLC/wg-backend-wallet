@@ -103,7 +103,8 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 				WalletAddressId: eventWebHookDTO?.data?.walletAddressId,
 				ReceiverUrl: recieverWallet?.walletAddress,
 				SenderUrl:
-					eventWebHookDTO?.data?.metadata?.type === 'REVENUE'
+					eventWebHookDTO?.data?.metadata?.type === 'REVENUE' ||
+					eventWebHookDTO?.data?.metadata?.type === 'REFUND'
 						? senderWalletValue?.walletAddress
 						: userWallet?.walletAddress,
 				State: 'PENDING',

@@ -3413,11 +3413,12 @@ export class WalletService {
 		await this.createTransactionUser(
 			walletAddressId,
 			walletAddressUrl,
-			amountUpdated,
+			amountUpdated / Math.pow(10, scaleAsset),
 			userIdSend,
 			'USD',
 			scaleAsset,
-			false
+			false,
+			'REFUND'
 		);
 
 		return refund;
@@ -3453,7 +3454,8 @@ export class WalletService {
 		userIdSend: string,
 		code: string,
 		scale: number,
-		sendEmail = true
+		sendEmail = true,
+		typeMetadata = 'USER'
 	) {
 		const userWallet = await this.getWalletByRafikyId(walletAddressId);
 		if (!userWallet) {
@@ -3463,9 +3465,9 @@ export class WalletService {
 			};
 		}
 		// await addApiSignatureHeader(req, req.body);
-		const inputReceiver = {
+		const inputReceiver: any = {
 			metadata: {
-				type: 'USER',
+				type: typeMetadata,
 				wgUser: userIdSend,
 				description: '',
 			},
@@ -3476,6 +3478,14 @@ export class WalletService {
 			},
 			walletAddressUrl: walletAddressUrl,
 		};
+		if (typeMetadata === 'REFUND') {
+			inputReceiver.metadata = {
+				type: typeMetadata,
+				wgUser: '',
+				description: '',
+				serviceProviderId: userIdSend,
+			};
+		}
 		const receiver = await this.createReceiver(inputReceiver);
 		const quoteInput = {
 			walletAddressId: walletAddressId,
@@ -3489,15 +3499,27 @@ export class WalletService {
 		setTimeout(async () => {
 			const quote = await this.createQuote(quoteInput);
 
-			const inputOutgoing = {
+			let inputOutgoing: any = {
 				walletAddressId: walletAddressId,
 				quoteId: quote?.createQuote?.quote?.id,
 				metadata: {
-					type: 'USER',
+					type: typeMetadata,
 					wgUser: userIdSend,
 					description: '',
 				},
 			};
+			if (typeMetadata === 'REFUND') {
+				inputOutgoing = {
+					walletAddressId: walletAddressId,
+					quoteId: quote?.createQuote?.quote?.id,
+					metadata: {
+						type: typeMetadata,
+						wgUser: '',
+						description: '',
+						serviceProviderId: userIdSend,
+					},
+				};
+			}
 			const outgoingPayment = await this.createOutgoingPayment(inputOutgoing);
 			if (sendEmail) {
 				await this.sendMoneyMailConfirmation(inputOutgoing, outgoingPayment);
