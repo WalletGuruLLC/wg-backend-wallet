@@ -2030,17 +2030,29 @@ export class WalletService {
 		walletAddress?: string
 	) {
 		const docClient = new DocumentClient();
-		console.log(userId);
-		const linkedProviders = await this.getLinkedProvidersUserById(userId);
-		const params: any = {
-			TableName: 'UserIncoming',
-			IndexName: 'UserIdIndex',
-			KeyConditionExpression: 'UserId = :userId',
-			ExpressionAttributeValues: {
-				':userId': userId,
-			},
-		};
-		console.log(params);
+
+		let params: any;
+		let linkedProviders;
+		if (userInfo.type === 'WALLET') {
+			linkedProviders = await this.getLinkedProvidersUserById(userId);
+			params = {
+				TableName: 'UserIncoming',
+				IndexName: 'UserIdIndex',
+				KeyConditionExpression: 'UserId = :userId',
+				ExpressionAttributeValues: {
+					':userId': userId,
+				},
+			};
+		} else if (userInfo.type === 'PROVIDER') {
+			params = {
+				TableName: 'UserIncoming',
+				IndexName: 'ServiceProviderIdIndex',
+				KeyConditionExpression: 'ServiceProviderId = :serviceProviderId',
+				ExpressionAttributeValues: {
+					':serviceProviderId': serviceProviderId,
+				},
+			};
+		}
 
 		if (status !== undefined) {
 			params.FilterExpression = '#status = :status';
@@ -2050,8 +2062,7 @@ export class WalletService {
 			params.ExpressionAttributeValues[':status'] =
 				parseStringToBoolean(status);
 		}
-
-		if (serviceProviderId) {
+		if (serviceProviderId && userInfo.type === 'WALLET') {
 			params.FilterExpression = params.FilterExpression
 				? `${params.FilterExpression} AND ServiceProviderId = :serviceProviderId`
 				: 'ServiceProviderId = :serviceProviderId';
@@ -2085,13 +2096,17 @@ export class WalletService {
 		}
 		try {
 			const result = await docClient.query(params).promise();
-
 			if (!result?.Items?.length) {
 				const expireDate = await this.expireDate();
 				const currentDate = await this.currentDate();
-				const provider = await this.getWalletByProviderId(
-					linkedProviders?.[0]?.serviceProviderId
-				);
+				let provider;
+				if (userInfo.type === 'WALLET') {
+					provider = await this.getWalletByProviderId(
+						linkedProviders?.[0]?.serviceProviderId
+					);
+				} else if (userInfo.type === 'PROVIDER') {
+					provider = await this.getWalletByProviderId(serviceProviderId);
+				}
 				if (!provider?.name) {
 					return [];
 				}
