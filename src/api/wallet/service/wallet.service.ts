@@ -1231,18 +1231,21 @@ export class WalletService {
 		userInfo?: any
 	) {
 		const userWallet = await this.getUserByToken(token);
-		const userLogged = await this.getUserInfoById(userWallet?.UserId);
+		// let userLogged;
+		// if (userInfo.type !== 'WALLET') {
+		// 	userLogged = await this.getUserInfoById(userWallet?.UserId);
+		// }
 		const startTimestamp = startDate ? new Date(startDate).getTime() : null;
 		const endTimestamp = endDate ? new Date(endDate).getTime() : null;
 		let userIncomingPayment: any[];
-		if (userLogged.type === 'PLATFORM') {
+		if (userInfo.type === 'PLATFORM') {
 			if (!serviceProviderId) {
-				serviceProviderId = userLogged.serviceProviderId;
+				serviceProviderId = userInfo.serviceProviderId;
 			}
 			const docClient = new DocumentClient();
 			const params = {
 				TableName: 'Roles',
-				Key: { Id: userLogged.roleId },
+				Key: { Id: userInfo.roleId },
 			};
 
 			const result = await docClient.get(params).promise();
@@ -1251,7 +1254,7 @@ export class WalletService {
 				role,
 				requestedModuleId: 'RF86',
 				requiredMethod: 'GET',
-				userId: userLogged.id,
+				userId: userInfo.id,
 				serviceProviderId,
 			});
 
@@ -1268,17 +1271,17 @@ export class WalletService {
 				endTimestamp,
 				walletAddress
 			);
-		} else if (userLogged.type === 'PROVIDER') {
+		} else if (userInfo.type === 'PROVIDER') {
 			userIncomingPayment = await this.getIncomingPaymentsByUser(
 				userWallet?.UserId,
 				state,
 				userInfo,
-				userLogged.serviceProviderId,
+				userInfo.serviceProviderId,
 				startTimestamp,
 				endTimestamp,
 				walletAddress
 			);
-		} else if (userLogged.type === 'WALLET') {
+		} else if (userInfo.type === 'WALLET') {
 			userIncomingPayment = await this.getIncomingPaymentsByUser(
 				userWallet?.UserId,
 				state,
@@ -2027,6 +2030,7 @@ export class WalletService {
 		walletAddress?: string
 	) {
 		const docClient = new DocumentClient();
+		console.log(userId);
 		const linkedProviders = await this.getLinkedProvidersUserById(userId);
 		const params: any = {
 			TableName: 'UserIncoming',
@@ -2036,6 +2040,7 @@ export class WalletService {
 				':userId': userId,
 			},
 		};
+		console.log(params);
 
 		if (status !== undefined) {
 			params.FilterExpression = '#status = :status';
@@ -3368,6 +3373,7 @@ export class WalletService {
 				customCode: 'WGE0238',
 			};
 		}
+		// VALIDATE PERMISSION BY ROL MODULE
 		const userWg = await this.getUserWithToken(token);
 		const docClient = new DocumentClient();
 		const params = {
@@ -3405,6 +3411,7 @@ export class WalletService {
 			Amount: amountUpdated,
 			Description: createRefundsDto.description,
 			ActivityId: createRefundsDto.activityId,
+			WalletAddress: walletAddressUrl,
 		};
 		const refund = convertToCamelCase(
 			await this.dbRefunds.create(saveRefundsDto)
@@ -3537,8 +3544,43 @@ export class WalletService {
 		items: string,
 		startDate: string,
 		endDate: string,
-		walletAddress: string
+		walletAddress: string,
+		token: string
 	) {
+		// VALIDATE PERMISSION BY ROL MODULE
+		const userWg = await this.getUserWithToken(token);
+		const docClient = new DocumentClient();
+		const params = {
+			TableName: 'Roles',
+			Key: { Id: userWg.RoleId },
+		};
+		const resultRol = await docClient.get(params).promise();
+		const role = resultRol.Item;
+		let permissions;
+		if (userWg.Type === 'PROVIDER') {
+			permissions = validatePermisionssSp({
+				role,
+				requestedModuleId: 'RFSP',
+				requiredMethod: 'GET',
+				userId: userWg.Id,
+				serviceProviderId: userWg.ServiceProviderId,
+			});
+			if (permissions.hasAccess !== true) {
+				return {
+					statusCode: HttpStatus.FORBIDDEN,
+					customCode: 'WGE0038',
+				};
+			}
+		} else if (userWg.Type === 'PLATFORM') {
+			// permissions = validatePermissionsPl({
+			// 	role,
+			// 	requestedModuleId: 'DWG2',
+			// 	requiredMethod: 'POST',
+			// 	userId: userWg.Id,
+			// 	serviceProviderId: getWalletProvider.providerId,
+			// });
+		}
+
 		const pageNumber = parseInt(page, 10) || 1;
 		const itemsNumber = parseInt(items, 10) || 10;
 
@@ -3566,6 +3608,25 @@ export class WalletService {
 		const refundsData = await scan.exec();
 
 		const convertedRefunds = convertToCamelCase(refundsData);
+
+		await Promise.all(
+			convertedRefunds.map(async refund => {
+				const getWalletProvider = await this.getWalletAddressByProviderId(
+					refund.serviceProviderId
+				);
+				const serviceProvider = await this.getProviderById(
+					refund.serviceProviderId
+				);
+				const getWalletuser = await this.getWalletByAddress(
+					refund.walletAddress
+				);
+				const dataUser = await this.getUserInfoById(getWalletuser.userId);
+				refund.userName = dataUser.firstName + ' ' + dataUser.lastName;
+				refund.walletServiceProvider = getWalletProvider.walletAddress;
+				refund.nameServiceProvider = serviceProvider.name;
+				// return refund;
+			})
+		);
 
 		if (!convertedRefunds.length) {
 			return {

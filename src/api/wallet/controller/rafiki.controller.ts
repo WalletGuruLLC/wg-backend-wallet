@@ -1992,8 +1992,7 @@ export class RafikiWalletController {
 					},
 				}
 			);
-			userInfo = userInfo.data;
-
+			userInfo = userInfo.data.data;
 			const incomingPayments = await this.walletService.listIncomingPayments(
 				token,
 				startDate,
@@ -2016,7 +2015,9 @@ export class RafikiWalletController {
 				data: { incomingPayments },
 			});
 		} catch (error) {
-			Sentry.captureException(error);
+			console.log(error);
+
+			// Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
 				customCode: 'WGE0137',
