@@ -1231,37 +1231,33 @@ export class WalletService {
 		userInfo?: any
 	) {
 		const userWallet = await this.getUserByToken(token);
-		// let userLogged;
-		// if (userInfo.type !== 'WALLET') {
-		// 	userLogged = await this.getUserInfoById(userWallet?.UserId);
-		// }
 		const startTimestamp = startDate ? new Date(startDate).getTime() : null;
 		const endTimestamp = endDate ? new Date(endDate).getTime() : null;
 		let userIncomingPayment: any[];
+
 		if (userInfo.type === 'PLATFORM') {
 			if (!serviceProviderId) {
-				serviceProviderId = userInfo.serviceProviderId;
+				// serviceProviderId = userInfo.serviceProviderId;
+			} else {
+				const docClient = new DocumentClient();
+				const params = {
+					TableName: 'Roles',
+					Key: { Id: userInfo.roleId },
+				};
+
+				const result = await docClient.get(params).promise();
+				const role = result.Item;
+				const permisos = validarPermisos({
+					role,
+					requestedModuleId: 'RF86',
+					requiredMethod: 'GET',
+					userId: userInfo.id,
+					serviceProviderId,
+				});
+				if (!permisos.hasAccess) {
+					return { customCode: permisos.customCode };
+				}
 			}
-			const docClient = new DocumentClient();
-			const params = {
-				TableName: 'Roles',
-				Key: { Id: userInfo.roleId },
-			};
-
-			const result = await docClient.get(params).promise();
-			const role = result.Item;
-			const permisos = validarPermisos({
-				role,
-				requestedModuleId: 'RF86',
-				requiredMethod: 'GET',
-				userId: userInfo.id,
-				serviceProviderId,
-			});
-
-			if (!permisos.hasAccess) {
-				return { customCode: permisos.customCode };
-			}
-
 			userIncomingPayment = await this.getIncomingPaymentsByUser(
 				userWallet?.UserId,
 				state,
@@ -2030,7 +2026,6 @@ export class WalletService {
 		walletAddress?: string
 	) {
 		const docClient = new DocumentClient();
-
 		let params: any;
 		let linkedProviders;
 		if (userInfo.type === 'WALLET') {
@@ -2052,6 +2047,11 @@ export class WalletService {
 					':serviceProviderId': serviceProviderId,
 				},
 			};
+		} else if (userInfo.type === 'PLATFORM') {
+			params = {
+				TableName: 'UserIncoming',
+				ExpressionAttributeValues: {},
+			};
 		}
 
 		if (status !== undefined) {
@@ -2062,7 +2062,7 @@ export class WalletService {
 			params.ExpressionAttributeValues[':status'] =
 				parseStringToBoolean(status);
 		}
-		if (serviceProviderId && userInfo.type === 'WALLET') {
+		if (serviceProviderId && userInfo.type !== 'PROVIDER') {
 			params.FilterExpression = params.FilterExpression
 				? `${params.FilterExpression} AND ServiceProviderId = :serviceProviderId`
 				: 'ServiceProviderId = :serviceProviderId';
@@ -2095,7 +2095,16 @@ export class WalletService {
 			params.ExpressionAttributeValues[':senderUrl'] = walletAddress;
 		}
 		try {
-			const result = await docClient.query(params).promise();
+			let result;
+			if (userInfo.type === 'WALLET' || userInfo.type === 'PROVIDER') {
+				result = await docClient.query(params).promise();
+			} else if (userInfo.type === 'PLATFORM') {
+				if (Object.keys(params.ExpressionAttributeValues).length === 0) {
+					delete params.ExpressionAttributeValues;
+				}
+				result = await docClient.scan(params).promise();
+			}
+
 			if (!result?.Items?.length) {
 				const expireDate = await this.expireDate();
 				const currentDate = await this.currentDate();
@@ -2107,7 +2116,7 @@ export class WalletService {
 				} else if (userInfo.type === 'PROVIDER') {
 					provider = await this.getWalletByProviderId(serviceProviderId);
 				}
-				if (!provider?.name) {
+				if (!provider?.name && userInfo.type !== 'PLATFORM') {
 					return [];
 				}
 				return [

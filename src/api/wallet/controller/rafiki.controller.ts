@@ -1982,7 +1982,6 @@ export class RafikiWalletController {
 				HttpStatus.UNAUTHORIZED
 			);
 		}
-
 		try {
 			let userInfo = await axios.get(
 				this.AUTH_MICRO_URL + '/api/v1/users/current-user',
