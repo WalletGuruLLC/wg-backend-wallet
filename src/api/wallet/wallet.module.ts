@@ -48,6 +48,10 @@ export class WalletModule implements NestModule {
 		consumer
 			.apply(AccessControlMiddleware)
 			.exclude({ path: 'api/v1/wallets/refunds', method: RequestMethod.POST })
+			.exclude({
+				path: 'api/v1/wallets/get/refunds',
+				method: RequestMethod.GET,
+			})
 			.forRoutes(WalletController);
 	}
 }

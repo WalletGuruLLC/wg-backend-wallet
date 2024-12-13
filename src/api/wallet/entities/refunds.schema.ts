@@ -29,6 +29,10 @@ export const RefundsSchema = new dynamoose.Schema(
 				name: 'ServiceProviderIdIndex',
 			},
 		},
+		WalletAddress: {
+			type: String,
+			required: false,
+		},
 	},
 	{
 		timestamps: {

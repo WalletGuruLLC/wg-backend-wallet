@@ -452,8 +452,8 @@ export class WalletController {
 				customCode: 'WGE0231',
 			});
 		} catch (error) {
-			// Sentry.captureException(error);
-			console.log('Error in createRefund:', error);
+			Sentry.captureException(error);
+			// console.log('Error in createRefund:', error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
 				customCode: 'WGE0231',
@@ -474,6 +474,7 @@ export class WalletController {
 	@Get('get/refunds')
 	async getRefunds(
 		@Res() res,
+		@Headers() headers: MapOfStringToList,
 		@Query('walletAddress') walletAddress?: string,
 		@Query('serviceProviderId') serviceProviderId?: string,
 		@Query('page') page?: string,
@@ -481,6 +482,18 @@ export class WalletController {
 		@Query('startDate') startDate?: string,
 		@Query('endDate') endDate?: string
 	) {
+		let token;
+		try {
+			token = headers.authorization ?? '';
+			const instanceVerifier = await this.verifyService.getVerifiedFactory();
+			await instanceVerifier.verify(token.toString().split(' ')[1]);
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.UNAUTHORIZED).send({
+				statusCode: HttpStatus.UNAUTHORIZED,
+				customCode: 'WGE0001',
+			});
+		}
 		try {
 			const result = await this.walletService.getRefunds(
 				serviceProviderId,
@@ -488,9 +501,16 @@ export class WalletController {
 				items,
 				startDate,
 				endDate,
-				walletAddress
+				walletAddress,
+				token
 			);
 			if (result) {
+				if (result.statusCode) {
+					return res.status(result.statusCode).send({
+						statusCode: result.statusCode,
+						customCode: result.customCode,
+					});
+				}
 				return res.status(HttpStatus.OK).send({
 					statusCode: HttpStatus.OK,
 					customCode: 'WGE0234',
