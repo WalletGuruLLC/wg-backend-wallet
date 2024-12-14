@@ -1228,8 +1228,14 @@ export class WalletService {
 		walletAddress?: string,
 		serviceProviderId?: string,
 		state?: any,
-		userInfo?: any
+		userInfo?: any,
+		page = '1',
+		items = '10',
+		search = ''
 	) {
+		const pageNumber = parseInt(page, 10);
+		let itemsNumber = parseInt(items, 10);
+
 		const userWallet = await this.getUserByToken(token);
 		const startTimestamp = startDate ? new Date(startDate).getTime() : null;
 		const endTimestamp = endDate ? new Date(endDate).getTime() : null;
@@ -1278,6 +1284,7 @@ export class WalletService {
 				walletAddress
 			);
 		} else if (userInfo.type === 'WALLET') {
+			itemsNumber = 1000;
 			userIncomingPayment = await this.getIncomingPaymentsByUser(
 				userWallet?.UserId,
 				state,
@@ -1288,9 +1295,27 @@ export class WalletService {
 				walletAddress
 			);
 		}
-
 		if (userIncomingPayment?.[0]?.state == 'BLANK') {
-			return userIncomingPayment;
+			if (search !== '') {
+				userIncomingPayment = userIncomingPayment.filter(payment =>
+					payment.ownerUser.toLowerCase().includes(search.toLowerCase())
+				);
+			}
+			const allIncomingPayments = userIncomingPayment;
+			const startIndex = (pageNumber - 1) * itemsNumber;
+			const endIndex = Math.min(
+				startIndex + itemsNumber,
+				allIncomingPayments.length
+			);
+
+			const paginatedRefunds = allIncomingPayments.slice(startIndex, endIndex);
+
+			return {
+				incomingPayments: paginatedRefunds,
+				totalItems: allIncomingPayments.length,
+				currentPage: pageNumber,
+				totalPages: Math.ceil(allIncomingPayments.length / itemsNumber),
+			};
 		}
 
 		const incomingPayments = [];
@@ -1300,7 +1325,12 @@ export class WalletService {
 				const incomingPayment = await this.getIncomingPayment(
 					userIncomingPayment?.incomingPaymentId
 				);
-				const user = await this.getWalletUserById(userWallet?.UserId);
+				let user;
+				if (userInfo.type === 'WALLET') {
+					user = await this.getWalletUserById(userWallet?.UserId);
+				} else {
+					user = await this.getUserInfoById(userIncomingPayment.userId);
+				}
 
 				const providerWallet = await this.getWalletByRafikyId(
 					incomingPayment.walletAddressId
@@ -1330,6 +1360,7 @@ export class WalletService {
 						id: updatedIncomingPayment.id,
 						provider: provider.name,
 						ownerUser: `${user?.firstName} ${user?.lastName}`,
+						status: userIncomingPayment.status,
 						state: updatedIncomingPayment.state,
 						incomingAmount: updatedIncomingPayment?.incomingAmount,
 						createdAt: updatedIncomingPayment.createdAt,
@@ -1345,7 +1376,29 @@ export class WalletService {
 				new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
 		);
 
-		return convertToCamelCase(incomingSorted);
+		let allIncomingPayments;
+
+		if (search !== '') {
+			allIncomingPayments = incomingPayments.filter(payment =>
+				payment.ownerUser.toLowerCase().includes(search.toLowerCase())
+			);
+		} else {
+			allIncomingPayments = convertToCamelCase(incomingSorted);
+		}
+		const startIndex = (pageNumber - 1) * itemsNumber;
+		const endIndex = Math.min(
+			startIndex + itemsNumber,
+			allIncomingPayments.length
+		);
+
+		const paginatedRefunds = allIncomingPayments.slice(startIndex, endIndex);
+
+		return {
+			incomingPayments: paginatedRefunds,
+			totalItems: allIncomingPayments.length,
+			currentPage: pageNumber,
+			totalPages: Math.ceil(allIncomingPayments.length / itemsNumber),
+		};
 	}
 
 	async listClearPayments(filters, provider) {
@@ -2104,7 +2157,6 @@ export class WalletService {
 				}
 				result = await docClient.scan(params).promise();
 			}
-
 			if (!result?.Items?.length) {
 				const expireDate = await this.expireDate();
 				const currentDate = await this.currentDate();

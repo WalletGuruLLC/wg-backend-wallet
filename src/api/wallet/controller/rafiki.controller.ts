@@ -72,6 +72,7 @@ import {
 import { toBase64 } from 'src/utils/helpers/openPaymentSignature';
 import { GraphqlService } from 'src/graphql/graphql.service';
 import { calcularTotalCostoWalletGuru } from '../../../utils/helpers/calcularCostoWalletGuru';
+import { json } from 'express';
 
 @ApiTags('wallet-rafiki')
 @Controller('api/v1/wallets-rafiki')
@@ -1953,6 +1954,9 @@ export class RafikiWalletController {
 	@ApiQuery({ name: 'endDate', required: false, type: String })
 	@ApiQuery({ name: 'walletAddress', required: false, type: String })
 	@ApiQuery({ name: 'serviceProviderId', required: false, type: String })
+	@ApiQuery({ name: 'page', required: false, type: String })
+	@ApiQuery({ name: 'items', required: false, type: String })
+	@ApiQuery({ name: 'search', required: false, type: String })
 	@ApiOperation({ summary: 'List all incoming payments' })
 	@ApiBearerAuth('JWT')
 	@ApiOkResponse({ description: 'Incoming payments retrieved successfully.' })
@@ -1965,7 +1969,10 @@ export class RafikiWalletController {
 		@Query('startDate') startDate?: string,
 		@Query('endDate') endDate?: string,
 		@Query('walletAddress') walletAddress?: string,
-		@Query('serviceProviderId') serviceProviderId?: string
+		@Query('serviceProviderId') serviceProviderId?: string,
+		@Query('page') page?: string,
+		@Query('items') items?: string,
+		@Query('search') search?: string
 	) {
 		let token;
 		try {
@@ -1999,7 +2006,10 @@ export class RafikiWalletController {
 				walletAddress,
 				serviceProviderId,
 				status,
-				userInfo
+				userInfo,
+				page,
+				items,
+				search
 			);
 
 			if (incomingPayments?.customCode) {
@@ -2011,7 +2021,7 @@ export class RafikiWalletController {
 			return res.status(HttpStatus.OK).send({
 				statusCode: HttpStatus.OK,
 				customCode: 'WGS0138',
-				data: { incomingPayments },
+				data: incomingPayments,
 			});
 		} catch (error) {
 			console.log(error);
