@@ -1,6 +1,6 @@
 export function validatePassword(password) {
 	const minLength = 8;
-	const maxLength = 12;
+	const maxLength = 20;
 	const error = 'Password does not meet the required criteria';
 
 	if (password.length < minLength || password.length > maxLength) {
