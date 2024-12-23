@@ -407,8 +407,8 @@ export class WalletController {
 	}
 
 	@Post('/refunds')
-	@ApiOperation({ summary: 'Create a new wallet' })
-	@ApiCreatedResponse({ description: 'Wallet successfully created.' })
+	@ApiOperation({ summary: 'Create a new refund' })
+	@ApiCreatedResponse({ description: 'Refund created.' })
 	@ApiForbiddenResponse({ description: 'Forbidden access.' })
 	@ApiBearerAuth('JWT')
 	async createRefund(
