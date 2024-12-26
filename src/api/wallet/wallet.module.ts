@@ -52,6 +52,10 @@ export class WalletModule implements NestModule {
 				path: 'api/v1/wallets/get/refunds',
 				method: RequestMethod.GET,
 			})
+			.exclude({
+				path: 'api/v1/wallets/info',
+				method: RequestMethod.GET,
+			})
 			.forRoutes(WalletController);
 	}
 }

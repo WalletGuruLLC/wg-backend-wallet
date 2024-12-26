@@ -96,6 +96,81 @@ export class WalletController {
 		}
 	}
 
+	@ApiOperation({ summary: 'Return info wallet' })
+	@ApiQuery({ name: 'address', required: false, type: String })
+	@ApiBearerAuth('JWT')
+	@ApiOkResponse({ description: 'Wallet address info' })
+	@ApiResponse({ status: 206, description: 'Incomplete parameters.' })
+	@ApiResponse({ status: 401, description: 'Unauthorized access.' })
+	@ApiResponse({ status: 500, description: 'Server error.' })
+	@Get('/info')
+	async getWalletAddressUser(
+		@Query('address') address: string,
+		@Headers() headers: MapOfStringToList,
+		@Res() res
+	) {
+		try {
+			try {
+				const token = headers.authorization ?? '';
+				const instanceVerifier = await this.verifyService.getVerifiedFactory();
+				await instanceVerifier.verify(token.toString().split(' ')[1]);
+			} catch (error) {
+				Sentry.captureException(error);
+				return res.status(HttpStatus.UNAUTHORIZED).send({
+					statusCode: HttpStatus.UNAUTHORIZED,
+					customCode: 'WGE0001',
+				});
+			}
+
+			if (!address) {
+				return res.status(HttpStatus.PARTIAL_CONTENT).send({
+					statusCode: HttpStatus.PARTIAL_CONTENT,
+					customCode: 'WGE0134',
+				});
+			}
+			const walletFind = await this.walletService.getWalletByAddressRegex(
+				address
+			);
+
+			let fullName = '';
+			if (walletFind?.userId != undefined) {
+				const nameUser = await this.walletService.getUserInfoById(
+					walletFind?.userId
+				);
+				fullName = nameUser?.firstName + ' ' + nameUser?.lastName;
+			}
+
+			const dataResponse = {
+				id: walletFind?.id,
+				name: walletFind?.name,
+				walletType: walletFind?.walletType,
+				walletAddress: walletFind?.walletAddress,
+				active: walletFind?.active,
+				userId: walletFind?.userId,
+				providerId: walletFind?.providerId,
+				nameUser: walletFind?.userId == undefined ? undefined : fullName,
+				nameProvider:
+					walletFind?.providerId == undefined
+						? undefined
+						: (await this.walletService.getProviderById(walletFind?.providerId))
+								.name,
+			};
+
+			return res.status(HttpStatus.OK).send({
+				statusCode:
+					walletFind == undefined ? HttpStatus.NOT_FOUND : HttpStatus.OK,
+				customCode: walletFind == undefined ? 'WGE0074' : 'WGE0077',
+				data: dataResponse,
+			});
+		} catch (error) {
+			Sentry.captureException(error);
+			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+				customCode: 'WGE0078',
+			});
+		}
+	}
+
 	//CONTROLLER TO ADD A WALLET
 	@Post('/')
 	@ApiOperation({ summary: 'Create a new wallet' })
