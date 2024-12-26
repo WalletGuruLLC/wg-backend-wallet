@@ -3281,7 +3281,7 @@ export class WalletService {
 
 			const startDate = new Date(
 				now.getFullYear(),
-				now.getMonth(),
+				now.getMonth() - 1,
 				1,
 				0,
 				0,
@@ -3291,7 +3291,7 @@ export class WalletService {
 
 			const endDate = new Date(
 				now.getFullYear(),
-				now.getMonth() + 1,
+				now.getMonth(),
 				0,
 				23,
 				59,
