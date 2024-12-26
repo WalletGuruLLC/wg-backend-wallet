@@ -3281,7 +3281,7 @@ export class WalletService {
 
 			const startDate = new Date(
 				now.getFullYear(),
-				now.getMonth() - 1,
+				now.getMonth(),
 				1,
 				0,
 				0,
@@ -3291,14 +3291,13 @@ export class WalletService {
 
 			const endDate = new Date(
 				now.getFullYear(),
-				now.getMonth(),
+				now.getMonth() + 1,
 				0,
 				23,
 				59,
 				59,
 				999
 			);
-
 			Promise.all(
 				providers.map(async provider => {
 					const providerWallet = await this.getWalletAddressByProviderId(
@@ -3343,15 +3342,35 @@ export class WalletService {
 							scale
 						);
 
+						const getRefunds = await this.getRefunds(
+							provider?.id,
+							'1',
+							'100000',
+							`${
+								startDate.getMonth() + 1
+							}/${startDate.getDate()}/${startDate.getFullYear()}`,
+							`${
+								endDate.getMonth() + 1
+							}/${endDate.getDate()}/${endDate.getFullYear()}`,
+							'',
+							'',
+							false
+						);
+						let refunds = 0;
+						getRefunds.items.map(async refund => {
+							refunds += refund.amount;
+						});
+
 						const createProviderRevenueDTO = {
 							ServiceProviderId: provider?.id,
 							Value: totalAmount,
 							StartDate: startDate.getTime(),
 							EndDate: endDate.getTime(),
-							Fees: fees,
+							Fees: fees * transactions?.length,
 							TransactionIds: transactionIds,
-							Month: startDate.getMonth(),
+							Month: startDate.getMonth() + 1,
 							Year: startDate.getFullYear(),
+							Refunds: refunds,
 						};
 						await this.dbClearPayments.create(createProviderRevenueDTO);
 					}
@@ -3621,42 +3640,44 @@ export class WalletService {
 		startDate: string,
 		endDate: string,
 		walletAddress: string,
-		token: string
+		token: string,
+		validateToken = true
 	) {
 		// VALIDATE PERMISSION BY ROL MODULE
-		const userWg = await this.getUserWithToken(token);
-		const docClient = new DocumentClient();
-		const params = {
-			TableName: 'Roles',
-			Key: { Id: userWg.RoleId },
-		};
-		const resultRol = await docClient.get(params).promise();
-		const role = resultRol.Item;
-		let permissions;
-		if (userWg.Type === 'PROVIDER') {
-			permissions = validatePermisionssSp({
-				role,
-				requestedModuleId: 'RFSP',
-				requiredMethod: 'GET',
-				userId: userWg.Id,
-				serviceProviderId: userWg.ServiceProviderId,
-			});
-			if (permissions.hasAccess !== true) {
-				return {
-					statusCode: HttpStatus.FORBIDDEN,
-					customCode: 'WGE0038',
-				};
+		if (validateToken) {
+			const userWg = await this.getUserWithToken(token);
+			const docClient = new DocumentClient();
+			const params = {
+				TableName: 'Roles',
+				Key: { Id: userWg.RoleId },
+			};
+			const resultRol = await docClient.get(params).promise();
+			const role = resultRol.Item;
+			let permissions;
+			if (userWg.Type === 'PROVIDER') {
+				permissions = validatePermisionssSp({
+					role,
+					requestedModuleId: 'RFSP',
+					requiredMethod: 'GET',
+					userId: userWg.Id,
+					serviceProviderId: userWg.ServiceProviderId,
+				});
+				if (permissions.hasAccess !== true) {
+					return {
+						statusCode: HttpStatus.FORBIDDEN,
+						customCode: 'WGE0038',
+					};
+				}
+			} else if (userWg.Type === 'PLATFORM') {
+				// permissions = validatePermissionsPl({
+				// 	role,
+				// 	requestedModuleId: 'DWG2',
+				// 	requiredMethod: 'POST',
+				// 	userId: userWg.Id,
+				// 	serviceProviderId: getWalletProvider.providerId,
+				// });
 			}
-		} else if (userWg.Type === 'PLATFORM') {
-			// permissions = validatePermissionsPl({
-			// 	role,
-			// 	requestedModuleId: 'DWG2',
-			// 	requiredMethod: 'POST',
-			// 	userId: userWg.Id,
-			// 	serviceProviderId: getWalletProvider.providerId,
-			// });
 		}
-
 		const pageNumber = parseInt(page, 10) || 1;
 		const itemsNumber = parseInt(items, 10) || 10;
 
@@ -3735,7 +3756,6 @@ export class WalletService {
 		endDate?: string
 	) {
 		const docClient = new DocumentClient();
-
 		try {
 			const params: DocumentClient.ScanInput = {
 				TableName: 'ProviderRevenues',

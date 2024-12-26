@@ -14,4 +14,5 @@ export class ClearPayments extends Document {
 	State?: boolean;
 	Month?: number;
 	Year?: number;
+	Refunds?: number;
 }
