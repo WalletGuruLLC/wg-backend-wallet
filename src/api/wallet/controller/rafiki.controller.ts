@@ -1331,10 +1331,12 @@ export class RafikiWalletController {
 			}
 
 			const balance =
-				userWallet?.walletDb?.postedCredits -
-				(userWallet?.walletDb?.pendingDebits +
-					userWallet?.walletDb?.postedDebits);
-
+				userWallet?.postedCredits -
+				(userWallet?.pendingDebits + userWallet?.postedDebits);
+			console.log(
+				balance,
+				adjustValue(input?.amount, userWalletByToken?.walletAsset?.scale)
+			);
 			if (
 				adjustValue(input?.amount, userWalletByToken?.walletAsset?.scale) >
 				balance
