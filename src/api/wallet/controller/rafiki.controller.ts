@@ -1335,7 +1335,10 @@ export class RafikiWalletController {
 				(userWallet?.walletDb?.pendingDebits +
 					userWallet?.walletDb?.postedDebits);
 
-			if (input?.amount > balance) {
+			if (
+				adjustValue(input?.amount, userWalletByToken?.walletAsset?.scale) >
+				balance
+			) {
 				return res.status(HttpStatus.BAD_REQUEST).send({
 					statusCode: HttpStatus.BAD_REQUEST,
 					customCode: 'WGE0079',
