@@ -1330,7 +1330,12 @@ export class RafikiWalletController {
 				});
 			}
 
-			if (input?.amount > userWalletByToken?.walletDb?.balance) {
+			const balance =
+				userWallet?.walletDb?.postedCredits -
+				(userWallet?.walletDb?.pendingDebits +
+					userWallet?.walletDb?.postedDebits);
+
+			if (input?.amount > balance) {
 				return res.status(HttpStatus.BAD_REQUEST).send({
 					statusCode: HttpStatus.BAD_REQUEST,
 					customCode: 'WGE0079',
