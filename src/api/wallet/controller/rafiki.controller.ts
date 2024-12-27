@@ -1333,10 +1333,10 @@ export class RafikiWalletController {
 			const balance =
 				userWallet?.postedCredits -
 				(userWallet?.pendingDebits + userWallet?.postedDebits);
-			console.log(
-				balance,
-				adjustValue(input?.amount, userWalletByToken?.walletAsset?.scale)
-			);
+			// console.log(
+			// 	balance,
+			// 	adjustValue(input?.amount, userWalletByToken?.walletAsset?.scale)
+			// );
 			if (
 				adjustValue(input?.amount, userWalletByToken?.walletAsset?.scale) >
 				balance
