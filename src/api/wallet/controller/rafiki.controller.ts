@@ -1322,6 +1322,21 @@ export class RafikiWalletController {
 					customCode: 'WGE0021',
 				});
 			}
+
+			if (input?.amount <= 0) {
+				return res.status(HttpStatus.BAD_REQUEST).send({
+					statusCode: HttpStatus.BAD_REQUEST,
+					customCode: 'WGE0075',
+				});
+			}
+
+			if (input?.amount > userWalletByToken?.walletDb?.balance) {
+				return res.status(HttpStatus.BAD_REQUEST).send({
+					statusCode: HttpStatus.BAD_REQUEST,
+					customCode: 'WGE0079',
+				});
+			}
+
 			await addApiSignatureHeader(req, req.body);
 			const inputReceiver = {
 				metadata: {
