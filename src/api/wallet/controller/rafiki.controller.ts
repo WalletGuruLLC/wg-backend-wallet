@@ -799,10 +799,32 @@ export class RafikiWalletController {
 				filters,
 				userTypeInfo
 			);
-			await this.walletService.generateCsv(
-				res,
-				paginatedTransactions?.transactions
+
+			const transactions = paginatedTransactions?.transactions.map(
+				({
+					createdAt,
+					state,
+					type,
+					updatedAt,
+					metadata,
+					receiveAmount,
+					incomingAmount,
+					senderName,
+					receiverName,
+				}) => ({
+					createdAt,
+					state,
+					type,
+					updatedAt,
+					metadata,
+					receiveAmount,
+					incomingAmount,
+					senderName,
+					receiverName,
+				})
 			);
+
+			await this.walletService.generateCsv(res, transactions);
 		} catch (error) {
 			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
@@ -940,10 +962,31 @@ export class RafikiWalletController {
 				filters,
 				userTypeInfo
 			);
-			await this.walletService.generateCsv(
-				res,
-				paginatedTransactions?.transactions
+			const transactions = paginatedTransactions?.transactions.map(
+				({
+					createdAt,
+					state,
+					type,
+					updatedAt,
+					metadata,
+					receiveAmount,
+					incomingAmount,
+					senderName,
+					receiverName,
+				}) => ({
+					createdAt,
+					state,
+					type,
+					updatedAt,
+					metadata,
+					receiveAmount,
+					incomingAmount,
+					senderName,
+					receiverName,
+				})
 			);
+
+			await this.walletService.generateCsv(res, transactions);
 		} catch (error) {
 			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
@@ -1097,10 +1140,33 @@ export class RafikiWalletController {
 				filters,
 				userTypeInfo
 			);
-			await this.walletService.generateCsv(
-				res,
-				paginatedTransactions?.transactions
+
+			const transactions = paginatedTransactions?.transactions.map(
+				({
+					createdAt,
+					state,
+					type,
+					updatedAt,
+					metadata,
+					receiveAmount,
+					incomingAmount,
+					senderName,
+					receiverName,
+				}) => ({
+					createdAt,
+					state,
+					type,
+					updatedAt,
+					metadata,
+					receiveAmount,
+					incomingAmount,
+					senderName,
+					receiverName,
+				})
 			);
+			console.log(transactions);
+
+			await this.walletService.generateCsv(res, transactions);
 		} catch (error) {
 			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
@@ -1250,10 +1316,31 @@ export class RafikiWalletController {
 				filters,
 				userTypeInfo
 			);
-			await this.walletService.generateCsv(
-				res,
-				paginatedTransactions?.transactions
+			const transactions = paginatedTransactions?.transactions.map(
+				({
+					createdAt,
+					state,
+					type,
+					updatedAt,
+					metadata,
+					receiveAmount,
+					incomingAmount,
+					senderName,
+					receiverName,
+				}) => ({
+					createdAt,
+					state,
+					type,
+					updatedAt,
+					metadata,
+					receiveAmount,
+					incomingAmount,
+					senderName,
+					receiverName,
+				})
 			);
+
+			await this.walletService.generateCsv(res, transactions);
 		} catch (error) {
 			Sentry.captureException(error);
 			return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({

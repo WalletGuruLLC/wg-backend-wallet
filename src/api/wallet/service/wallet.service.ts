@@ -1354,7 +1354,6 @@ export class WalletService {
 							).toString(),
 						},
 					};
-
 					const incomingConverted = {
 						type: updatedIncomingPayment.__typename,
 						id: updatedIncomingPayment.id,
@@ -1365,6 +1364,8 @@ export class WalletService {
 						incomingAmount: updatedIncomingPayment?.incomingAmount,
 						createdAt: updatedIncomingPayment.createdAt,
 						expiresAt: updatedIncomingPayment?.expiresAt,
+						receiverUrl: userIncomingPayment.receiverUrl,
+						senderUrl: userIncomingPayment.senderUrl,
 					};
 					incomingPayments.push(incomingConverted);
 				}
