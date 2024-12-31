@@ -3427,6 +3427,7 @@ export class WalletService {
 		let walletAddressUrl = '';
 		let walletAddressId = '';
 		let userIdSend = '';
+		let activityIdDiferentSP = false;
 		const resultTransaction = await this.transacctionByActivityId(
 			createRefundsDto.activityId
 		);
@@ -3451,8 +3452,17 @@ export class WalletService {
 				scaleAsset = scale;
 				serviceProviderId = transaction.ReceiverUrl;
 				walletAddressUrl = transaction.SenderUrl;
+				if (transaction.ReceiverUrl !== createRefundsDto.serviceProviderId) {
+					activityIdDiferentSP = true;
+				}
 			}
 		});
+		if (activityIdDiferentSP) {
+			return {
+				statusCode: HttpStatus.BAD_REQUEST,
+				customCode: 'WGE0240',
+			};
+		}
 		const getWalletProvider = await this.getWalletByAddress(serviceProviderId);
 		if (!getWalletProvider) {
 			return {
@@ -3460,6 +3470,7 @@ export class WalletService {
 				customCode: 'WGE0237',
 			};
 		}
+
 		walletAddressId = getWalletProvider.rafikiId;
 		userIdSend = getWalletProvider.providerId;
 		const amountUpdated = amount * Math.pow(10, scaleAsset);
