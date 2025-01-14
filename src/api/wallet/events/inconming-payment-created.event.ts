@@ -33,7 +33,7 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 		const providerId = eventWebHookDTO?.data?.metadata?.serviceProviderId;
 
 		const credits =
-			(wallet.pendingCredits || 0) +
+			(wallet?.pendingCredits || 0) +
 			parseInt(eventWebHookDTO.data.incomingAmount.value);
 
 		const params = {
