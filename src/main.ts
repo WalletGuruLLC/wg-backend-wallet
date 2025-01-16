@@ -6,6 +6,7 @@ import * as Sentry from '@sentry/nestjs';
 import * as cookieParser from 'cookie-parser';
 import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import { SecretsService } from './utils/secrets.service';
+import redocExpressMiddleware from 'redoc-express';
 
 async function bootstrap() {
 	const secretsService = new SecretsService();
@@ -35,7 +36,7 @@ async function bootstrap() {
 		.setDescription(
 			'Comprehensive documentation for the Wallet Guru API, detailing the wallet service and its endpoints'
 		)
-		.addServer('http://localhost:3000/', 'Local environment')
+		.addServer('http://localhost:3001/', 'Local environment')
 		.addServer('https://dev.wallet.walletguru.co/', 'Dev environment')
 		.addServer('https://qa.wallet.walletguru.co/', 'QA environment')
 		.addServer('https://stg.wallet.walletguru.co/', 'Stg environment')
@@ -57,6 +58,13 @@ async function bootstrap() {
 		credentials: true,
 		methods: 'GET,POST,PUT,DELETE,PATCH',
 	});
+	const redocOptions = {
+		title: 'Wallet Guru API Documentation',
+		version: '1.0',
+		specUrl: '/docs-json',
+	};
+
+	app.use('/redocs', redocExpressMiddleware(redocOptions));
 
 	await app.listen(3000);
 }
