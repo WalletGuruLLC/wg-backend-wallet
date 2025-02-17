@@ -800,27 +800,61 @@ export class RafikiWalletController {
 				userTypeInfo
 			);
 
-			const transactions = paginatedTransactions?.transactions.map(
-				({
-					createdAt,
-					state,
-					type,
-					updatedAt,
-					metadata,
-					receiveAmount,
-					incomingAmount,
-					senderName,
-					receiverName,
-				}) => ({
-					createdAt,
-					state,
-					type,
-					updatedAt,
-					metadata,
-					receiveAmount,
-					incomingAmount,
-					senderName,
-					receiverName,
+			const transactions = await Promise.all(
+				paginatedTransactions?.transactions.map(async (transaction: any) => {
+					const {
+						createdAt,
+						state,
+						type,
+						updatedAt,
+						metadata,
+						receiveAmount,
+						incomingAmount,
+						senderName,
+						receiverName,
+						outgoingPaymentId,
+					} = transaction;
+
+					let outgoingPaymentInfo = {
+						assetCode: null,
+						assetScale: null,
+						value: null,
+					};
+
+					if (outgoingPaymentId) {
+						try {
+							const testPaymentAmount =
+								await this.walletService.getOutgoingPayment(outgoingPaymentId);
+							const sentAmount = testPaymentAmount?.outgoingPayment?.sentAmount;
+							if (sentAmount) {
+								outgoingPaymentInfo = {
+									assetCode: sentAmount.assetCode,
+									assetScale: sentAmount.assetScale,
+									value: sentAmount.value,
+								};
+							}
+						} catch (error) {
+							console.error(
+								`Error al obtener el outgoingPayment para ID: ${outgoingPaymentId}`,
+								error
+							);
+						}
+					}
+
+					return {
+						createdAt: new Date(createdAt).toLocaleDateString('en-US'),
+						updatedAt: new Date(updatedAt).toLocaleDateString('en-US'),
+						state,
+						type,
+						metadata,
+						receiveAmount,
+						incomingAmount,
+						senderName,
+						receiverName,
+						outgoingPaymentAssetCode: outgoingPaymentInfo?.assetCode,
+						outgoingPaymentAssetScale: outgoingPaymentInfo?.assetScale,
+						outgoingPaymentValue: outgoingPaymentInfo?.value,
+					};
 				})
 			);
 
@@ -962,27 +996,61 @@ export class RafikiWalletController {
 				filters,
 				userTypeInfo
 			);
-			const transactions = paginatedTransactions?.transactions.map(
-				({
-					createdAt,
-					state,
-					type,
-					updatedAt,
-					metadata,
-					receiveAmount,
-					incomingAmount,
-					senderName,
-					receiverName,
-				}) => ({
-					createdAt,
-					state,
-					type,
-					updatedAt,
-					metadata,
-					receiveAmount,
-					incomingAmount,
-					senderName,
-					receiverName,
+			const transactions = await Promise.all(
+				paginatedTransactions?.transactions.map(async (transaction: any) => {
+					const {
+						createdAt,
+						state,
+						type,
+						updatedAt,
+						metadata,
+						receiveAmount,
+						incomingAmount,
+						senderName,
+						receiverName,
+						outgoingPaymentId,
+					} = transaction;
+
+					let outgoingPaymentInfo = {
+						assetCode: null,
+						assetScale: null,
+						value: null,
+					};
+
+					if (outgoingPaymentId) {
+						try {
+							const testPaymentAmount =
+								await this.walletService.getOutgoingPayment(outgoingPaymentId);
+							const sentAmount = testPaymentAmount?.outgoingPayment?.sentAmount;
+							if (sentAmount) {
+								outgoingPaymentInfo = {
+									assetCode: sentAmount.assetCode,
+									assetScale: sentAmount.assetScale,
+									value: sentAmount.value,
+								};
+							}
+						} catch (error) {
+							console.error(
+								`Error al obtener el outgoingPayment para ID: ${outgoingPaymentId}`,
+								error
+							);
+						}
+					}
+
+					return {
+						createdAt: new Date(createdAt).toLocaleDateString('en-US'),
+						updatedAt: new Date(updatedAt).toLocaleDateString('en-US'),
+						state,
+						type,
+						metadata,
+						receiveAmount,
+						incomingAmount,
+						senderName,
+						receiverName,
+						outgoingPaymentAssetCode: outgoingPaymentInfo?.assetCode,
+						outgoingPaymentAssetScale: outgoingPaymentInfo?.assetScale,
+						outgoingPaymentValue: outgoingPaymentInfo?.value,
+					};
 				})
 			);
 
@@ -1141,27 +1209,61 @@ export class RafikiWalletController {
 				userTypeInfo
 			);
 
-			const transactions = paginatedTransactions?.transactions.map(
-				({
-					createdAt,
-					state,
-					type,
-					updatedAt,
-					metadata,
-					receiveAmount,
-					incomingAmount,
-					senderName,
-					receiverName,
-				}) => ({
-					createdAt,
-					state,
-					type,
-					updatedAt,
-					metadata,
-					receiveAmount,
-					incomingAmount,
-					senderName,
-					receiverName,
+			const transactions = await Promise.all(
+				paginatedTransactions?.transactions.map(async (transaction: any) => {
+					const {
+						createdAt,
+						state,
+						type,
+						updatedAt,
+						metadata,
+						receiveAmount,
+						incomingAmount,
+						senderName,
+						receiverName,
+						outgoingPaymentId,
+					} = transaction;
+
+					let outgoingPaymentInfo = {
+						assetCode: null,
+						assetScale: null,
+						value: null,
+					};
+
+					if (outgoingPaymentId) {
+						try {
+							const testPaymentAmount =
+								await this.walletService.getOutgoingPayment(outgoingPaymentId);
+							const sentAmount = testPaymentAmount?.outgoingPayment?.sentAmount;
+							if (sentAmount) {
+								outgoingPaymentInfo = {
+									assetCode: sentAmount.assetCode,
+									assetScale: sentAmount.assetScale,
+									value: sentAmount.value,
+								};
+							}
+						} catch (error) {
+							console.error(
+								`Error al obtener el outgoingPayment para ID: ${outgoingPaymentId}`,
+								error
+							);
+						}
+					}
+
+					return {
+						createdAt: new Date(createdAt).toLocaleDateString('en-US'),
+						updatedAt: new Date(updatedAt).toLocaleDateString('en-US'),
+						state,
+						type,
+						metadata,
+						receiveAmount,
+						incomingAmount,
+						senderName,
+						receiverName,
+						outgoingPaymentAssetCode: outgoingPaymentInfo?.assetCode,
+						outgoingPaymentAssetScale: outgoingPaymentInfo?.assetScale,
+						outgoingPaymentValue: outgoingPaymentInfo?.value,
+					};
 				})
 			);
 			console.log(transactions);
@@ -1316,27 +1418,62 @@ export class RafikiWalletController {
 				filters,
 				userTypeInfo
 			);
-			const transactions = paginatedTransactions?.transactions.map(
-				({
-					createdAt,
-					state,
-					type,
-					updatedAt,
-					metadata,
-					receiveAmount,
-					incomingAmount,
-					senderName,
-					receiverName,
-				}) => ({
-					createdAt,
-					state,
-					type,
-					updatedAt,
-					metadata,
-					receiveAmount,
-					incomingAmount,
-					senderName,
-					receiverName,
+
+			const transactions = await Promise.all(
+				paginatedTransactions?.transactions.map(async (transaction: any) => {
+					const {
+						createdAt,
+						state,
+						type,
+						updatedAt,
+						metadata,
+						receiveAmount,
+						incomingAmount,
+						senderName,
+						receiverName,
+						outgoingPaymentId,
+					} = transaction;
+
+					let outgoingPaymentInfo = {
+						assetCode: null,
+						assetScale: null,
+						value: null,
+					};
+
+					if (outgoingPaymentId) {
+						try {
+							const testPaymentAmount =
+								await this.walletService.getOutgoingPayment(outgoingPaymentId);
+							const sentAmount = testPaymentAmount?.outgoingPayment?.sentAmount;
+							if (sentAmount) {
+								outgoingPaymentInfo = {
+									assetCode: sentAmount.assetCode,
+									assetScale: sentAmount.assetScale,
+									value: sentAmount.value,
+								};
+							}
+						} catch (error) {
+							console.error(
+								`Error al obtener el outgoingPayment para ID: ${outgoingPaymentId}`,
+								error
+							);
+						}
+					}
+
+					return {
+						createdAt: new Date(createdAt).toLocaleDateString('en-US'),
+						updatedAt: new Date(updatedAt).toLocaleDateString('en-US'),
+						state,
+						type,
+						metadata,
+						receiveAmount,
+						incomingAmount,
+						senderName,
+						receiverName,
+						outgoingPaymentAssetCode: outgoingPaymentInfo?.assetCode,
+						outgoingPaymentAssetScale: outgoingPaymentInfo?.assetScale,
+						outgoingPaymentValue: outgoingPaymentInfo?.value,
+					};
 				})
 			);
 
