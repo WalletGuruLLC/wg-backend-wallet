@@ -1604,9 +1604,9 @@ export class WalletService {
 	}
 
 	async expireDate() {
-		const fechaActual = new Date();
-		fechaActual.setMonth(fechaActual.getMonth() + 1);
-		return `${fechaActual.toISOString()}`;
+		return new Date(
+			new Date().setFullYear(new Date().getFullYear() + 10)
+		).toISOString();
 	}
 
 	async currentDate() {
@@ -1636,7 +1636,7 @@ export class WalletService {
 					),
 				},
 				walletAddressUrl: input.walletAddressUrl,
-				// expiresAt: expireDate, //TODO: uncomment when the expire date is fixed
+				expiresAt: expireDate,
 			};
 			const balance =
 				userWallet?.walletDb?.postedCredits -
@@ -2193,7 +2193,6 @@ export class WalletService {
 
 			return convertToCamelCase(result.Items);
 		} catch (error) {
-			console.log('error', error?.message);
 			Sentry.captureException(error);
 			return {
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
