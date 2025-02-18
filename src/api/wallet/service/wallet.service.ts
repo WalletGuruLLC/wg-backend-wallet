@@ -1670,7 +1670,6 @@ export class WalletService {
 			return await this.dbUserIncoming.create(userIncomingPayment);
 		} catch (error) {
 			Sentry.captureException(error);
-			console.log('error', error?.message);
 			return {
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
 				customCode: 'WGE0165',
@@ -2194,7 +2193,6 @@ export class WalletService {
 
 			return convertToCamelCase(result.Items);
 		} catch (error) {
-			console.log('error', error?.message);
 			Sentry.captureException(error);
 			return {
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
