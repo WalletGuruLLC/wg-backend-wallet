@@ -1653,19 +1653,13 @@ export class WalletService {
 			const incomingPayment = await this.graphqlService.createReceiver(
 				updateInput
 			);
-			console.log(
-				'incomingPayment',
-				incomingPayment,
-				'providerWallet',
-				providerWallet
-			);
 
 			const providerWalletId =
 				incomingPayment?.createReceiver?.receiver?.id.split('/');
 			const incomingPaymentId = providerWalletId?.[4];
 
 			const userIncomingPayment = {
-				ServiceProviderId: providerWallet?.providerId ?? '',
+				ServiceProviderId: providerWallet?.providerId,
 				UserId: userWallet.walletDb?.userId,
 				IncomingPaymentId: incomingPaymentId,
 				ReceiverId: incomingPayment?.createReceiver?.receiver?.id,
