@@ -25,8 +25,24 @@ export class IncomingPaymentExpiredEvent implements EventWebHook {
 			ReturnValues: 'ALL_NEW',
 		};
 
+		const userIncoming = await this.walletService.getUserIncomingPaymentById(
+			eventWebHookDTO?.data?.id
+		);
+
+		const paramsStatus = {
+			Key: {
+				Id: userIncoming?.id,
+			},
+			TableName: 'UserIncoming',
+			UpdateExpression: 'SET Status = :status',
+			ExpressionAttributeValues: {
+				':status': false,
+			},
+			ReturnValues: 'ALL_NEW',
+		};
 		try {
 			const result = await docClient.update(params).promise();
+			await docClient.update(paramsStatus).promise();
 			return convertToCamelCase(result);
 		} catch (error) {
 			Sentry.captureException(error);

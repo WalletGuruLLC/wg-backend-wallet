@@ -1604,9 +1604,9 @@ export class WalletService {
 	}
 
 	async expireDate() {
-		const fechaActual = new Date();
-		fechaActual.setMonth(fechaActual.getMonth() + 1);
-		return `${fechaActual.toISOString()}`;
+		return new Date(
+			new Date().setFullYear(new Date().getFullYear() + 10)
+		).toISOString();
 	}
 
 	async currentDate() {
@@ -1636,7 +1636,7 @@ export class WalletService {
 					),
 				},
 				walletAddressUrl: input.walletAddressUrl,
-				// expiresAt: expireDate, //TODO: uncomment when the expire date is fixed
+				expiresAt: expireDate,
 			};
 			const balance =
 				userWallet?.walletDb?.postedCredits -
@@ -1653,13 +1653,19 @@ export class WalletService {
 			const incomingPayment = await this.graphqlService.createReceiver(
 				updateInput
 			);
+			console.log(
+				'incomingPayment',
+				incomingPayment,
+				'providerWallet',
+				providerWallet
+			);
 
 			const providerWalletId =
 				incomingPayment?.createReceiver?.receiver?.id.split('/');
 			const incomingPaymentId = providerWalletId?.[4];
 
 			const userIncomingPayment = {
-				ServiceProviderId: providerWallet?.providerId,
+				ServiceProviderId: providerWallet?.providerId ?? '',
 				UserId: userWallet.walletDb?.userId,
 				IncomingPaymentId: incomingPaymentId,
 				ReceiverId: incomingPayment?.createReceiver?.receiver?.id,
@@ -1670,6 +1676,7 @@ export class WalletService {
 			return await this.dbUserIncoming.create(userIncomingPayment);
 		} catch (error) {
 			Sentry.captureException(error);
+			console.log('error', error?.message);
 			return {
 				statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
 				customCode: 'WGE0165',
