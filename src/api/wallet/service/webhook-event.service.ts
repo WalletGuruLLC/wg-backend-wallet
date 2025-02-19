@@ -30,9 +30,14 @@ export class WebHookEventService {
 
 				await eventAction.trigger(eventWebHookDTO, wallet);
 			}
+
+			return { message: 'Evento ejecutado correctamente' };
 		} catch (error) {
 			Sentry.captureException(error);
-			throw new Error(`Error triggering event: ${error.message}`);
+			throw new HttpException(
+				`Error triggering event: ${error.message}`,
+				HttpStatus.NOT_FOUND
+			);
 		}
 	}
 }
