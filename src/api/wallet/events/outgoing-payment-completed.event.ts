@@ -104,9 +104,7 @@ export class OutGoingPaymentCompletedEvent implements EventWebHook {
 				Pay: false,
 			};
 
-			console.log('transaction outgoing complete', transaction);
 			const transactionValue = await this.dbTransactions.create(transaction);
-			console.log('result outgoing complete bd', transactionValue);
 
 			const senderWallet = await this.walletService.getWalletByAddress(
 				transaction?.SenderUrl
