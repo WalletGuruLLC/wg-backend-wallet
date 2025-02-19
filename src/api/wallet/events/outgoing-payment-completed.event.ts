@@ -211,6 +211,11 @@ export class OutGoingPaymentCompletedEvent implements EventWebHook {
 				postedDebit: receiver.Attributes?.PostedDebits,
 			};
 
+			// this.userWsGateway.sendBalance(
+			// 	receiver.Attributes?.UserId,
+			// 	receiverBalance
+			// );
+
 			receiverBalance['userIdSend'] = receiver.Attributes?.UserId;
 			const notificationWs2 = await axios.post(
 				this.WS_URL + '/api/v1/wallets-rafiki/ws',
