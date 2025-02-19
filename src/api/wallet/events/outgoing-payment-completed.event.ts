@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, Injectable } from '@nestjs/common';
 import { EventWebHookDTO } from '../dto/event-hook.dto';
 import { EventWebHook } from '../dto/event-webhook';
 import { DocumentClient } from 'aws-sdk/clients/dynamodb';
@@ -10,6 +10,7 @@ import { TransactionsSchema } from '../entities/transactions.schema';
 import * as dynamoose from 'dynamoose';
 import { UserWsGateway } from '../service/websocket-users';
 import axios from 'axios';
+import { HttpStatus } from 'src/utils/constants';
 
 export class OutGoingPaymentCompletedEvent implements EventWebHook {
 	private dbTransactions: Model<Transaction>;
@@ -229,8 +230,9 @@ export class OutGoingPaymentCompletedEvent implements EventWebHook {
 			console.log('wallets-rafiki/ws', notificationWs2.data);
 		} catch (error) {
 			Sentry.captureException(error);
-			throw new Error(
-				`Error on trigger outgoing payment completed: ${error.message}`
+			throw new HttpException(
+				`Error on trigger outgoing payment completed: ${error.message}`,
+				HttpStatus.NOT_FOUND
 			);
 		}
 	}

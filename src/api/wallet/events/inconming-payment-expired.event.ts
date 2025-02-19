@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, Injectable } from '@nestjs/common';
 import { EventWebHookDTO } from '../dto/event-hook.dto';
 import { EventWebHook } from '../dto/event-webhook';
 import { DocumentClient } from 'aws-sdk/clients/dynamodb';
 import * as Sentry from '@sentry/nestjs';
 import { convertToCamelCase } from 'src/utils/helpers/convertCamelCase';
 import { WalletService } from '../service/wallet.service';
+import { HttpStatus } from 'src/utils/constants';
 
 export class IncomingPaymentExpiredEvent implements EventWebHook {
 	constructor(private readonly walletService: WalletService) {}
@@ -51,8 +52,9 @@ export class IncomingPaymentExpiredEvent implements EventWebHook {
 			return convertToCamelCase(result);
 		} catch (error) {
 			Sentry.captureException(error);
-			throw new Error(
-				`Error on trigger incoming payment expired: ${error.message}`
+			throw new HttpException(
+				`Error on trigger incoming payment expired: ${error.message}`,
+				HttpStatus.NOT_FOUND
 			);
 		}
 	}
