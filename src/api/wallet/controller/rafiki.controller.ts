@@ -1562,8 +1562,9 @@ export class RafikiWalletController {
 			// 	adjustValue(input?.amount, userWalletByToken?.walletAsset?.scale)
 			// );
 			if (
-				adjustValue(input?.amount, userWalletByToken?.walletAsset?.scale) >
-				balance
+				Math.round(
+					adjustValue(input?.amount, userWalletByToken?.walletAsset?.scale)
+				) > balance
 			) {
 				return res.status(HttpStatus.BAD_REQUEST).send({
 					statusCode: HttpStatus.BAD_REQUEST,
@@ -1581,9 +1582,8 @@ export class RafikiWalletController {
 				incomingAmount: {
 					assetCode: userWalletByToken?.walletAsset?.code,
 					assetScale: userWalletByToken?.walletAsset?.scale,
-					value: adjustValue(
-						input?.amount,
-						userWalletByToken?.walletAsset?.scale
+					value: Math.round(
+						adjustValue(input?.amount, userWalletByToken?.walletAsset?.scale)
 					),
 				},
 				walletAddressUrl: input.walletAddressUrl,
@@ -1595,9 +1595,8 @@ export class RafikiWalletController {
 				receiveAmount: {
 					assetCode: userWalletByToken?.walletAsset?.code,
 					assetScale: userWalletByToken?.walletAsset?.scale,
-					value: adjustValue(
-						input?.amount,
-						userWalletByToken?.walletAsset?.scale
+					value: Math.round(
+						adjustValue(input?.amount, userWalletByToken?.walletAsset?.scale)
 					),
 				},
 			};
