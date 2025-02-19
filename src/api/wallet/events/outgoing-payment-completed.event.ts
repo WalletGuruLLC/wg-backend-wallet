@@ -103,7 +103,10 @@ export class OutGoingPaymentCompletedEvent implements EventWebHook {
 				Description: '',
 				Pay: false,
 			};
+
+			console.log('transaction outgoing complete', transaction);
 			const transactionValue = await this.dbTransactions.create(transaction);
+			console.log('result outgoing complete bd', transactionValue);
 
 			const senderWallet = await this.walletService.getWalletByAddress(
 				transaction?.SenderUrl
@@ -208,10 +211,6 @@ export class OutGoingPaymentCompletedEvent implements EventWebHook {
 				postedDebit: receiver.Attributes?.PostedDebits,
 			};
 
-			// this.userWsGateway.sendBalance(
-			// 	receiver.Attributes?.UserId,
-			// 	receiverBalance
-			// );
 			receiverBalance['userIdSend'] = receiver.Attributes?.UserId;
 			const notificationWs2 = await axios.post(
 				this.WS_URL + '/api/v1/wallets-rafiki/ws',
