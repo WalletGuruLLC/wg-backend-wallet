@@ -34,9 +34,17 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 		const userId = eventWebHookDTO?.data?.metadata?.wgUser;
 		const providerId = eventWebHookDTO?.data?.metadata?.serviceProviderId;
 
+		console.log(
+			'incomingAmount.value',
+			parseInt(eventWebHookDTO.data.incomingAmount.value),
+			'wallet?.pendingCredits',
+			wallet?.pendingCredits
+		);
 		const credits =
 			(wallet?.pendingCredits || 0) +
 			parseInt(eventWebHookDTO.data.incomingAmount.value);
+
+		console.log('credits', credits);
 
 		const params = {
 			Key: {
@@ -49,6 +57,8 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 			},
 			ReturnValues: 'ALL_NEW',
 		};
+
+		console.log('params', params);
 
 		try {
 			const userWallet = await this.walletService.getWalletByUser(userId);
