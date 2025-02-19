@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, Injectable } from '@nestjs/common';
 import { EventWebHookDTO } from '../dto/event-hook.dto';
 import { EventWebHook } from '../dto/event-webhook';
 import { DocumentClient } from 'aws-sdk/clients/dynamodb';
@@ -6,6 +6,7 @@ import * as Sentry from '@sentry/nestjs';
 import { convertToCamelCase } from 'src/utils/helpers/convertCamelCase';
 import { WalletService } from '../service/wallet.service';
 import { v4 as uuidv4 } from 'uuid';
+import { HttpStatus } from 'src/utils/constants';
 
 export class OutGoingPaymentCreatedEvent implements EventWebHook {
 	constructor(private readonly walletService: WalletService) {}
@@ -53,8 +54,9 @@ export class OutGoingPaymentCreatedEvent implements EventWebHook {
 			}
 		} catch (error) {
 			Sentry.captureException(error);
-			throw new Error(
-				`Error on trigger outgoing payment created: ${error.message}`
+			throw new HttpException(
+				`Error on trigger outgoing payment created: ${error.message}`,
+				HttpStatus.NOT_FOUND
 			);
 		}
 	}

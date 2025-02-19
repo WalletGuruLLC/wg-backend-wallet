@@ -10,6 +10,8 @@ import { TransactionsSchema } from '../entities/transactions.schema';
 import * as dynamoose from 'dynamoose';
 import { UserWsGateway } from '../service/websocket-users';
 import axios from 'axios';
+import { HttpException } from '@nestjs/common';
+import { HttpStatus } from 'src/utils/constants';
 
 export class IncomingPaymentCreatedEvent implements EventWebHook {
 	private dbTransactions: Model<Transaction>;
@@ -219,8 +221,9 @@ export class IncomingPaymentCreatedEvent implements EventWebHook {
 			return convertToCamelCase(receiver);
 		} catch (error) {
 			Sentry.captureException(error);
-			throw new Error(
-				`Error on trigger incoming payment created: ${error.message}`
+			throw new HttpException(
+				`Error on trigger incoming payment created: ${error.message}`,
+				HttpStatus.NOT_FOUND
 			);
 		}
 	}
