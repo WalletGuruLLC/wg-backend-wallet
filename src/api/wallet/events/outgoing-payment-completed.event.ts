@@ -87,8 +87,6 @@ export class OutGoingPaymentCompletedEvent implements EventWebHook {
 				eventWebHookDTO?.data?.walletAddressId
 			);
 
-			console.log('userWallet', userWallet);
-
 			const transaction = {
 				Type: 'OutgoingPayment',
 				OutgoingPaymentId: eventWebHookDTO.data?.id,
@@ -108,11 +106,7 @@ export class OutGoingPaymentCompletedEvent implements EventWebHook {
 				Pay: false,
 			};
 
-			console.log('transaction', transaction);
-
 			const transactionValue = await this.dbTransactions.create(transaction);
-
-			console.log('transactionValue', transactionValue);
 
 			const senderWallet = await this.walletService.getWalletByAddress(
 				transaction?.SenderUrl

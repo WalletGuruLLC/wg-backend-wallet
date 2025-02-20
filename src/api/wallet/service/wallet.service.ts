@@ -864,6 +864,20 @@ export class WalletService {
 		});
 	}
 
+	async scanTable(params) {
+		const documentClient = new DocumentClient();
+
+		const scanResults = [];
+		let items;
+		do {
+			items = await documentClient.scan(params).promise();
+			items.Items.forEach(item => scanResults.push(item));
+			params.ExclusiveStartKey = items.LastEvaluatedKey;
+		} while (typeof items.LastEvaluatedKey !== 'undefined');
+
+		return scanResults;
+	}
+
 	async listTransactions(
 		token: string,
 		search: string,
@@ -986,7 +1000,7 @@ export class WalletService {
 				ExpressionAttributeValues: expressionAttributeValues,
 			};
 			// console.log(outgoingParams);
-			dynamoOutgoingPayments = await docClient.scan(outgoingParams).promise();
+			dynamoOutgoingPayments = await this.scanTable(outgoingParams);
 		} catch (error) {
 			Sentry.captureException(error);
 			return {
@@ -996,9 +1010,8 @@ export class WalletService {
 				totalPages: 1,
 			};
 		}
-		// console.log(dynamoOutgoingPayments?.Items?.length);
-		if (dynamoOutgoingPayments?.Items?.length > 0) {
-			const sortedArray = dynamoOutgoingPayments?.Items?.sort(
+		if (dynamoOutgoingPayments?.length > 0) {
+			const sortedArray = dynamoOutgoingPayments?.sort(
 				(a: any, b: any) =>
 					new Date(b?.createdAt)?.getTime() - new Date(a?.createdAt)?.getTime()
 			);
