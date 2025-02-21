@@ -2900,7 +2900,11 @@ export class WalletService {
 		}
 	}
 
-	async sendMoneyMailConfirmation(input: any, outGoingPayment: any) {
+	async sendMoneyMailConfirmation(
+		input: any,
+		outGoingPayment: any,
+		walletAddressUrl?: string
+	) {
 		try {
 			const walletInfo = await this.getWalletByRafikyId(input.walletAddressId);
 			const docClient = new DocumentClient();
@@ -2984,6 +2988,7 @@ export class WalletService {
 				value: valueReceiverFormatted / pow,
 				asset: incomingPayment.incomingAmount.assetCode,
 				walletAddress: walletInfo.walletAddress,
+				destinationWalletAddress: walletAddressUrl,
 				date: receiverDateFormatted,
 			};
 
@@ -3648,7 +3653,11 @@ export class WalletService {
 			}
 			const outgoingPayment = await this.createOutgoingPayment(inputOutgoing);
 			if (sendEmail) {
-				await this.sendMoneyMailConfirmation(inputOutgoing, outgoingPayment);
+				await this.sendMoneyMailConfirmation(
+					inputOutgoing,
+					outgoingPayment,
+					walletAddressUrl
+				);
 			}
 			return {
 				data: outgoingPayment,
