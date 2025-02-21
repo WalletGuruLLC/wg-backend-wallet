@@ -2941,6 +2941,7 @@ export class WalletService {
 					outGoingPayment.createOutgoingPayment.payment.receiveAmount.assetCode,
 				walletAddress: walletInfo.walletAddress,
 				date: formattedDate,
+				destinationWalletAddress: walletAddressUrl,
 			};
 
 			const sqsMessage = {
