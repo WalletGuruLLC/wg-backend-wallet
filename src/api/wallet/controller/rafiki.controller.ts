@@ -1618,7 +1618,8 @@ export class RafikiWalletController {
 
 				await this.walletService.sendMoneyMailConfirmation(
 					inputOutgoing,
-					outgoingPayment
+					outgoingPayment,
+					input.walletAddressUrl
 				);
 
 				return res.status(200).send({
