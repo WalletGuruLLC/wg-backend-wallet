@@ -808,7 +808,6 @@ export class RafikiWalletController {
 						type,
 						updatedAt,
 						metadata,
-						receiveAmount,
 						incomingAmount,
 						senderName,
 						receiverName,
@@ -820,6 +819,22 @@ export class RafikiWalletController {
 						assetScale: null,
 						value: null,
 					};
+
+					let receiveAmount = {
+						assetCode: null,
+						assetScale: null,
+						value: null,
+						typename: null,
+					};
+
+					if (incomingAmount?.assetCode) {
+						receiveAmount = {
+							assetScale: incomingAmount?.assetScale,
+							assetCode: incomingAmount?.assetCode,
+							value: incomingAmount?.value,
+							typename: incomingAmount?.typename,
+						};
+					}
 
 					if (outgoingPaymentId) {
 						try {
@@ -1217,7 +1232,6 @@ export class RafikiWalletController {
 						type,
 						updatedAt,
 						metadata,
-						receiveAmount,
 						incomingAmount,
 						senderName,
 						receiverName,
@@ -1229,6 +1243,22 @@ export class RafikiWalletController {
 						assetScale: null,
 						value: null,
 					};
+
+					let receiveAmount = {
+						assetCode: null,
+						assetScale: null,
+						value: null,
+						typename: null,
+					};
+
+					if (incomingAmount?.assetCode) {
+						receiveAmount = {
+							assetScale: incomingAmount?.assetScale,
+							assetCode: incomingAmount?.assetCode,
+							value: incomingAmount?.value,
+							typename: incomingAmount?.typename,
+						};
+					}
 
 					if (outgoingPaymentId) {
 						try {
@@ -1266,7 +1296,6 @@ export class RafikiWalletController {
 					};
 				})
 			);
-			console.log(transactions);
 
 			await this.walletService.generateCsv(res, transactions);
 		} catch (error) {
