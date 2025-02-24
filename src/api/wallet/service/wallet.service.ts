@@ -3453,6 +3453,7 @@ export class WalletService {
 		const resultTransaction = await this.transacctionByActivityId(
 			createRefundsDto.activityId
 		);
+		const userWg = await this.getUserWithToken(token);
 		if (resultTransaction.length === 0) {
 			return {
 				statusCode: HttpStatus.BAD_REQUEST,
@@ -3479,7 +3480,7 @@ export class WalletService {
 				}
 			}
 		});
-		if (activityIdDiferentSP) {
+		if (activityIdDiferentSP && userWg.Type !== 'PLATFORM') {
 			return {
 				statusCode: HttpStatus.BAD_REQUEST,
 				customCode: 'WGE0240',
@@ -3503,7 +3504,6 @@ export class WalletService {
 			};
 		}
 		// VALIDATE PERMISSION BY ROL MODULE
-		const userWg = await this.getUserWithToken(token);
 		const docClient = new DocumentClient();
 		const params = {
 			TableName: 'Roles',
