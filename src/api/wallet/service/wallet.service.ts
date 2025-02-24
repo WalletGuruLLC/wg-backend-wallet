@@ -1365,6 +1365,10 @@ export class WalletService {
 								parseInt(incomingPayment?.incomingAmount?.value ?? '0') -
 								parseInt(incomingPayment?.receivedAmount?.value ?? '0')
 							).toString(),
+							assetCode: incomingPayment?.incomingAmount?.assetCode ?? 'USD',
+							assetScale: incomingPayment?.incomingAmount?.assetScale ?? 6,
+							_Typename:
+								incomingPayment?.incomingAmount?.__typename ?? 'Amount',
 						},
 					};
 					const incomingConverted = {
