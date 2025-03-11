@@ -1,5 +1,6 @@
 services:
   server:
+    image: public.ecr.aws/m6h2e8f8/backend-wallet:development-latest
     build:
       context: .
     ports:

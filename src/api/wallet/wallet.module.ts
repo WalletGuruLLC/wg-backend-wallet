@@ -21,6 +21,7 @@ import { SqsService } from './sqs/sqs.service';
 import { UserWsGateway } from './service/websocket-users';
 import { ClearPaymentController } from './controller/clear-payment.controller';
 import { PaymentService } from './service/payments.service';
+import {InternalController} from "./controller/internal.controller";
 
 @Module({
 	imports: [ConfigModule, VerifyModule],
@@ -29,6 +30,7 @@ import { PaymentService } from './service/payments.service';
 		RafikiWalletController,
 		WebHookController,
 		ClearPaymentController,
+		InternalController
 	],
 	providers: [
 		WalletService,
