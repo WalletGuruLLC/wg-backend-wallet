@@ -13,6 +13,7 @@ This microservice uses the following key dependencies:
 - [Dynamoose](https://dynamoosejs.com/) - ORM for DynamoDB
 - [AWS SDK](https://aws.amazon.com/sdk-for-node-js/) - AWS integration
 - [bcrypt](https://www.npmjs.com/package/bcrypt) - Secure password hashing
+- [Wg-infra](https://github.com/ErgonStreamGH/wg-infra) - Deploy services with Terraform
 
 ---
 
@@ -58,6 +59,26 @@ Create a secret in AWS Secrets Manager with the name `walletguru-wallet-local` a
 }
 ```
 
+| **Name Env**                  | **Description**                                                                                                                                               | **REQUIRED** |
+|-------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------|
+| AWS_ACCESS_KEY_ID             | AWS Access Key for access to resources and service                                                                                                            | Yes          |
+| AWS_SECRET_ACCESS_KEY         | AWS Secret Key for access to resources and service                                                                                                            | Yes          |
+| AWS_REGION                    | AWS Region for access to resources and service                                                                                                                | Yes          |
+| COGNITO_USER_POOL_ID          | Open https://us-east-2.console.aws.amazon.com/cognito/v2/idp/user-pools and see details of user-auth and get User pool ID                                     | Yes          |
+| COGNITO_CLIENT_ID             | Open https://us-east-2.console.aws.amazon.com/cognito/v2/idp/user-pools and see details of user-auth and open app clients, get Client ID                      | Yes          |
+| SENTRY_DSN                    | If you use Sentry you can put the dsn for logs                                                                                                                | No           |
+| AUTH_URL                      | Micro service auth for local is http://localhost:3001                                                                                                         | Yes          |
+| RAFIKI_GRAPHQL_URL            | Instance of rafiki [Doc official](https://github.com/interledger/rafiki/tree/main/localenv)                                                                   | Yes          |
+| DOMAIN_WALLET_URL             | Domain used for create new wallets                                                                                                                            | Yes          |
+| BACKEND_API_SIGNATURE_VERSION | Version of signature of rafiki                                                                                                                                | Yes          |
+| BACKEND_API_SIGNATURE_SECRET  | Secret for create signature in servers of rafiki                                                                                                              | Yes          |
+| SQS_QUEUE_URL                 | Open https://us-east-2.console.aws.amazon.com/sqs/v3/home?region=us-east-2#/queues and see details of paystreme-notifications-local and and get parameter URL | Yes          |
+| WALLET_WG_URL                 | Url for service of wallet for enviroment local is http://localhost:3003                                                                                       | Yes          |
+| CRON_TIME_EXPRESSION          | 1 0 1 * * Expression for run command create balances of service providers                                                                                     | Yes          |
+| API_SECRET_SERVICES           | Secret for create jwt header                                                                                                                                  | Yes          |
+| WS_URL                        | WS URL for public access                                                                                                                                      | No           |
+| SIGNATURE_URL                 | Signature URL for public access for create auth in rafiki https://kxu5d4mr4blcthphxomjlc4xk40rvdsx.lambda-url.eu-central-1.on.aws/                            | Yes          |
+
 ### 4. Set Up Environment Variables
 
 Create a `.env` file in the root directory and add:
@@ -66,86 +87,6 @@ Create a `.env` file in the root directory and add:
 AWS_ACCESS_KEY_ID=""
 AWS_SECRET_ACCESS_KEY=""
 SECRET_NAME="walletguru-wallet-local"
-```
-
----
-
-## Deployment to AWS ECR
-
-### 1. Create an AWS ECR Repository
-
-#### Option 1: Manually via AWS Console
-
-1. **Go to the AWS ECR Console**
-    - Open the [AWS ECR Console](https://console.aws.amazon.com/ecr/home).
-2. **Create a New Repository**
-    - Click **"Create repository"**.
-    - Set the **Repository name** to `backend-wallet`.
-    - Choose **Private** or **Public** based on your needs.
-    - (Optional) Enable **Scan on Push** for security checks.
-    - Click **"Create repository"**.
-3. For more details, see
-   the [AWS ECR Repository Creation Guide](https://docs.aws.amazon.com/en_us/AmazonECR/latest/userguide/repository-create.html).
-
-#### Option 2: Using AWS CLI (Automated)
-
-##### **Step 1: Sign in to AWS CLI**
-
-Ensure you are authenticated with AWS before creating the repository:
-
-```sh
-aws configure
-```
-
-This command will prompt you to enter your AWS credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and default
-region).
-
-##### **Step 2: Create the Repository**
-
-```sh
-aws ecr create-repository --repository-name backend-wallet
-```
-
-### 2. Add Repository Details to `wg-infra/local.tfvars`
-
-After creating the repository, update the Terraform variables in `wg-infra/local.tfvars`:
-
-- **Add the repository name to `repos_list`:**
-  ```hcl
-  repos_list = [
-    "backend-wallet",  # Add this line
-    # Other repositories...
-  ]
-  ```
-
-- **Add the repository URI to `microservices_list`:**
-  ```hcl
-  microservices_list = {
-    "backend-wallet" = "<AWS_ACCOUNT_ID>.dkr.ecr.us-east-2.amazonaws.com/backend-wallet"
-    # Other microservices...
-  }
-  ```
-
-### 3. Build the Docker Image
-
-Using **Docker Compose**:
-
-```sh
-docker-compose build
-```
-
-### 4. Authenticate Docker with AWS ECR
-
-```sh
-aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin <AWS_ACCOUNT_ID>.dkr.ecr.us-east-2.amazonaws.com
-```
-
-### 5. Tag and Push Image to ECR
-
-```sh
-docker tag wg-backend-wallet-server:latest <AWS_ACCOUNT_ID>.dkr.ecr.us-east-2.amazonaws.com/backend-wallet:latest
-
-docker push <AWS_ACCOUNT_ID>.dkr.ecr.us-east-2.amazonaws.com/backend-wallet:latest
 ```
 
 ---
@@ -165,16 +106,18 @@ running `wg-infra`. Otherwise, the infrastructure setup may fail due to missing 
 Make sure you follow similar steps when setting up, deploying, and managing the following microservices hosted in the
 respective repositories:
 
-| **Microservice**                              | **Repository URL**                                              |
-|-----------------------------------------------|-----------------------------------------------------------------|
-| Authentication Service (`backend-auth`)       | [GitHub Repo](https://github.com/WalletGuruLLC/backend-auth)    |
-| Notification Service (`backend-notification`) | [GitHub Repo](https://github.com/your-org/backend-notification) |
-| Admin Frontend (`frontend-admin`)             | [GitHub Repo](https://github.com/WalletGuruLLC/frontend-admin)  |
-| Wallet Service (`backend-wallet`)             | [GitHub Repo](https://github.com/WalletGuruLLC/backend-wallet)  |
+| **Microservice**                                | **Repository URL**                                               |
+|-------------------------------------------------|------------------------------------------------------------------|
+| Authentication Service (`backend-auth`)         | [GitHub Repo](https://github.com/WalletGuruLLC/backend-auth)     |
+| Notification Service (`backend-notification`)   | [GitHub Repo](https://github.com/your-org/backend-notification)  |
+| Admin Frontend (`frontend-admin`)               | [GitHub Repo](https://github.com/WalletGuruLLC/frontend-admin)   |
+| Wallet Service (`backend-wallet`)               | [GitHub Repo](https://github.com/WalletGuruLLC/backend-wallet)   |
+| Countries Now Service (`backend-countries-now`) | [GitHub Repo](https://github.com/ErgonStreamGH/wg-countries-now) |
+| Codes Service (`backend-codes`)                 | [GitHub Repo](https://github.com/ErgonStreamGH/wg-backend-codes) |
 
 Each microservice should:
 
-1️⃣ Have its **Docker image pushed to AWS ECR**  
-2️⃣ Be referenced in **`wg-infra/local.tfvars`** for Terraform  
-3️⃣ Store environment variables securely in **AWS Secrets Manager**
+1️⃣ Deploy the dependencies using Terraform in the **wg-infra** repository
+2️⃣ Store environment variables securely in **AWS Secrets Manager**
+3️⃣ Use **Docker Compose** for local development
 
