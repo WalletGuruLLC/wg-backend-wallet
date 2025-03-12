@@ -1,6 +1,6 @@
-# Authentication Microservice
+# Wallet Microservice
 
-This **Authentication Microservice** provides secure user authentication and authorization using **Node.js** and *
+This **Wallet Microservice** provides secure user authentication and authorization using **Node.js** and *
 *NestJS**. It integrates **DynamoDB** as the NoSQL database with **Dynamoose** as the ORM.
 
 ## Dependencies
