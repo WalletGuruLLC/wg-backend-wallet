@@ -14,7 +14,7 @@ This microservice uses the following key dependencies:
 - [AWS SDK](https://aws.amazon.com/sdk-for-node-js/) - AWS integration
 - [bcrypt](https://www.npmjs.com/package/bcrypt) - Secure password hashing
 - [Wg-infra](https://github.com/ErgonStreamGH/wg-infra) - Deploy services with Terraform
-
+- [Rafiki](https://github.com/interledger/rafiki/tree/main/localenv) - Deploy services rafiki in local for connect with open payments
 ---
 
 ## Install
